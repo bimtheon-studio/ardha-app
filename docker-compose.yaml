@@ -1,0 +1,44 @@
+# Dépendances locales d'Ardha. Ne pas lancer directement : `pnpm demarrer` génère d'abord
+# `docker-compose.override.yaml` (ports du worktree, mots de passe locaux), ignoré par git.
+# Les ports ne sont publiés que sur 127.0.0.1.
+services:
+  postgres:
+    build: ./docker/postgres
+    image: ardha/postgres:18-3.6-pgvector-0.8.5
+    environment:
+      POSTGRES_USER: ardha
+      POSTGRES_DB: ardha
+    volumes:
+      - postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ardha -d ardha"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:8.10.2
+    command: ["redis-server", "--appendonly", "no", "--save", ""]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  minio:
+    # L'image officielle minio/minio n'est plus publiée ; fork communautaire, version épinglée.
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ardha
+    volumes:
+      - minio:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  postgres:
+  minio:

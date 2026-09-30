@@ -1,0 +1,123 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter-tight';
+@import '@fontsource/jetbrains-mono/400.css';
+
+/* =============================================================================
+   BÉTON — charte d'Ardha, reprise de l'ancienne application (src/index.css @ 2a7f9a0).
+   Béton, encre et bleu Klein (IKB). À plat : ni dégradé, ni halo. Couleurs HSL.
+   Tailwind 4 : les jetons sont des variables CSS, exposées comme couleurs par @theme.
+   ============================================================================= */
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: 42 22% 91%;
+  --foreground: 60 5% 8%;
+  --card: 43 26% 95%;
+  --card-foreground: 60 5% 8%;
+  --popover: 43 26% 95%;
+  --popover-foreground: 60 5% 8%;
+  --primary: 223 100% 33%;
+  --primary-foreground: 43 26% 95%;
+  --secondary: 45 18% 87%;
+  --secondary-foreground: 60 5% 8%;
+  --muted: 45 18% 87%;
+  --muted-foreground: 48 5% 38%;
+  --accent: 223 100% 33%;
+  --accent-foreground: 43 26% 95%;
+  --destructive: 8 74% 44%;
+  --destructive-foreground: 43 26% 95%;
+  --border: 47 11% 79%;
+  --input: 47 11% 50%; /* contour de champ 3:1 (WCAG 1.4.11) */
+  --ring: 223 100% 33%;
+  --radius: 0rem; /* angles vifs */
+}
+
+.dark {
+  --background: 60 5% 8%;
+  --foreground: 42 22% 91%;
+  --card: 60 5% 11%;
+  --card-foreground: 42 22% 91%;
+  --popover: 60 5% 11%;
+  --popover-foreground: 42 22% 91%;
+  --primary: 223 100% 63%;
+  --primary-foreground: 60 5% 8%;
+  --secondary: 60 5% 16%;
+  --secondary-foreground: 42 22% 91%;
+  --muted: 60 5% 16%;
+  --muted-foreground: 45 8% 62%;
+  --accent: 223 100% 63%;
+  --accent-foreground: 60 5% 8%;
+  --destructive: 8 74% 44%;
+  --destructive-foreground: 42 22% 91%;
+  --border: 60 5% 20%;
+  --input: 60 5% 37%;
+  --ring: 223 100% 63%;
+}
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --font-sans: 'Inter Tight Variable', 'Helvetica Neue', Helvetica, Arial, 'Liberation Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', Consolas, Monaco, 'Liberation Mono', monospace;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1.03;
+  }
+}
+
+@layer utilities {
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

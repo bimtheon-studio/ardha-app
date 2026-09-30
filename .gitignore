@@ -6,3 +6,4 @@ coverage/
 docker-compose.override.yaml
 *.log
 .DS_Store
+.idea/

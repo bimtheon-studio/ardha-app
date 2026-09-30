@@ -1,0 +1,18 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "types": ["vite/client"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@contrats": ["../src/contrats/index.ts"],
+      "@domaine": ["../src/domaine/index.ts"]
+    }
+  },
+  "include": ["src", "vite.config.ts", "vitest.config.ts"]
+}

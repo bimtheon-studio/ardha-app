@@ -1,0 +1,37 @@
+# Le back est le paquet racine ; le front est le seul autre paquet.
+packages:
+  - frontend
+
+# Une dépendance qui ne respecte pas `engines` fait échouer l'installation.
+engineStrict: true
+
+allowBuilds:
+  '@swc/core': true
+  esbuild: true
+  msgpackr-extract: true
+
+minimumReleaseAgeExclude:
+  - '@nestjs/common@12.1.2'
+  - '@nestjs/core@12.1.2'
+  - '@nestjs/platform-express@12.1.2'
+  - '@nestjs/testing@12.1.2'
+  - '@swc/core-darwin-arm64@1.16.13'
+  - '@swc/core-darwin-x64@1.16.13'
+  - '@swc/core-linux-arm-gnueabihf@1.16.13'
+  - '@swc/core-linux-arm64-gnu@1.16.13'
+  - '@swc/core-linux-arm64-musl@1.16.13'
+  - '@swc/core-linux-ppc64-gnu@1.16.13'
+  - '@swc/core-linux-s390x-gnu@1.16.13'
+  - '@swc/core-linux-x64-gnu@1.16.13'
+  - '@swc/core-linux-x64-musl@1.16.13'
+  - '@swc/core-win32-arm64-msvc@1.16.13'
+  - '@swc/core-win32-ia32-msvc@1.16.13'
+  - '@swc/core-win32-x64-msvc@1.16.13'
+  - '@swc/core@1.16.13'
+  - '@vitest/coverage-v8@5.0.3'
+  - lucide-react@1.49.0
+  - pg-cloudflare@1.4.1
+  - pg-connection-string@2.14.1
+  - pg-protocol@1.16.1
+  - pg@8.23.1
+  - vitest@5.0.3

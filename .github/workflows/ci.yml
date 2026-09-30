@@ -1,0 +1,53 @@
+# CI d'Ardha (PLAN §8) : types, lint, contrôle « base bête », tests unitaires et d'intégration sur
+# la stack Docker (migrations rejouées depuis une base vide), build.
+# Chaque étape se rejoue en local avec la même commande `pnpm`.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master, staging]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verifier:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v5
+
+      # Node et pnpm aux versions de mise.toml.
+      - uses: jdx/mise-action@v3
+
+      - name: Dépendances
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint (et frontières de l'architecture)
+        run: pnpm lint
+
+      - name: Types
+        run: pnpm typecheck
+
+      - name: Doctrine « base bête » — migrations
+        run: pnpm doctrine
+
+      - name: Stack (Postgres, Redis, MinIO), migrations depuis zéro, seed
+        run: pnpm demarrer --infra
+
+      - name: Doctrine « base bête » — schéma migré
+        run: pnpm doctrine --base
+
+      - name: Tests (outils, back, front) et seuils de couverture
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Journaux de la stack
+        if: failure()
+        run: docker compose logs --no-color --tail=200

@@ -177,7 +177,7 @@ s'appellent eux-mêmes en HTTP avec un secret ; demain, seul le worker sort.
 
 | Geste | Quoi | Condition |
 |---|---|---|
-| **Porter** dans `packages/domain` | les 22 modules purs de `supabase/functions/_shared/` (vérification des citations, consensus, segmentation, file d'extraction, fraîcheur, DVF…), l'extracteur `plui-extract` de la session voisine, les utilitaires géométriques et les formats d'export déjà testés | relus ligne à ligne, **avec leurs tests** ; un module sans test se réécrit |
+| **Porter** dans `src/domaine` | les 22 modules purs de `supabase/functions/_shared/` (vérification des citations, consensus, segmentation, file d'extraction, fraîcheur, DVF…), l'extracteur `plui-extract` de la session voisine, les utilitaires géométriques et les formats d'export déjà testés | relus ligne à ligne, **avec leurs tests** ; un module sans test se réécrit |
 | **Réécrire** | tout accès aux données, les 31 edge functions, les pages, les hooks d'appel aux API | selon la fiche arbitrée |
 | **Reprendre tel quel** | les primitives shadcn/ui (4 754 lignes) | code de bibliothèque |
 
@@ -325,6 +325,32 @@ sur un fait nouveau, pas sur une préférence.
 Mesures du 29/09 : registre npm (`prisma` latest = 8.0.0-rc.19, stable 7.10.0 ; `drizzle-orm` 0.45.3 ;
 `pg-boss` 12.35.0), postgresql.org (18.6, pas de 19), Docker Hub (`postgis/postgis:18-3.6`,
 `pgvector/pgvector:0.8.5-pg18`), historique git d'`ardha`.
+
+### Décisions techniques de L0 (à relire)
+
+Prises en route pendant L0, le 30/09/2026, par l'agent de réécriture. Elles ne sont pas arbitrées :
+à relire par le porteur du produit, et à rouvrir sur un fait nouveau comme les autres.
+
+| N° | Décision | Plutôt que | Sur quoi elle repose |
+|---|---|---|---|
+| DT-01 | Node 26.10 (`mise.toml`, `engines`) | Node 24 | Node 26 devient LTS fin octobre 2026, supporté jusqu'en avril 2029 ; ESM, `require(esm)` et exécution native du TypeScript effaçable (outils) |
+| DT-02 | pnpm 12.8 ; le back est le paquet racine, `frontend/` le seul autre paquet | npm, monorepo à paquets | structure revue par le porteur du produit le 30/09 : le back à la racine, API, worker et CLI comme entrées-sorties (`src/entrees/`), le cœur à côté ; ni build de paquets ni `dist/` intermédiaire |
+| DT-03 | TypeScript 6.0 | TypeScript 7 (compilateur natif) | typescript-eslint 8.71 exige TypeScript < 6.1 |
+| DT-04 | ESM partout ; back compilé par swc (décorateurs et métadonnées de Nest), outils exécutés tels quels par Node | CommonJS, tsc, tsx | NestJS 12 est publié en ESM ; esbuild et tsx n'émettent pas les métadonnées de décorateurs |
+| DT-05 | Express, plateforme par défaut de Nest | Fastify | aucun besoin de performance qui le justifie en L0 |
+| DT-06 | Contrat = schémas zod de `src/contrats`, décrivant chaque route ; client du front tiré de ces routes ; document OpenAPI 3.1 **dérivé** et servi sur `/api/openapi.json` | client généré depuis un document OpenAPI | une seule source, les mêmes messages de validation côté front et côté API ; l'OpenAPI reste disponible pour la CLI, MCP ou un tiers |
+| DT-07 | Vitest 5 partout ; couverture v8 à cliquet (`autoUpdate` en local, seuils bloquants en CI) ; domaine et contrat à 100 % | Jest | un seul lanceur pour Node et le navigateur ; le cliquet ne fait que monter |
+| DT-08 | Ports de base 13000 (API), 14000 (front), 15432, 16379, 19000/19500 | 3000, 5173, 5432, 6379, 9000 | sur cette machine, d'autres stacks suivent le même décalage `crc32 % 400 + 5` à partir de 5432 et 6379 : partager la base mènerait à des collisions systématiques |
+| DT-09 | pgvector **0.8.5 compilé depuis son tag** dans une image dérivée de `postgis/postgis:18-3.6` | le paquet PGDG | le dépôt PGDG ne garde que la dernière version (0.8.6 au 30/09) : l'image ne serait pas reproductible. Passer en 0.8.6 est une montée de correctif à décider |
+| DT-10 | MinIO local : fork communautaire `pgsty/minio`, version épinglée | `minio/minio` | l'image officielle n'est plus publiée sur Docker Hub (fait constaté le 30/09). Sans effet sur la production : l'API parle S3 |
+| DT-11 | Mots de passe locaux (Postgres, MinIO) tirés au hasard au premier `pnpm demarrer`, dans les fichiers ignorés | mots de passe de développement dans `docker-compose.yaml` | aucune valeur de secret dans un fichier suivi ; ports publiés sur 127.0.0.1 seulement |
+| DT-12 | Limiteur : `@nestjs/throttler` avec un stockage Redis écrit pour Ardha, fenêtre fixe de 15 min | stockage `@nest-lab/throttler-storage-redis` | celui-ci ne déclare pas Nest 12. Le module compte les **tentatives** (réussies comprises), pas seulement les échecs |
+| DT-13 | Session : jeton opaque de 32 octets, seule son empreinte SHA-256 en base ; CSRF : cookie `SameSite=Lax`, contrôle `Origin` et `Sec-Fetch-Site`, corps JSON obligatoire | JWT | révocable immédiatement (déconnexion, désactivation, réinitialisation) |
+| DT-14 | argon2id par `@node-rs/argon2`, paramètres de l'OWASP (19 Mio, 2 passes) ; vérification leurre quand le compte n'existe pas | bcrypt | la feuille de route demande argon2id ; durée de réponse identique, compte existant ou non |
+| DT-15 | Identifiants `uuidv7()`, natif de PostgreSQL 18 | `gen_random_uuid()`, identifiants générés par l'application | ordonnés dans le temps, index compacts ; fonction native, pas une fonction à nous (doctrine tenue) |
+| DT-16 | Front : React 19.3, React Router 8, Vite 8, Tailwind 4 ; primitives shadcn/ui reprises, polices auto-hébergées (`@fontsource`) | Tailwind 3 ; Google Fonts | versions courantes ; le front ne charge rien hors d'Ardha sauf les tuiles IGN (D-08) |
+| DT-17 | Logs structurés par pino (`nestjs-pino`), cookies et en-têtes d'authentification masqués | logger de Nest | logs JSON exploitables en production (PLAN §8) |
+| DT-18 | ESLint 10 + typescript-eslint ; frontières d'architecture en `no-restricted-imports` | règles de revue | la CI fait respecter le domaine pur, Drizzle confiné, le front limité au contrat |
 
 ## 12. Questions ouvertes
 

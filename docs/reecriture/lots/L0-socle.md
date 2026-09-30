@@ -2,7 +2,7 @@
 
 > À la fin de L0, l'utilisateur sait **créer un compte, se connecter, se déconnecter**, et un développeur
 > (humain ou agent) sait **démarrer une stack complète et isolée par worktree** en une commande.
-> Branche de travail : `l0-socle`, partie de `master`.
+> Branche de travail : `master` directement (consigne du porteur du produit, 30/09/2026).
 
 ## Ce qui est déjà tranché (ne pas réarbitrer)
 
@@ -21,10 +21,11 @@ connexion par e-mail et mot de passe, **aucun e-mail envoyé en v1**, pas de pro
    commande CLI d'administration ?) ; que devient l'aiguillage d'onboarding. **Poser les questions au
    porteur du produit dans ce pane et attendre ses réponses** avant de coder ce qui en dépend ; avancer
    en attendant sur l'infrastructure (étapes 3 à 6), qui n'en dépend pas.
-3. **Monorepo** : `apps/api` (NestJS, trois points d'entrée : `api`, `worker`, `cli`), `apps/web` (React,
-   Vite, TanStack Query, Tailwind, primitives shadcn/ui reprises telles quelles), `packages/domain`
-   (modules purs), `packages/contracts` (schémas partagés front ↔ API). Versions épinglées (`mise.toml`,
-   `engines`).
+3. **Structure du dépôt** (revue par le porteur du produit le 30/09/2026) : le back NestJS **à la
+   racine** — `src/domaine` (règles pures), `src/contrats` (schémas partagés front ↔ API), le cœur
+   (services, repositories), et `src/entrees/{api,worker,cli}`, simples entrées-sorties — et le front
+   dans `frontend/` (React, Vite, TanStack Query, Tailwind, primitives shadcn/ui reprises telles
+   quelles). Versions épinglées (`mise.toml`, `engines`).
 4. **Stack locale compatible worktree** : `docker compose` avec Postgres 18 (image PostGIS 3.6 à laquelle
    on ajoute pgvector), Redis, MinIO. Une commande de démarrage qui reconnaît un worktree, isole le projet
    Compose, décale les ports de façon déterministe à partir de la branche (modèle :
@@ -48,7 +49,7 @@ connexion par e-mail et mot de passe, **aucun e-mail envoyé en v1**, pas de pro
 
 ## Critères de fin
 
-- `master` intact ; tout le travail sur `l0-socle`, en commits locaux.
+- Tout le travail sur `master`, en commits locaux.
 - Depuis un clone **et** depuis un worktree, la commande de démarrage rend une stack qui marche, sur des
   ports différents, en même temps.
 - Un utilisateur crée un compte, se connecte, se déconnecte ; un administrateur est créé par la CLI.
