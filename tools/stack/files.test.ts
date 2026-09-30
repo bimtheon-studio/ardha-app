@@ -57,6 +57,15 @@ describe('upsertBloc', () => {
     expect(second.split(BLOCK_START)).toHaveLength(2);
   });
 
+  it('ne garde qu’un bloc quand le fichier en contient plusieurs, même sous un ancien en-tête', () => {
+    const old = '# >>> ardha stack (généré par `pnpm demarrer`, ne pas committer) >>>\nA=0\n' + BLOCK_END + '\n';
+    const doubled = `AVANT=1\n\n${old}\n${upsertBlock('', { A: '1' })}\n${upsertBlock('', { A: '1' })}APRES=2\n`;
+    const output = upsertBlock(doubled, { A: '2' });
+    expect(output.split('# >>> ardha stack')).toHaveLength(2);
+    expect(output).toBe(`AVANT=1\n\n${BLOCK_START}\nA=2\n${BLOCK_END}\n\nAPRES=2\n`);
+    expect(upsertBlock(output, { A: '2' })).toBe(output);
+  });
+
   it('crée le fichier quand il est vide', () => {
     expect(upsertBlock('', { A: '1' })).toBe(`${BLOCK_START}\nA=1\n${BLOCK_END}\n`);
   });

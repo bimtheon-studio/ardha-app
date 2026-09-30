@@ -2,6 +2,9 @@
 import swc from 'unplugin-swc';
 import { defineConfig } from 'vitest/config';
 
+// swc pour les décorateurs et leurs métadonnées (injection de dépendances de Nest).
+const nestSwc = swc.vite({ jsc: { transform: { legacyDecorator: true, decoratorMetadata: true } } });
+
 export default defineConfig({
   test: {
     projects: [
@@ -9,14 +12,17 @@ export default defineConfig({
         test: { name: 'outils', include: ['tools/**/*.test.ts'] },
       },
       {
-        // swc pour les décorateurs et leurs métadonnées (injection de dépendances de Nest).
-        plugins: [swc.vite({ jsc: { transform: { legacyDecorator: true, decoratorMetadata: true } } })],
+        plugins: [nestSwc],
+        test: { name: 'unit', include: ['src/**/*.test.ts'] },
+      },
+      {
+        plugins: [nestSwc],
         test: {
-          name: 'back',
-          include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
+          name: 'integration',
+          include: ['test/**/*.test.ts'],
           globalSetup: ['test/setup-db.ts'],
-          // Une seule base de test par worktree : les fichiers s'exécutent l'un après l'autre.
-          fileParallelism: false,
+          // Une base par worker, clonée de la base modèle : les fichiers tournent en parallèle.
+          setupFiles: ['test/worker-db.ts'],
         },
       },
     ],

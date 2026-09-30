@@ -20,10 +20,10 @@ export class SystemController {
   @Public()
   async health(@Res({ passthrough: true }) response: Response): Promise<Health> {
     const [db, redis] = await Promise.all([
-      this.pool.query('SELECT 1').then(() => 'ok' as const, () => 'injoignable' as const),
-      this.redis.ping().then(() => 'ok' as const, () => 'injoignable' as const),
+      this.pool.query('SELECT 1').then(() => 'ok' as const, () => 'unreachable' as const),
+      this.redis.ping().then(() => 'ok' as const, () => 'unreachable' as const),
     ]);
-    const status = db === 'ok' && redis === 'ok' ? 'ok' : 'degrade';
+    const status = db === 'ok' && redis === 'ok' ? 'ok' : 'degraded';
     if (status !== 'ok') response.status(503);
     return { status, db, redis };
   }

@@ -9,7 +9,7 @@ export class CallError extends Error {
     readonly fields: Record<string, string> = {},
   ) {
     super(message);
-    this.name = 'ErreurAppel';
+    this.name = 'CallError';
   }
 }
 

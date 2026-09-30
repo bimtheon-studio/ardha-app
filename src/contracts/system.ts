@@ -3,9 +3,9 @@ import { z } from 'zod';
 import { route } from './routes.ts';
 
 export const Health = z.object({
-  status: z.enum(['ok', 'degrade']),
-  db: z.enum(['ok', 'injoignable']),
-  redis: z.enum(['ok', 'injoignable']),
+  status: z.enum(['ok', 'degraded']),
+  db: z.enum(['ok', 'unreachable']),
+  redis: z.enum(['ok', 'unreachable']),
 });
 export type Health = z.infer<typeof Health>;
 

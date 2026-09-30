@@ -7,7 +7,7 @@ import type { Job, Queue } from 'bullmq';
 import { AccountsPurge } from '../accounts/purge.service.ts';
 
 export const MAINTENANCE_QUEUE = 'maintenance';
-export const PURGE_JOB = 'comptes:purger';
+export const PURGE_JOB = 'accounts:purge';
 
 @Processor(MAINTENANCE_QUEUE)
 export class MaintenanceProcessor extends WorkerHost {
@@ -31,7 +31,7 @@ export class MaintenanceScheduler implements OnApplicationBootstrap {
 
   async onApplicationBootstrap(): Promise<void> {
     await this.file.upsertJobScheduler(
-      'purge-quotidienne',
+      'daily-purge',
       { pattern: '0 4 * * *', tz: 'Europe/Paris' },
       { name: PURGE_JOB, opts: { removeOnComplete: 30, removeOnFail: 100 } },
     );

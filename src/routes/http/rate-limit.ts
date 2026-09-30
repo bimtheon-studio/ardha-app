@@ -35,7 +35,7 @@ export const LIMITS: ThrottlerOptions[] = [
 export class RedisRateLimitStorage implements ThrottlerStorage {
   constructor(
     private readonly redis: Redis,
-    private readonly prefix = 'ardha:limite',
+    private readonly prefix = 'ardha:rate-limit',
   ) {}
 
   async increment(key: string, ttl: number, limit: number, blockMs: number, name: string): Promise<ThrottlerStorageRecord> {

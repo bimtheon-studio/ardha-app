@@ -77,13 +77,21 @@ export function variables(ctx: Context, secrets: Secrets): Record<string, string
   };
 }
 
-/** Insère ou remplace le bloc généré dans un `.env.local`, sans toucher au reste du fichier. */
+/** Tout bloc généré, y compris sous un ancien libellé d'en-tête (« pnpm demarrer »). */
+const ANY_BLOCK = /# >>> ardha stack[^\n]*\n[\s\S]*?# <<< ardha stack <<<\n?/g;
+
+/**
+ * Insère ou remplace le bloc généré dans un `.env.local`, sans toucher au reste du fichier. Les blocs
+ * en double (écrits par une version qui ne retrouvait pas le sien) sont retirés : il n'en reste qu'un,
+ * à la place du premier.
+ */
 export function upsertBlock(existing: string, vars: Record<string, string>): string {
   const block = [BLOCK_START, ...Object.entries(vars).map(([k, v]) => `${k}=${v}`), BLOCK_END].join('\n');
-  const start = existing.indexOf(BLOCK_START);
-  const end = existing.indexOf(BLOCK_END);
-  if (start !== -1 && end > start) {
-    return existing.slice(0, start) + block + existing.slice(end + BLOCK_END.length);
+  const first = existing.search(ANY_BLOCK);
+  if (first !== -1) {
+    const before = existing.slice(0, first);
+    const after = existing.slice(first).replace(ANY_BLOCK, '').replace(/^\n+/, '');
+    return `${before}${block}\n${after ? `\n${after}` : ''}`;
   }
   const rest = existing.trimEnd();
   return (rest ? `${rest}\n\n` : '') + block + '\n';

@@ -33,7 +33,7 @@ export class ApiModule implements NestModule {
           inject: [REDIS, CONFIG],
           useFactory: (redis: Redis, c: Config) => ({
             throttlers: LIMITS,
-            storage: new RedisRateLimitStorage(redis, `ardha:${c.SESSION_COOKIE_NAME}:limite`),
+            storage: new RedisRateLimitStorage(redis, `ardha:${c.SESSION_COOKIE_NAME}:rate-limit`),
           }),
         }),
       ],

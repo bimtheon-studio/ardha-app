@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { callApi, CallError } from '@/api/client';
 
-export const ME_KEY = ['auth', 'moi'] as const;
+export const ME_KEY = ['auth', 'me'] as const;
 
 /** `null` : pas de session. Une autre erreur (serveur injoignable) remonte telle quelle : « illisible » n'est pas « déconnecté ». */
 async function fetchMe(): Promise<User | null> {
