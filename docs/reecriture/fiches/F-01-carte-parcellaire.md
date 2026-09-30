@@ -1,6 +1,6 @@
 # F-01 · Carte et parcellaire : adresse, cadastre, sélection de parcelles
 
-> Lot : L1 · Statut : `codée` — **arbitrages provisoires, à confirmer** (30/09/2026)
+> Lot : L1 · Statut : `recettée` (30/09/2026) — **arbitrages Q1 à Q11 provisoires, à confirmer par le porteur du produit**
 > Ancien code : `bimtheon-studio/ardha` @ `2a7f9a0` (export de `origin/main` le 30/09/2026)
 
 ## Ce que voit l'utilisateur
@@ -142,10 +142,32 @@ incohérent entre cadastre et BD TOPO ; courses entre recherches (#3) ; surface 
 
 ## Recette
 
-À faire : voir la feuille de route.
+Le 30/09/2026, sur `master` (75d807b et suivants), stack du clone principal.
+
+| Cas | Résultat |
+|---|---|
+| Seed sans Internet (`pnpm seed`, réponses enregistrées) | Maisons-Alfort 5 873 parcelles, Tours 30 668, Beaumont-Village 1 145, millésime 2026-09-01 ; 2,5 s ; relancé : « déjà à jour » |
+| Maisons-Alfort, « 9 rue Pasteur » → clic sur AY 96 puis AY 97 | 2 parcelles, contenance 510 m², surface calculée 507 m² ; une parcelle à 12 m (AY 98) est refusée : « La parcelle doit toucher la sélection. » ; la sélection revient au rechargement |
+| Commune jamais chargée, par le worker en direct : Paris 11e (`commune:load 75111`) | prête en ~2 s, 4 629 parcelles ; `address:search` passe par le worker |
+| Corse : « 10 cours Napoléon Ajaccio » (2A004, refusé par l'ancien code, #19) | cadastre chargé de lui-même, prêt en 1,3 s, parcelles affichées |
+| Aire calculée comparée à PostGIS (`ST_Area(geography)`) | écart < 10⁻⁵ en métropole et en Martinique (tests du domaine) |
+| e2e (Chromium, stack jetable, sans Internet) | 6 scénarios, 12 s tout compris : compte, recherche d'adresse, sélection au clic, refus, rechargement, fonds, mobile |
+
+Captures : `scratchpad` de la session (non versionnées) ; à reprendre en `captures/F-01-*.png` avec
+l'ancienne application côte à côte quand elle sera accessible hors constellation.
+
+Constats : les tuiles du Plan IGN répondent 404 en mer aux petits zooms (normal, Leaflet laisse la
+case vide) ; la mesure des erreurs de tuiles (D-08) attend Sentry (reporté, question « Propriété »).
 
 ## Écarts assumés
 
+- Le cadastre vient du fichier Etalab de la commune (millésime trimestriel), chargé par le worker,
+  et non plus du WFS de la Géoplateforme interrogé par le navigateur (PLAN §3-4) : il peut avoir
+  jusqu'à un trimestre de retard sur le plan cadastral de la DGFiP ; le millésime est affiché.
+- La contiguïté se juge à 1 m entre bords (#11) : deux parcelles qui se touchent par un bord sans
+  sommet commun sont acceptées ; deux parcelles séparées d'un chemin de 1 m aussi.
+- Retirer une parcelle peut laisser la sélection en morceaux : c'est dit, pas empêché (#12, Q4).
+- Plafond de 50 parcelles (#13, Q5).
 - La sélection vit dans l'URL, plus dans `localStorage` (Q7) ; plus d'expiration à 2 h.
 - L'IDU officiel remplace l'identifiant maison (#17).
 - Le fond OSM laisse la place aux fonds IGN (#23) ; les bâtiments BD TOPO ne sont plus superposés

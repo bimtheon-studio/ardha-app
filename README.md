@@ -20,6 +20,11 @@ pnpm start          # dépendances Docker, migrations, seed, puis API + worker +
 Le front s'ouvre sur l'adresse affichée (`http://127.0.0.1:14000` dans le clone principal).
 Ctrl-C arrête l'API, le worker et le front ; les conteneurs restent (`pnpm stop` pour les arrêter).
 
+Le seed charge le cadastre des trois communes de référence (Maisons-Alfort, Tours,
+Beaumont-Village) depuis les réponses enregistrées de `fixtures/http`, sans Internet. Une autre
+commune se charge d'elle-même quand on la regarde sur la carte : c'est le worker qui va chercher son
+cadastre (il lui faut Internet ; `ARDHA_SOURCES=recorded` l'en prive).
+
 Créer un administrateur (la commande affiche un lien pour choisir son mot de passe) :
 
 ```bash
@@ -42,6 +47,7 @@ hasard) et vérifie que les ports sont libres. En cas de collision :
 | PostgreSQL 18 + PostGIS 3.6 + pgvector | 15432 | 15432 + décalage |
 | Redis | 16379 | 16379 + décalage |
 | MinIO (S3) · console | 19000 · 19500 | + décalage |
+| API · front des tests e2e | 17000 · 18000 | + décalage |
 
 ## Commandes
 
@@ -49,11 +55,23 @@ hasard) et vérifie que les ports sont libres. En cas de collision :
 |---|---|
 | `pnpm start [--infra]` | stack complète ; `--infra` s'arrête après migrations et seed |
 | `pnpm stop` · `pnpm destroy` · `pnpm status` | arrêter ; supprimer conteneurs et volumes ; ports et conteneurs |
-| `pnpm test` | tests des outils, du back (intégration sur la base `ardha_test` du worktree) et du front, avec couverture |
+| `pnpm test` | tests unitaires et d'intégration (bases `ardha_test_w*` du worktree, en parallèle) des outils, du back et du front, avec couverture à cliquet |
+| `pnpm test:e2e` | parcours dans Chromium sur une stack jetable (base `ardha_e2e`, ports e2e, sans Internet) |
 | `pnpm lint` · `pnpm typecheck` | lint (dont les frontières de l'architecture) ; types |
 | `pnpm doctrine [--base]` | contrôle « base bête » des migrations ; `--base` : aussi le schéma migré |
 | `pnpm migration:generate` | nouvelle migration SQL depuis `src/db/schema.ts` |
-| `pnpm cli <commande>` | CLI métier (`pnpm cli --help`) |
+| `pnpm cli <commande>` | CLI métier (`pnpm cli --help`) ; `--json` pour une sortie lisible par une machine |
+
+La CLI pilote et débogue la chaîne sans le front :
+
+| Commande | Effet |
+|---|---|
+| `commune:load <codes…> [--inline] [--force]` | demande le chargement du cadastre (le worker le fait) ; `--inline` sur place |
+| `commune:show <code>` · `commune:list` | état du cadastre (millésime, parcelles, erreur) |
+| `parcel:show <IDU…>` · `parcel:at <lon> <lat>` | une parcelle : libellé, contenance, surface calculée, emprise |
+| `parcel:selection <IDU…>` | rejoue une sélection clic par clic (contiguïté, plafond), avec son résumé |
+| `address:search <texte…> [--inline]` · `address:reverse <lon> <lat>` | géocodage, par le worker ou sur place |
+| `source:record <url…>` | enregistre la réponse réelle d'une source dans `fixtures/http` |
 
 ## Structure
 
@@ -62,6 +80,9 @@ src/                   le back (NestJS)
   domain/              règles pures, sans framework
   contracts/           schémas zod des routes, partagés avec le front ; OpenAPI dérivé
   accounts/            comptes : services et repositories
+  geo/                 carte et parcellaire : communes, parcelles, état des sources, recherches
+  sources/             adaptateurs des sources publiques (worker et CLI seulement)
+  ingestion/           chargement des données de référence depuis les sources (worker et CLI)
   audit/               journal d'audit
   db/                  schéma Drizzle, connexion, migrations
   shared/ config/      briques communes, configuration
@@ -69,12 +90,15 @@ src/                   le back (NestJS)
   worker/              point d'entrée worker : files BullMQ
   cli/                 point d'entrée CLI : commandes
 drizzle/               migrations SQL, en avant seulement
+fixtures/http/         réponses réelles enregistrées des sources publiques (seed, tests, e2e)
 test/                  tests d'intégration du back
+e2e/                   tests e2e (Playwright) et leur stack jetable
 frontend/              le front (React, Vite, TanStack Query, Tailwind, shadcn/ui)
 tools/                 stack par worktree, contrôle de doctrine, inventaire de l'ancien code
 ```
 
 Règles tenues par le lint : le domaine n'importe rien hors de son dossier ; le contrat ne dépend que
-du domaine et de zod ; Drizzle reste dans `src/db` et les repositories ; le front n'importe du back
-que `@contracts` et `@domain`. La base est « bête » : ni trigger, ni fonction SQL, ni policy — la CI
+du domaine et de zod ; Drizzle reste dans `src/db` et les repositories ; seuls le worker et la CLI
+touchent aux sources publiques (`src/sources`, `src/ingestion`, `fetch`) ; le front n'importe du
+back que `@contracts` et `@domain`. La base est « bête » : ni trigger, ni fonction SQL, ni policy — la CI
 refuse une migration qui en contient.

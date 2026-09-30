@@ -36,7 +36,12 @@ sur ce qui n'en dépend pas.
 - **Base « bête »** : tables, types, index, clés, `UNIQUE`, `NOT NULL`. Jamais de trigger, de fonction
   SQL, de policy, de `pg_cron`. Une migration qui en contient doit faire échouer la CI.
 - Jobs : **BullMQ + Redis**. L'état du travail vit dans Postgres ; Redis se reconstruit.
-- **Seul le worker appelle l'extérieur** (API publiques, PDF, LLM). L'API ne lit que la base.
+- **Seul le worker appelle l'extérieur** (API publiques, PDF, LLM). L'API ne lit que la base. Les
+  adaptateurs vivent dans `src/sources`, les chargeurs dans `src/ingestion` : le lint les interdit
+  hors du worker et de la CLI. Les tests rejouent des réponses réelles enregistrées
+  (`fixtures/http`, `pnpm cli source:record`), jamais Internet.
+- Chaque fonctionnalité livre l'API, le front **et** des commandes CLI pour la piloter et la
+  déboguer, avec tests unitaires, d'intégration et e2e (`pnpm test`, `pnpm test:e2e`).
 - Stockage de fichiers : S3 (MinIO en local).
 - **Tout est en anglais** : dossiers, fichiers, identifiants, commandes (pnpm, CLI), options,
   variables d'environnement, routes (API et front), champs JSON, codes d'erreur, **tables et colonnes**

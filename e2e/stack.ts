@@ -52,11 +52,22 @@ run('node', ['dist/cli/main.js', 'migrate']);
 run('node', ['dist/cli/main.js', 'seed']);
 if (!process.env.E2E_SKIP_FRONT_BUILD) run('pnpm', ['--filter', './frontend', 'run', '--silent', 'build']);
 
+/** Le front relaie `/api` : il n'est lancé qu'une fois l'API prête (Playwright attend le front). */
+async function apiReady(): Promise<void> {
+  for (let i = 0; i < 200; i++) {
+    const ok = await fetch(`http://127.0.0.1:${api}/api/health`).then((r) => r.ok, () => false);
+    if (ok) return;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error(`L'API e2e ne répond pas sur le port ${api}.`);
+}
+
 const children: ChildProcess[] = [
   spawn('node', ['--enable-source-maps', 'dist/routes/main.js'], { cwd: ROOT, env, stdio: 'inherit' }),
   spawn('node', ['--enable-source-maps', 'dist/worker/main.js'], { cwd: ROOT, env, stdio: 'inherit' }),
-  spawn('pnpm', ['--filter', './frontend', 'exec', 'vite', 'preview', '--port', String(web), '--strictPort'], { cwd: ROOT, env, stdio: 'inherit' }),
 ];
+await apiReady();
+children.push(spawn('pnpm', ['--filter', './frontend', 'exec', 'vite', 'preview', '--port', String(web), '--strictPort'], { cwd: ROOT, env, stdio: 'inherit' }));
 console.log(`Stack e2e : front http://127.0.0.1:${web}, API http://127.0.0.1:${api}`);
 
 const stop = () => {

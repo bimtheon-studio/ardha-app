@@ -2,18 +2,30 @@
 // Par défaut, les commandes passent par le worker comme l'API (`commune:load` dépose un job,
 // `address:search` attend sa réponse) ; `--inline` appelle la source depuis la CLI, sans worker.
 // `--json` rend une sortie lisible par une machine (Claude, MCP).
+import { Inject } from '@nestjs/common';
 import { Command, CommandRunner, Option } from 'nest-commander';
 
-import { formatArea, parcelLabel, parseParcelId, pieces, type SelectableParcel, summarize, toggle, REFUSAL_MESSAGES, isCommuneCode, bboxOf, areaM2 } from '../domain/index.ts';
+import { CONFIG, type Config } from '../config/config.ts';
 import type { Address, Commune, ParcelFeature } from '../contracts/index.ts';
+import {
+  areaM2,
+  bboxOf,
+  formatArea,
+  isCommuneCode,
+  parcelLabel,
+  parseParcelId,
+  pieces,
+  REFUSAL_MESSAGES,
+  type SelectableParcel,
+  summarize,
+  toggle,
+} from '../domain/index.ts';
 import { CADASTRE_SOURCE, CadastreService } from '../geo/cadastre.service.ts';
 import { CommunesRepository } from '../geo/communes.repository.ts';
 import { Lookups } from '../geo/lookups.ts';
 import { SourceStatesRepository } from '../geo/source-states.repository.ts';
 import { CadastreLoader } from '../ingestion/cadastre-loader.ts';
 import { LookupHandlers } from '../ingestion/lookup-handlers.ts';
-import { CONFIG, type Config } from '../config/config.ts';
-import { Inject } from '@nestjs/common';
 import { LiveHttp, RecordingHttp } from '../sources/http.ts';
 
 interface JsonOption {

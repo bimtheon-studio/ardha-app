@@ -40,6 +40,12 @@
    Internet : inscription, connexion, recherche d'adresse, sélection de parcelles).
 10. **Clore** : fiche à jour, README, journal du PLAN, décisions techniques de L1.
 
+## État au 30/09/2026
+
+Critères de fin tenus en local (recette de [F-01](../fiches/F-01-carte-parcellaire.md#recette)).
+Reste : **confirmer les arbitrages provisoires Q1 à Q11** ; exécuter la CI sur GitHub (pas de
+remote) ; captures comparées à l'ancienne application.
+
 ## Critères de fin
 
 - Tout le travail sur `master`, en commits locaux.
