@@ -73,6 +73,12 @@ describe('connexion', () => {
 });
 
 describe('inscription', () => {
+  it('déjà connecté, /inscription et /connexion mènent à l’accueil', async () => {
+    fausseApi({ 'GET /api/auth/moi': { statut: 200, corps: alice } });
+    afficher('/inscription');
+    expect(await screen.findByRole('heading', { name: 'Bonjour Alice Martin' })).toBeInTheDocument();
+  });
+
   it('montre sous le champ l’adresse déjà utilisée', async () => {
     fausseApi({
       'GET /api/auth/moi': sansSession,

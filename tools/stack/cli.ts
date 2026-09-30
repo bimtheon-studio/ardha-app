@@ -88,8 +88,9 @@ function creerBucket(ctx: Contexte): void {
 
 async function demarrer(ctx: Contexte, infraSeule: boolean): Promise<void> {
   afficherContexte(ctx);
-  ecrireFichiers(ctx);
+  // Les ports d'abord : un démarrage refusé ne doit pas réécrire la configuration d'une stack qui tourne.
   await verifierPorts(ctx, infraSeule ? SERVICES_DOCKER : [...SERVICES_DOCKER, ...SERVICES_LOCAUX]);
+  ecrireFichiers(ctx);
 
   lancer('docker', ['compose', 'up', '-d', '--build', '--wait'], ctx);
   creerBucket(ctx);

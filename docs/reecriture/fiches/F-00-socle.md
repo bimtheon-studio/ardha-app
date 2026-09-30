@@ -1,6 +1,6 @@
 # F-00 · Socle : compte, connexion, coquille de l'application
 
-> Lot : L0 · Statut : `codée` (30/09/2026)
+> Lot : L0 · Statut : `recettée` (30/09/2026)
 > Ancien code : `bimtheon-studio/ardha` @ `2a7f9a0` (export de `origin/main` le 30/09/2026)
 
 ## Ce que voit l'utilisateur
@@ -118,9 +118,27 @@ Aucune règle métier d'urbanisme dans ce lot. Règles de sécurité retenues ou
 
 ## Recette
 
-Pas de commune de référence pour ce lot : la recette porte sur les parcours (inscription, connexion,
-déconnexion, administrateur créé par la CLI), dans le clone principal et dans un worktree en même
-temps. Résultats : voir le journal du PLAN.
+Pas de commune de référence pour ce lot : la recette porte sur les parcours. Faite le 30/09/2026 dans
+Chromium (headless), sur le clone principal (ports +0) **et**, en même temps, sur un worktree
+`essai-worktree` (décalage +285, base, Redis, MinIO et cookie `ardha_session_ardha_essai` distincts) :
+
+| Étape | Clone | Worktree |
+|---|---|---|
+| `/` sans session mène à `/connexion` | ✓ | ✓ |
+| inscription : mot de passe trop court refusé avant l'envoi | ✓ | ✓ |
+| inscription réussie, accueil « Bonjour Camille Recette » | ✓ | ✓ |
+| session conservée au rechargement ; cookie `httpOnly`, `SameSite=Lax` | ✓ | ✓ |
+| déconnexion par le menu du compte | ✓ | ✓ |
+| mauvais mot de passe refusé, bon mot de passe accepté | ✓ | ✓ |
+| 404 en français | ✓ | ✓ |
+| administrateur créé par `utilisateur:creer-admin`, mot de passe choisi par le lien, connexion | ✓ | ✓ |
+| le lien ne sert qu'une fois | ✓ | ✓ |
+| les comptes d'une stack sont invisibles depuis l'autre | ✓ | ✓ |
+
+`ARDHA_DECALAGE=0 pnpm demarrer` depuis le worktree, pendant que le clone tourne : refus avec la liste
+des ports pris et la commande pour en sortir, sans toucher à la configuration en place.
+
+Aucun écart de comportement hors des écarts assumés ci-dessous.
 
 ## Écarts assumés
 

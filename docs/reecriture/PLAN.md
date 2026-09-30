@@ -369,6 +369,12 @@ vers des comptes pas encore recréés) ; aucune migration ne les a réinjectées
 
 ## Journal
 
+- **30/09/2026** — **L0 livré sur `master`** (b86d58d et suivant). Fiche F-00 scannée, arbitrée (Q1 à Q9),
+  codée, recettée dans le clone et dans un worktree en même temps. Structure revue par le porteur du
+  produit : back à la racine, `frontend/` à part. Décisions techniques DT-01 à DT-18 consignées, à
+  relire. Faits nouveaux : pgvector 0.8.6 publié (on reste en 0.8.5, DT-09), image officielle MinIO
+  retirée (DT-10). 154 tests, doctrine et CI rejouées en local ; pas encore de remote, donc CI jamais
+  exécutée sur GitHub.
 - **30/09/2026** — plan complet reporté dans le dépôt (sections de l'artefact ajoutées) ; `plan.html`
   versionné ; feuille de route de L0 écrite ; agent de réécriture lancé sur L0 (workspace Herdr
   `ardha-app`).

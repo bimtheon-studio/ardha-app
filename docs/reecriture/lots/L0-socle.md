@@ -47,6 +47,12 @@ connexion par e-mail et mot de passe, **aucun e-mail envoyé en v1**, pas de pro
    `PLAN.md` complété. Les choix techniques faits en route (gestionnaire de paquets, version de Node,
    lanceur de tests…) sont consignés dans `PLAN.md` comme **décisions techniques de L0**, à relire.
 
+## État au 30/09/2026
+
+Critères de fin tenus, en local : voir la recette de [F-00](../fiches/F-00-socle.md#recette) et le journal
+du [PLAN](../PLAN.md#journal). Reste hors de ce lot : exécuter la CI sur GitHub (pas de remote), choisir
+l'hébergeur (question ouverte du PLAN).
+
 ## Critères de fin
 
 - Tout le travail sur `master`, en commits locaux.
