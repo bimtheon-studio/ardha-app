@@ -1,0 +1,900 @@
+<title>Réécriture d'Ardha</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Spectral:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+
+<style>
+  :root {
+    --fond:      #F0F3EE;
+    --surface:   #FAFBF7;
+    --surface-2: #E7EBE4;
+    --trait:     #CCD4C9;
+    --trait-fin: #DDE3D9;
+    --encre:     #141D1A;
+    --encre-2:   #4A5751;
+    --encre-3:   #6F7D76;
+    --accent:    #1C5B54;
+    --accent-f:  rgba(28, 91, 84, .09);
+    --brique:    #9E4632;
+    --ocre:      #8F6412;
+    --bleu:      #2F5A7A;
+    --grille:    rgba(28, 91, 84, .10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --fond:      #0E1412;
+      --surface:   #161E1B;
+      --surface-2: #1E2724;
+      --trait:     #2F3B37;
+      --trait-fin: #243029;
+      --encre:     #E5EBE4;
+      --encre-2:   #AEBBB4;
+      --encre-3:   #84928B;
+      --accent:    #74BEB0;
+      --accent-f:  rgba(116, 190, 176, .12);
+      --brique:    #DB8B72;
+      --ocre:      #D6A64B;
+      --bleu:      #8DB6D6;
+      --grille:    rgba(116, 190, 176, .12);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --fond:      #0E1412;
+    --surface:   #161E1B;
+    --surface-2: #1E2724;
+    --trait:     #2F3B37;
+    --trait-fin: #243029;
+    --encre:     #E5EBE4;
+    --encre-2:   #AEBBB4;
+    --encre-3:   #84928B;
+    --accent:    #74BEB0;
+    --accent-f:  rgba(116, 190, 176, .12);
+    --brique:    #DB8B72;
+    --ocre:      #D6A64B;
+    --bleu:      #8DB6D6;
+    --grille:    rgba(116, 190, 176, .12);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--fond);
+    color: var(--encre);
+    font-family: "Spectral", Georgia, "Times New Roman", serif;
+    font-size: 1.02rem;
+    line-height: 1.66;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 1080px; margin: 0 auto; padding-inline: 20px; padding-block: 0 96px; }
+  .mesure { max-width: 68ch; }
+
+  /* ── Tête ─────────────────────────────────────────────────── */
+  .tete {
+    position: relative;
+    margin-inline: -20px;
+    padding: 56px 20px 40px;
+    border-bottom: 1px solid var(--trait);
+    background-image:
+      linear-gradient(var(--grille) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grille) 1px, transparent 1px);
+    background-size: 44px 44px, 44px 44px;
+    background-position: -1px -1px;
+  }
+  .tete::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg, transparent 18%, var(--fond) 96%);
+    pointer-events: none;
+  }
+  .tete > * { position: relative; z-index: 1; }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .7rem; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--accent); font-weight: 500;
+  }
+  h1 {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: clamp(2.4rem, 7.4vw, 3.9rem);
+    line-height: 1; letter-spacing: -.025em;
+    margin: .3em 0 .14em; text-wrap: balance;
+  }
+  .sous-titre {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-weight: 500;
+    font-size: clamp(1.02rem, 2.3vw, 1.26rem);
+    line-height: 1.38; color: var(--encre-2);
+    max-width: 52ch; margin: 0 0 26px; text-wrap: balance;
+  }
+  .cartouche {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    border: 1px solid var(--trait); background: var(--surface);
+    max-width: 880px; margin: 0;
+  }
+  .cartouche div { padding: 11px 14px; border-right: 1px solid var(--trait-fin); border-bottom: 1px solid var(--trait-fin); }
+  .cartouche dt {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .64rem; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--encre-3); margin: 0 0 3px;
+  }
+  .cartouche dd { margin: 0; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .83rem; font-weight: 500; }
+  .cartouche dd.statut { color: var(--ocre); }
+
+  /* ── Sommaire ─────────────────────────────────────────────── */
+  nav.sommaire {
+    margin-top: 28px;
+    display: flex; flex-wrap: wrap; gap: 6px 18px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .76rem;
+  }
+  nav.sommaire a { color: var(--encre-2); text-decoration: none; border-bottom: 1px solid var(--trait); padding-bottom: 1px; }
+  nav.sommaire a:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ── Sections ─────────────────────────────────────────────── */
+  section { margin-top: 64px; scroll-margin-top: 20px; }
+  h2 {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-weight: 600; font-size: clamp(1.5rem, 3.6vw, 2rem);
+    line-height: 1.15; letter-spacing: -.016em;
+    margin: .35em 0 .55em; text-wrap: balance;
+  }
+  h3 {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-weight: 600; font-size: 1.08rem; letter-spacing: -.005em;
+    margin: 38px 0 10px; text-wrap: balance;
+  }
+  p { margin: 0 0 15px; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+  code, .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .84em; }
+  code { background: var(--surface-2); padding: .08em .32em; border-radius: 2px; }
+  strong { font-weight: 600; }
+  ul.puces { padding-left: 19px; margin: 0 0 16px; }
+  ul.puces li { margin-bottom: 7px; }
+
+  /* ── En bref ──────────────────────────────────────────────── */
+  .bref {
+    display: grid; gap: 1px; background: var(--trait); border: 1px solid var(--trait);
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    margin-top: 22px;
+  }
+  .bref div { background: var(--surface); padding: 15px 16px 17px; }
+  .bref b {
+    display: block; font-family: "Archivo", system-ui, sans-serif;
+    font-weight: 600; font-size: .98rem; margin-bottom: 4px;
+  }
+  .bref span { display: block; font-size: .9rem; line-height: 1.5; color: var(--encre-2); }
+
+  /* ── Constats chiffrés ────────────────────────────────────── */
+  .chiffres {
+    display: grid; gap: 1px; background: var(--trait); border: 1px solid var(--trait);
+    grid-template-columns: repeat(2, 1fr);
+    margin: 22px 0 8px;
+  }
+  @media (min-width: 760px) { .chiffres { grid-template-columns: repeat(4, 1fr); } }
+  .ch { background: var(--surface); padding: 14px 14px 15px; }
+  .ch b {
+    display: block; font-family: "Archivo", system-ui, sans-serif;
+    font-weight: 700; font-size: 1.55rem; letter-spacing: -.02em;
+    font-variant-numeric: tabular-nums; line-height: 1.1;
+  }
+  .ch span {
+    display: block; font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .66rem; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--encre-3); margin-top: 5px; line-height: 1.45;
+  }
+  .note-mesure { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .76rem; color: var(--encre-3); margin-top: 10px; }
+
+  /* ── Tableaux ─────────────────────────────────────────────── */
+  .table-wrap { overflow-x: auto; margin: 20px 0; border: 1px solid var(--trait); background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: .9rem; }
+  th, td { text-align: left; padding: 9px 13px; border-bottom: 1px solid var(--trait-fin); vertical-align: top; }
+  th {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .65rem; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--encre-3); font-weight: 500; background: var(--surface-2);
+    border-bottom: 1px solid var(--trait);
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.n { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; white-space: nowrap; font-size: .82rem; }
+  td.k { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .8rem; }
+  tr.groupe td {
+    background: var(--surface-2);
+    font-family: "Archivo", system-ui, sans-serif; font-weight: 600; font-size: .86rem;
+    padding-top: 8px; padding-bottom: 8px;
+  }
+
+  .sort {
+    display: inline-block; white-space: nowrap;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .62rem; letter-spacing: .08em; text-transform: uppercase;
+    padding: 2px 6px; border: 1px solid currentColor; border-radius: 2px;
+  }
+  .s-refondu     { color: var(--accent); }
+  .s-reconstruit { color: var(--bleu); }
+  .s-absorbe     { color: var(--encre-2); }
+  .s-abandonne   { color: var(--brique); }
+  .s-report      { color: var(--ocre); }
+
+  /* ── Figures ──────────────────────────────────────────────── */
+  figure { margin: 26px 0 8px; }
+  .fig-wrap { overflow-x: auto; border: 1px solid var(--trait); background: var(--surface); padding: 14px 10px; }
+  .fig-wrap svg { display: block; width: 100%; height: auto; min-width: 720px; }
+  figcaption { font-size: .88rem; color: var(--encre-2); margin-top: 9px; max-width: 72ch; }
+
+  .dg text { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12px; fill: var(--encre); }
+  .dg .t { font-family: "Archivo", system-ui, sans-serif; font-weight: 600; font-size: 13.5px; }
+  .dg .s { font-size: 10.5px; fill: var(--encre-2); }
+  .dg .z { font-size: 10px; letter-spacing: .12em; fill: var(--encre-3); }
+  .dg .lbl { font-size: 10.5px; fill: var(--encre-2); }
+  .dg .lbl-a { font-size: 10.5px; fill: var(--accent); font-weight: 500; }
+  .dg .boite { fill: var(--surface); stroke: var(--encre-3); stroke-width: 1; }
+  .dg .boite-a { fill: var(--accent-f); stroke: var(--accent); stroke-width: 1.4; }
+  .dg .zone { fill: var(--surface-2); stroke: none; }
+  .dg .ext { fill: none; stroke: var(--encre-3); stroke-width: 1; stroke-dasharray: 5 4; }
+  .dg .fl { fill: none; stroke: var(--encre-2); stroke-width: 1.3; }
+  .dg .fl-a { fill: none; stroke: var(--accent); stroke-width: 2; }
+  .dg .fl-d { fill: none; stroke: var(--encre-3); stroke-width: 1.2; stroke-dasharray: 4 4; }
+  .dg .pointe { fill: var(--encre-2); }
+  .dg .pointe-a { fill: var(--accent); }
+  .dg .pointe-d { fill: var(--encre-3); }
+
+  /* ── Principes ────────────────────────────────────────────── */
+  .principes { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); margin-top: 18px; }
+  .principe { border-top: 2px solid var(--accent); background: var(--surface); padding: 13px 15px 15px; border-left: 1px solid var(--trait); border-right: 1px solid var(--trait); border-bottom: 1px solid var(--trait); }
+  .principe b { font-family: "Archivo", system-ui, sans-serif; font-weight: 600; font-size: .97rem; display: block; margin-bottom: 4px; }
+  .principe span { font-size: .9rem; color: var(--encre-2); line-height: 1.5; display: block; }
+
+  /* ── Modèle de données ────────────────────────────────────── */
+  .modele { display: grid; gap: 16px; margin-top: 20px; }
+  @media (min-width: 780px) { .modele { grid-template-columns: 1fr 1fr; } }
+  .famille { border: 1px solid var(--trait); background: var(--surface); }
+  .famille-tete { padding: 11px 15px; border-bottom: 1px solid var(--trait); background: var(--surface-2); }
+  .famille-tete b { font-family: "Archivo", system-ui, sans-serif; font-weight: 600; font-size: 1rem; }
+  .famille-tete span { display: block; font-size: .84rem; color: var(--encre-2); }
+  .entite { padding: 9px 15px 10px; border-bottom: 1px solid var(--trait-fin); }
+  .entite:last-child { border-bottom: 0; }
+  .entite code { background: none; padding: 0; font-weight: 500; font-size: .84rem; color: var(--accent); }
+  .entite span { display: block; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .74rem; color: var(--encre-2); line-height: 1.5; margin-top: 1px; }
+  .lien-version {
+    margin-top: 14px; padding: 12px 15px; border: 1px dashed var(--accent);
+    background: var(--accent-f); font-size: .92rem;
+  }
+
+  /* ── Encadré estimation ───────────────────────────────────── */
+  .encadre { border: 1px solid var(--trait); border-left: 3px solid var(--ocre); background: var(--surface); padding: 16px 18px 12px; margin: 22px 0; }
+  .encadre h3 { margin-top: 0; }
+  .encadre p { font-size: .95rem; }
+
+  /* ── Méthode ──────────────────────────────────────────────── */
+  ol.boucle { counter-reset: e; list-style: none; padding: 0; margin: 20px 0 0; display: grid; gap: 1px; background: var(--trait); border: 1px solid var(--trait); grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  ol.boucle li { counter-increment: e; background: var(--surface); padding: 13px 15px 15px; font-size: .9rem; color: var(--encre-2); line-height: 1.5; }
+  ol.boucle li::before {
+    content: counter(e); display: inline-grid; place-items: center;
+    width: 22px; height: 22px; border-radius: 50%; margin-right: 8px;
+    border: 1px solid var(--accent); color: var(--accent);
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .72rem; font-weight: 500;
+  }
+  ol.boucle li b { font-family: "Archivo", system-ui, sans-serif; font-weight: 600; color: var(--encre); font-size: .96rem; }
+  ol.boucle li.cle { background: linear-gradient(var(--accent-f), var(--accent-f)), var(--surface); }
+
+  /* ── Décisions ────────────────────────────────────────────── */
+  .decisions { display: grid; gap: 10px; margin-top: 16px; }
+  .decision { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; border: 1px solid var(--trait); background: var(--surface); padding: 12px 15px; }
+  .decision b { font-family: "Archivo", system-ui, sans-serif; font-weight: 600; font-size: .98rem; }
+  .decision span { font-size: .9rem; color: var(--encre-2); }
+  .decision .qui { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; color: var(--ocre); }
+
+  .pied {
+    margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--trait);
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .75rem; color: var(--encre-3); line-height: 1.7;
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="page">
+
+  <header class="tete">
+    <span class="eyebrow">Plan de réécriture · 29 septembre 2026</span>
+    <h1>La réécriture d'Ardha</h1>
+    <p class="sous-titre">
+      D'une application Supabase adossée à la constellation BIMtheon à un logiciel autonome.
+      Ce qu'on vise, ce qui migre, et dans quel ordre.
+    </p>
+    <dl class="cartouche">
+      <div><dt>Statut</dt><dd class="statut">Plan · rien de lancé</dd></div>
+      <div><dt>Ancien code</dt><dd>ardha @ 2a7f9a0</dd></div>
+      <div><dt>Base mesurée</dt><dd>29/09 · lecture seule</dd></div>
+      <div><dt>Nouveau dépôt</dt><dd>ardha-app (local)</dd></div>
+      <div><dt>v1</dt><dd>gratuite · e-mail + mdp</dd></div>
+      <div><dt>Révision</dt><dd>6 · volet agent écarté</dd></div>
+    </dl>
+    <nav class="sommaire" aria-label="Sommaire">
+      <a href="#bref">En bref</a>
+      <a href="#depart">D'où on part</a>
+      <a href="#cible">La situation visée</a>
+      <a href="#donnees">Le modèle de données</a>
+      <a href="#migrations">Les migrations</a>
+      <a href="#lots">L'ordre des lots</a>
+      <a href="#methode">La méthode</a>
+      <a href="#outillage">Worktrees et outillage</a>
+      <a href="#risques">Risques</a>
+      <a href="#decisions-prises">Décisions prises</a>
+      <a href="#decisions">Décisions ouvertes</a>
+    </nav>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section id="bref">
+    <span class="eyebrow">En bref</span>
+    <h2>Un logiciel qu'on possède, sur des bases simples</h2>
+    <div class="mesure">
+      <p>
+        Ardha sort de la constellation BIMtheon pour devenir un produit autonome, avec un outillage
+        professionnel : CI, couverture de tests, déploiement continu, base gérée, sauvegardes. La
+        galaxie continue d'exister pour expérimenter. Ardha, lui, doit devenir stable et fiable avant
+        qu'on travaille à nouveau sa partie SaaS.
+      </p>
+    </div>
+    <div class="bref">
+      <div><b>Réécriture intégrale</b><span>Fonctionnalité par fonctionnalité, à partir d'une fiche que tu arbitres. Rien n'est recodé sans arbitrage.</span></div>
+      <div><b>Repartir de zéro</b><span>Aucune donnée à migrer : 0 étude, 0 estimation en base. Les données de référence sont reconstruites par le nouveau worker.</span></div>
+      <div><b>Trois priorités</b><span>Le modèle de données d'une étude, le stockage local des données externes, l'alimentation périodique des règles PLU.</span></div>
+      <div><b>Hors v1</b><span>OAuth et SSO, onboarding, organisations, facturation, e-mails, volet CRM de l'agent immobilier.</span></div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section id="depart">
+    <span class="eyebrow">D'où on part</span>
+    <h2>L'état mesuré, le 29 septembre</h2>
+    <div class="mesure">
+      <p>
+        Ardha tourne sur <code>bimtheon-core</code>, le projet Supabase partagé par six produits,
+        dans le schéma <code>ardha</code>. Ses comptes viennent de BIMtheon ID, ses migrations
+        appartiennent au dépôt <code>core</code>, et Rhyzom consomme deux de ses edge functions.
+        Chiffres relevés en lecture seule sur la base et sur le code :
+      </p>
+    </div>
+    <div class="chiffres">
+      <div class="ch"><b>0</b><span>étude, 0 estimation en base</span></div>
+      <div class="ch"><b>4</b><span>comptes pour toute la constellation, dont 2 avec accès Ardha</span></div>
+      <div class="ch"><b>141 Mo</b><span>de données de référence, 34 tables</span></div>
+      <div class="ch"><b>10 Go</b><span>de PDF d'urbanisme, 1 991 objets</span></div>
+      <div class="ch"><b>21 / 30</b><span>jobs d'extraction en échec, dont 19 sur la lecture du PDF</span></div>
+      <div class="ch"><b>31</b><span>edge functions Deno, 6 crons pg_cron</span></div>
+      <div class="ch"><b>85</b><span>policies RLS, 14 fonctions SQL</span></div>
+      <div class="ch"><b>0</b><span>workflow de CI qui lance les tests</span></div>
+    </div>
+    <p class="note-mesure">Base : requêtes <code>SELECT</code> en transaction lecture seule via la CLI Supabase. Code : <code>tools/inventaire-ancien.mjs</code> sur <code>origin/main</code>.</p>
+    <div class="mesure">
+      <p>
+        Trois conséquences pour le plan. Il n'y a <strong>rien à migrer côté client</strong> : la bascule
+        ne met personne en risque. La chaîne PLU <strong>bute sur la lecture des PDF, pas sur le
+        LLM</strong>. Et le front dépend directement des API publiques : 21 fichiers les appellent
+        depuis le navigateur, si bien que chaque panne externe devient une panne de l'écran.
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section id="cible">
+    <span class="eyebrow">La situation visée</span>
+    <h2>Un backend, trois points d'entrée, une base qui ne décide rien</h2>
+
+    <figure>
+      <div class="fig-wrap">
+        <svg class="dg" viewBox="0 0 920 600" role="img" aria-label="Architecture visée : le navigateur passe par le front et l'API, Claude passe par la CLI, seul le worker parle à l'extérieur, et Postgres sépare données client et données de référence.">
+          <defs>
+            <marker id="m1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="pointe"/></marker>
+            <marker id="m1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="pointe-a"/></marker>
+            <marker id="m1d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="pointe-d"/></marker>
+          </defs>
+
+          <!-- Extérieur -->
+          <text x="18" y="172" class="z">EXTÉRIEUR</text>
+          <rect x="16" y="180" width="200" height="204" class="ext"/>
+          <rect x="28" y="196" width="176" height="50" class="boite"/>
+          <text x="116" y="217" text-anchor="middle" class="t">API publiques</text>
+          <text x="116" y="234" text-anchor="middle" class="s">IGN · GPU · Géorisques · DVF</text>
+          <rect x="28" y="258" width="176" height="50" class="boite"/>
+          <text x="116" y="279" text-anchor="middle" class="t">Documents PLU</text>
+          <text x="116" y="296" text-anchor="middle" class="s">PDF et ZIP du GPU</text>
+          <rect x="28" y="320" width="176" height="50" class="boite"/>
+          <text x="116" y="341" text-anchor="middle" class="t">LLM</text>
+          <text x="116" y="358" text-anchor="middle" class="s">extraction des règles</text>
+
+          <!-- Clients -->
+          <rect x="500" y="16" width="180" height="44" class="boite"/>
+          <text x="590" y="43" text-anchor="middle" class="t">Navigateur</text>
+          <rect x="710" y="16" width="180" height="44" class="boite"/>
+          <text x="800" y="43" text-anchor="middle" class="t">Claude / MCP</text>
+          <rect x="500" y="118" width="180" height="44" class="boite"/>
+          <text x="590" y="145" text-anchor="middle" class="t">Front React</text>
+
+          <!-- Backend -->
+          <rect x="274" y="190" width="632" height="176" class="zone"/>
+          <text x="286" y="208" class="z">BACKEND NESTJS · UN CODE, TROIS POINTS D'ENTRÉE</text>
+          <rect x="290" y="222" width="180" height="130" class="boite-a"/>
+          <text x="380" y="262" text-anchor="middle" class="t">Worker</text>
+          <text x="380" y="282" text-anchor="middle" class="s">jobs BullMQ</text>
+          <text x="380" y="298" text-anchor="middle" class="s">un adaptateur par source</text>
+          <text x="380" y="314" text-anchor="middle" class="s">fraîcheur par source</text>
+          <rect x="500" y="222" width="180" height="130" class="boite"/>
+          <text x="590" y="262" text-anchor="middle" class="t">API</text>
+          <text x="590" y="282" text-anchor="middle" class="s">e-mail + mot de passe</text>
+          <text x="590" y="298" text-anchor="middle" class="s">études, estimations</text>
+          <text x="590" y="314" text-anchor="middle" class="s">jamais d'appel externe</text>
+          <rect x="710" y="222" width="180" height="130" class="boite"/>
+          <text x="800" y="262" text-anchor="middle" class="t">CLI</text>
+          <text x="800" y="282" text-anchor="middle" class="s">commandes métier</text>
+          <text x="800" y="298" text-anchor="middle" class="s">mêmes services que l'API</text>
+          <text x="800" y="314" text-anchor="middle" class="s">prod en lecture seule</text>
+
+          <!-- Redis entre API et worker -->
+          <rect x="455" y="372" width="90" height="36" class="boite"/>
+          <text x="500" y="389" text-anchor="middle" class="t" style="font-size:12px">Redis</text>
+          <text x="500" y="402" text-anchor="middle" class="s">file</text>
+
+          <!-- S3 -->
+          <rect x="28" y="452" width="176" height="60" class="boite"/>
+          <text x="116" y="476" text-anchor="middle" class="t">Stockage S3</text>
+          <text x="116" y="494" text-anchor="middle" class="s">PDF · CSV DVF · exports</text>
+
+          <!-- Postgres -->
+          <rect x="320" y="424" width="586" height="160" class="zone"/>
+          <text x="332" y="442" class="z">POSTGRES · POSTGIS · PGVECTOR · « BÊTE »</text>
+          <rect x="336" y="456" width="200" height="112" class="boite"/>
+          <text x="436" y="490" text-anchor="middle" class="t">Données de référence</text>
+          <text x="436" y="510" text-anchor="middle" class="s">cadastre · zonage · règles</text>
+          <text x="436" y="526" text-anchor="middle" class="s">risques · DVF · ECLN</text>
+          <text x="436" y="542" text-anchor="middle" class="s">+ état du travail</text>
+          <rect x="596" y="456" width="200" height="112" class="boite"/>
+          <text x="696" y="490" text-anchor="middle" class="t">Données client</text>
+          <text x="696" y="510" text-anchor="middle" class="s">comptes · sessions</text>
+          <text x="696" y="526" text-anchor="middle" class="s">études · estimations</text>
+          <text x="696" y="542" text-anchor="middle" class="s">journal d'audit</text>
+
+          <!-- Flux -->
+          <line x1="590" y1="60" x2="590" y2="116" class="fl" marker-end="url(#m1)"/>
+          <text x="598" y="92" class="lbl">HTTPS</text>
+          <line x1="590" y1="162" x2="590" y2="220" class="fl" marker-end="url(#m1)"/>
+          <text x="598" y="184" class="lbl">REST typé</text>
+          <line x1="800" y1="60" x2="800" y2="220" class="fl" marker-end="url(#m1)"/>
+          <text x="808" y="132" class="lbl">commandes</text>
+
+          <polyline points="500,140 116,140 116,194" class="fl-d" marker-end="url(#m1d)"/>
+          <text x="300" y="132" text-anchor="middle" class="lbl">tuiles de fond · IGN en direct, surveillé</text>
+
+          <line x1="290" y1="232" x2="206" y2="221" class="fl-a" marker-end="url(#m1a)"/>
+          <line x1="290" y1="283" x2="206" y2="283" class="fl-a" marker-end="url(#m1a)"/>
+          <line x1="290" y1="334" x2="206" y2="345" class="fl-a" marker-end="url(#m1a)"/>
+          <text x="248" y="376" text-anchor="middle" class="lbl-a">seul à sortir</text>
+
+          <polyline points="560,352 560,390 547,390" class="fl" marker-end="url(#m1)"/>
+          <text x="566" y="384" class="lbl">enfile</text>
+          <polyline points="455,390 420,390 420,354" class="fl" marker-end="url(#m1)"/>
+          <text x="414" y="386" text-anchor="end" class="lbl">consomme</text>
+
+          <line x1="370" y1="352" x2="370" y2="454" class="fl" marker-end="url(#m1)"/>
+          <text x="364" y="418" text-anchor="end" class="lbl">écrit</text>
+          <line x1="640" y1="352" x2="640" y2="454" class="fl" marker-end="url(#m1)"/>
+          <text x="646" y="418" class="lbl">lit · écrit</text>
+          <polyline points="850,352 850,512 798,512" class="fl" marker-end="url(#m1)"/>
+          <text x="856" y="418" class="lbl">même accès</text>
+
+          <polyline points="300,352 300,482 206,482" class="fl" marker-end="url(#m1)"/>
+          <text x="294" y="470" text-anchor="end" class="lbl">dépose</text>
+
+          <line x1="596" y1="512" x2="538" y2="512" class="fl-a" marker-end="url(#m1a)"/>
+          <text x="566" y="504" text-anchor="middle" class="lbl-a">version</text>
+        </svg>
+      </div>
+      <figcaption>
+        Seul le worker franchit la frontière vers l'extérieur. L'API ne lit que la base. Elle dépose
+        des jobs dans Redis, que le worker consomme. Une étude pointe vers la <em>version</em> des
+        données de référence qu'elle a utilisées. Seule exception : les tuiles des fonds de carte,
+        que le navigateur charge directement chez IGN. Leurs erreurs sont mesurées, et un proxy ne
+        se monte que sur critère (décision D-08).
+      </figcaption>
+    </figure>
+
+    <h3>Les règles qui tiennent l'ensemble</h3>
+    <div class="principes">
+      <div class="principe"><b>Seul le worker sort</b><span>Reprises, disjoncteur, limite de débit et métriques vivent en un seul endroit. Une panne d'IGN ne casse plus un écran : on sert la dernière copie, avec sa date.</span></div>
+      <div class="principe"><b>La base est « bête »</b><span>Tables, types, index, clés primaires et étrangères, <code>UNIQUE</code>, <code>NOT NULL</code>. Aucun trigger, aucune fonction SQL, aucune policy. La CI refuse une migration qui en contient.</span></div>
+      <div class="principe"><b>L'état du travail vit dans Postgres</b><span>Redis ne porte que « quoi faire maintenant ». Une réconciliation périodique réenfile ce qui s'est perdu, donc Redis n'a pas besoin de sauvegarde.</span></div>
+      <div class="principe"><b>Les références se font par version</b><span>Une analyse retient le PLU, le millésime DVF et la date des risques qu'elle a utilisés. On sait ce qui a produit un résultat, et quand il faut le recalculer.</span></div>
+      <div class="principe"><b>Un seul code, trois points d'entrée</b><span>API, worker et CLI partagent les mêmes services. Claude pilote des commandes métier, jamais du SQL brut.</span></div>
+      <div class="principe"><b>Tout au nom du produit</b><span>Dépôt, cloud, domaine, compte LLM, Sentry : au nom de l'entité qui porte Ardha, avec au moins deux propriétaires.</span></div>
+    </div>
+
+    <h3>La pile</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Brique</th><th>Choix</th><th>Pourquoi</th></tr></thead>
+        <tbody>
+          <tr><td>Backend</td><td class="k">NestJS · TypeScript</td><td>Injection de dépendances et modules : API, worker et CLI sur les mêmes services. Module officiel pour BullMQ.</td></tr>
+          <tr><td>Accès aux données</td><td class="k">Drizzle</td><td>Le SQL spatial s'écrit dans des requêtes typées, pgvector est natif, les migrations sont en SQL. Confiné aux repositories, donc réversible (D-06).</td></tr>
+          <tr><td>Base</td><td class="k">Postgres 18 · PostGIS 3.6 · pgvector 0.8</td><td>« Dans quelle zone tombe cette parcelle ? » devient une requête locale. Dernière version majeure, supportée jusqu'en novembre 2030 (D-10).</td></tr>
+          <tr><td>Jobs</td><td class="k">BullMQ · Redis</td><td>Toute la logique dans Node, une limite de débit par source, des flux parent-enfant pour la chaîne PLU.</td></tr>
+          <tr><td>Fichiers</td><td class="k">S3 (MinIO en local)</td><td>N'importe quel fournisseur, URL signées.</td></tr>
+          <tr><td>Front</td><td class="k">React · Vite · TanStack Query</td><td>Le client Supabase est remplacé par un client généré depuis le contrat OpenAPI de l'API.</td></tr>
+          <tr><td>Carte</td><td class="k">Leaflet</td><td>Conservé en L1, avec parcelles et zonage servis en GeoJSON par l'API. MapLibre GL si les tuiles vectorielles deviennent nécessaires (D-08).</td></tr>
+          <tr><td>CLI</td><td class="k">nest-commander</td><td>Troisième point d'entrée ; exposé plus tard en outils MCP.</td></tr>
+          <tr><td>Local</td><td class="k">docker compose</td><td>Postgres 18 (image PostGIS à laquelle on ajoute pgvector), Redis, MinIO : une application complète avec seed en une commande, une stack par worktree (D-09).</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section id="donnees">
+    <span class="eyebrow">Le modèle de données visé</span>
+    <h2>Ce que l'utilisateur décide, ce que le monde dit</h2>
+    <div class="mesure">
+      <p>
+        Aujourd'hui, une étude est une ligne de <code>etudes</code> avec six blocs JSON typés
+        <code>any</code>, complétée par neuf clés <code>localStorage</code>. Les données publiques y
+        sont recopiées au moment de l'étude, sans dire d'où elles viennent. Le modèle visé sépare les
+        deux familles, et le calcul retient ce qu'il a utilisé.
+      </p>
+      <p>
+        <strong>C'est une première esquisse.</strong> Le modèle de l'étude évoluera en itérant dessus,
+        à partir de L2 ; ce qui est acquis, c'est la séparation des deux familles et le lien par version.
+      </p>
+    </div>
+
+    <div class="modele">
+      <div class="famille">
+        <div class="famille-tete"><b>Données client</b><span>Appartiennent à l'utilisateur. Sauvegardées, jamais reconstruites.</span></div>
+        <div class="entite"><code>utilisateur</code> · <code>session</code><span>e-mail, mot de passe (argon2id), nom, rôle (admin, utilisateur)</span></div>
+        <div class="entite"><code>etude</code><span>auteur, nom, statut, commune, adresse principale</span></div>
+        <div class="entite"><code>etude_parcelle</code><span>référence cadastrale (IDU), géométrie, surface, rôle</span></div>
+        <div class="entite"><code>etude_variante</code><span>hypothèses de faisabilité, en JSON validé par un schéma versionné</span></div>
+        <div class="entite"><code>etude_analyse</code><span>type (urbanisme, risques, foncier, faisabilité), entrées = versions des sources, résultat, date du calcul</span></div>
+        <div class="entite"><code>estimation</code><span>bien (adresse, type, surfaces, pièces, DPE, état…), étape du parcours, fourchette de prix</span></div>
+        <div class="entite"><code>estimation_comparable</code> · <code>estimation_photo</code><span>mutation DVF retenue, score, ajustements ; photo rangée dans S3</span></div>
+        <div class="entite"><code>journal_audit</code><span>qui a fait quoi, quand</span></div>
+      </div>
+      <div class="famille">
+        <div class="famille-tete"><b>Données de référence</b><span>Alimentées par le worker. Reconstructibles depuis les sources.</span></div>
+        <div class="entite"><code>commune</code> · <code>parcelle</code><span>référentiel des communes ; cadastre Etalab, chargé commune par commune</span></div>
+        <div class="entite"><code>zonage_version</code> · <code>zone</code><span>zonage et prescriptions du GPU en PostGIS, par version du document</span></div>
+        <div class="entite"><code>document_urba</code> · <code>document_version</code><span>identifiant GPU, date d'approbation, empreinte, statut dans la chaîne</span></div>
+        <div class="entite"><code>reglement_segment</code><span>sortie de l'extracteur déterministe : zone, secteur, commune, article, texte, pages</span></div>
+        <div class="entite"><code>regle</code><span>thème, valeur, unité, condition, citation vérifiée, fiabilité, statut. Une ligne par règle, fini le bloc JSON</span></div>
+        <div class="entite"><code>dvf_mutation</code><span>mutations brutes par millésime, géolocalisées : analyses à rayon fin en local</span></div>
+        <div class="entite"><code>risque</code> · <code>ecln</code> · <code>indice_insee</code><span>caches à la demande et séries publiées</span></div>
+        <div class="entite"><code>etat_source</code><span>par source et par commune : version connue, date, état (frais, à vérifier, périmé)</span></div>
+      </div>
+    </div>
+    <div class="lien-version">
+      <strong>Le lien qui change tout.</strong> <code>etude_analyse.entrees</code> cite la version du
+      PLU, le millésime DVF et la date des risques. Quand une source bouge, l'étude affiche « données
+      plus récentes disponibles » et propose de recalculer. Les références vont toujours du client
+      vers la référence, jamais l'inverse.
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section id="migrations">
+    <span class="eyebrow">Les migrations prévues</span>
+    <h2>De l'ancien vers le nouveau</h2>
+    <div class="mesure">
+      <p>
+        Aucune donnée ne migre (D-03) : 0 étude et 0 estimation en base, et la référence se reconstruit
+        depuis les sources. Ce qui migre, ce sont des fonctions, réécrites dans une autre architecture.
+      </p>
+    </div>
+
+    <figure>
+      <div class="fig-wrap">
+        <svg class="dg" viewBox="0 0 920 300" role="img" aria-label="Avant : le navigateur et les edge functions appellent Internet, les crons passent par HTTP. Après : seul le worker appelle Internet, le navigateur ne charge que des tuiles.">
+          <defs>
+            <marker id="m2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="pointe"/></marker>
+            <marker id="m2a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="pointe-a"/></marker>
+            <marker id="m2d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="pointe-d"/></marker>
+          </defs>
+
+          <!-- Aujourd'hui -->
+          <text x="20" y="22" class="z">AUJOURD'HUI</text>
+          <rect x="20" y="40" width="150" height="44" class="boite"/>
+          <text x="95" y="67" text-anchor="middle" class="t">Navigateur</text>
+          <rect x="20" y="134" width="150" height="44" class="boite"/>
+          <text x="95" y="161" text-anchor="middle" class="t">31 edge functions</text>
+          <rect x="20" y="228" width="150" height="44" class="boite"/>
+          <text x="95" y="255" text-anchor="middle" class="t">6 crons pg_cron</text>
+          <line x1="330" y1="30" x2="330" y2="290" class="fl-d"/>
+          <rect x="345" y="40" width="90" height="232" class="boite"/>
+          <text x="390" y="150" text-anchor="middle" class="t">Internet</text>
+          <text x="390" y="168" text-anchor="middle" class="s">API · PDF · LLM</text>
+
+          <line x1="170" y1="62" x2="343" y2="62" class="fl" marker-end="url(#m2)"/>
+          <text x="256" y="54" text-anchor="middle" class="lbl">21 fichiers, en direct</text>
+          <line x1="95" y1="84" x2="95" y2="132" class="fl" marker-end="url(#m2)"/>
+          <text x="103" y="112" class="lbl">25 invoke</text>
+          <line x1="170" y1="156" x2="343" y2="156" class="fl" marker-end="url(#m2)"/>
+          <text x="256" y="148" text-anchor="middle" class="lbl">appels</text>
+          <line x1="95" y1="228" x2="95" y2="180" class="fl" marker-end="url(#m2)"/>
+          <text x="103" y="208" class="lbl">HTTP + secret</text>
+
+          <!-- Demain -->
+          <text x="490" y="22" class="z">DEMAIN</text>
+          <rect x="490" y="40" width="150" height="44" class="boite"/>
+          <text x="565" y="67" text-anchor="middle" class="t">Navigateur</text>
+          <rect x="490" y="134" width="150" height="44" class="boite"/>
+          <text x="565" y="161" text-anchor="middle" class="t">API</text>
+          <rect x="490" y="228" width="150" height="44" class="boite"/>
+          <text x="565" y="255" text-anchor="middle" class="t">Postgres</text>
+          <rect x="670" y="228" width="110" height="44" class="boite-a"/>
+          <text x="725" y="255" text-anchor="middle" class="t">Worker</text>
+          <line x1="800" y1="30" x2="800" y2="290" class="fl-d"/>
+          <rect x="815" y="40" width="90" height="232" class="boite"/>
+          <text x="860" y="150" text-anchor="middle" class="t">Internet</text>
+          <text x="860" y="168" text-anchor="middle" class="s">API · PDF · LLM</text>
+
+          <line x1="640" y1="62" x2="813" y2="62" class="fl-d" marker-end="url(#m2d)"/>
+          <text x="726" y="54" text-anchor="middle" class="lbl">tuiles, affichage seul</text>
+          <line x1="565" y1="84" x2="565" y2="132" class="fl" marker-end="url(#m2)"/>
+          <text x="573" y="112" class="lbl">REST typé</text>
+          <line x1="565" y1="178" x2="565" y2="226" class="fl" marker-end="url(#m2)"/>
+          <text x="573" y="206" class="lbl">lit</text>
+          <line x1="670" y1="250" x2="642" y2="250" class="fl" marker-end="url(#m2)"/>
+          <line x1="780" y1="250" x2="813" y2="250" class="fl-a" marker-end="url(#m2a)"/>
+          <text x="740" y="218" text-anchor="middle" class="lbl-a">seul à sortir</text>
+        </svg>
+      </div>
+      <figcaption>Aujourd'hui, le navigateur et les edge functions sortent vers Internet, et les crons s'appellent eux-mêmes en HTTP avec un secret. Demain, seul le worker sort.</figcaption>
+    </figure>
+
+    <h3>La plateforme</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Aujourd'hui</th><th>Demain</th></tr></thead>
+        <tbody>
+          <tr><td>Supabase Auth, BIMtheon ID</td><td>E-mail et mot de passe, sessions en base</td></tr>
+          <tr><td>PostgREST : 110 <code>.from()</code> dans le front</td><td>API REST typée (OpenAPI)</td></tr>
+          <tr><td>85 policies RLS, 14 fonctions SQL</td><td>Guards et services NestJS</td></tr>
+          <tr><td>31 edge functions, 6 crons <code>pg_cron</code></td><td>Jobs BullMQ, routes de l'API, commandes de la CLI</td></tr>
+          <tr><td>Supabase Storage, 10 Go</td><td>S3, URL signées</td></tr>
+          <tr><td>21 fichiers du front qui appellent les API publiques</td><td>Le worker, un adaptateur par source</td></tr>
+          <tr><td>Cartes PDF et vignettes capturées dans le navigateur</td><td>Composées par le worker</td></tr>
+          <tr><td>Netlify et Lovable, fusion = production</td><td><code>master</code> → production, <code>staging</code> (branches pré-fusionnées) → serveur de staging</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Les données : 34 tables</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Sort</th><th>Anciennes tables</th><th>Deviennent</th></tr></thead>
+        <tbody>
+          <tr><td><span class="sort s-refondu">Refondu</span></td><td class="k">etudes, estimations, user_roles</td><td><code>etude</code> (parcelles, variantes, analyses), <code>estimation</code> (comparables, photos), <code>utilisateur</code></td></tr>
+          <tr><td><span class="sort s-reconstruit">Reconstruit</span></td><td class="k">communes_referentiel, gpu_layers_cache, documents_*, archive_entrees, texte_reglement_cache, articles_urbanisme, extraction_job_chapters, regles_*, oap_analyses, dvf_price_aggregates, market_data_cache, ecln_prix_neufs, commune_data_status</td><td><code>commune</code>, <code>zone</code>, <code>document_version</code>, <code>reglement_segment</code>, <code>regle</code>, <code>dvf_mutation</code>, <code>ecln</code>, <code>etat_source</code></td></tr>
+          <tr><td><span class="sort s-absorbe">Absorbé</span></td><td class="k">extraction_jobs, pipeline_jobs, import_jobs, corpus_targets, extraction_settings, model_catalog, admin_audit_log, purge_audit_log</td><td>File BullMQ et statuts, configuration versionnée, <code>journal_audit</code></td></tr>
+          <tr><td><span class="sort s-abandonne">Abandonné</span></td><td class="k">subscription_plans, user_subscriptions, _remap_comptes</td><td>—</td></tr>
+          <tr><td><span class="sort s-abandonne">Non repris</span></td><td class="k">agent_profiles, agent_clients, agent_listings, agent_mandates</td><td>Volet agent, pas repris au départ (D-12)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="mesure">
+      Côté code, on <strong>porte</strong> avec leurs tests les 22 modules purs de <code>_shared/</code> et
+      l'extracteur de la session voisine, on <strong>réécrit</strong> tout accès aux données et les pages,
+      et on <strong>reprend</strong> les primitives shadcn/ui telles quelles.
+    </p>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section id="lots">
+    <span class="eyebrow">L'ordre des lots</span>
+    <h2>Dix lots, chacun livre un parcours complet</h2>
+
+    <figure>
+      <div class="fig-wrap">
+        <svg class="dg" viewBox="0 0 920 300" role="img" aria-label="Dépendances entre lots. Chemin critique : socle, carte, chaîne PLU, faisabilité, exports. L'estimation dépend du foncier. L'extracteur de la session voisine alimente la chaîne PLU.">
+          <defs>
+            <marker id="m3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="pointe"/></marker>
+            <marker id="m3a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="pointe-a"/></marker>
+            <marker id="m3d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="pointe-d"/></marker>
+          </defs>
+
+          <rect x="20" y="128" width="120" height="44" class="boite-a"/><text x="80" y="146" text-anchor="middle" class="t">L0</text><text x="80" y="162" text-anchor="middle" class="s">Socle</text>
+          <rect x="170" y="128" width="120" height="44" class="boite-a"/><text x="230" y="146" text-anchor="middle" class="t">L1</text><text x="230" y="162" text-anchor="middle" class="s">Carte, parcelles</text>
+          <rect x="320" y="70" width="120" height="44" class="boite"/><text x="380" y="88" text-anchor="middle" class="t">L2</text><text x="380" y="104" text-anchor="middle" class="s">Étude</text>
+          <rect x="320" y="190" width="120" height="44" class="boite-a"/><text x="380" y="208" text-anchor="middle" class="t">L3</text><text x="380" y="224" text-anchor="middle" class="s">Chaîne PLU</text>
+          <rect x="320" y="258" width="120" height="34" class="ext"/><text x="380" y="279" text-anchor="middle" class="s">extracteur voisin</text>
+          <rect x="490" y="40" width="120" height="44" class="boite"/><text x="550" y="58" text-anchor="middle" class="t">L5</text><text x="550" y="74" text-anchor="middle" class="s">Foncier, marché</text>
+          <rect x="490" y="120" width="120" height="44" class="boite"/><text x="550" y="138" text-anchor="middle" class="t">L4</text><text x="550" y="154" text-anchor="middle" class="s">Risques</text>
+          <rect x="490" y="230" width="120" height="44" class="boite"/><text x="550" y="248" text-anchor="middle" class="t">L9</text><text x="550" y="264" text-anchor="middle" class="s">Admin → CLI</text>
+          <rect x="660" y="40" width="120" height="44" class="boite"/><text x="720" y="58" text-anchor="middle" class="t">L6</text><text x="720" y="74" text-anchor="middle" class="s">Estimation</text>
+          <rect x="660" y="150" width="120" height="44" class="boite-a"/><text x="720" y="168" text-anchor="middle" class="t">L7</text><text x="720" y="184" text-anchor="middle" class="s">Faisabilité</text>
+          <rect x="800" y="100" width="110" height="44" class="boite-a"/><text x="855" y="118" text-anchor="middle" class="t">L8</text><text x="855" y="134" text-anchor="middle" class="s">Exports</text>
+
+          <line x1="140" y1="150" x2="168" y2="150" class="fl-a" marker-end="url(#m3a)"/>
+          <line x1="290" y1="140" x2="318" y2="100" class="fl" marker-end="url(#m3)"/>
+          <line x1="290" y1="160" x2="318" y2="204" class="fl-a" marker-end="url(#m3a)"/>
+          <line x1="380" y1="258" x2="380" y2="236" class="fl-d" marker-end="url(#m3d)"/>
+          <line x1="440" y1="86" x2="488" y2="64" class="fl" marker-end="url(#m3)"/>
+          <line x1="440" y1="100" x2="488" y2="140" class="fl" marker-end="url(#m3)"/>
+          <line x1="440" y1="222" x2="488" y2="250" class="fl" marker-end="url(#m3)"/>
+          <line x1="440" y1="210" x2="658" y2="176" class="fl-a" marker-end="url(#m3a)"/>
+          <line x1="610" y1="62" x2="658" y2="62" class="fl" marker-end="url(#m3)"/>
+          <line x1="610" y1="70" x2="658" y2="162" class="fl" marker-end="url(#m3)"/>
+          <line x1="610" y1="146" x2="658" y2="168" class="fl" marker-end="url(#m3)"/>
+          <line x1="780" y1="66" x2="798" y2="112" class="fl" marker-end="url(#m3)"/>
+          <line x1="780" y1="172" x2="798" y2="130" class="fl-a" marker-end="url(#m3a)"/>
+        </svg>
+      </div>
+      <figcaption>En vert, le chemin critique. L1 et L2 démarrent sans attendre personne ; L3 attend l'extracteur PDF de la session voisine.</figcaption>
+    </figure>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Lot</th><th>Livre</th><th>Dépend de</th><th>Ancien code</th></tr></thead>
+        <tbody>
+          <tr><td><strong>L0 · Socle</strong></td><td>compte, connexion ; stack de dev par worktree</td><td class="n">—</td><td class="n">265 + infra</td></tr>
+          <tr><td><strong>L1 · Carte</strong></td><td>adresse, cadastre, sélection de parcelles</td><td class="n">L0</td><td class="n">1 306 + partagé</td></tr>
+          <tr><td><strong>L2 · Étude</strong></td><td>enregistrer, rouvrir, consulter sur mobile</td><td class="n">L1</td><td class="n">1 818</td></tr>
+          <tr><td><strong>L3 · PLU</strong></td><td>zone, règles vérifiées et citations, documents</td><td class="n">L1 + extracteur</td><td class="n">5 563 + 6 623</td></tr>
+          <tr><td><strong>L4 · Risques</strong></td><td>Géorisques, argiles, altimétrie, PPRI</td><td class="n">L2</td><td class="n">1 611</td></tr>
+          <tr><td><strong>L5 · Foncier</strong></td><td>DVF, prix du neuf, Sitadel, indices</td><td class="n">L2</td><td class="n">1 862 + 1 608</td></tr>
+          <tr><td><strong>L6 · Estimation</strong></td><td>parcours en 6 étapes, dossier PDF</td><td class="n">L5</td><td class="n">6 690 + 260</td></tr>
+          <tr><td><strong>L7 · Faisabilité</strong></td><td>enveloppe 3D, bilan, variantes</td><td class="n">L3 · L4 · L5</td><td class="n">5 712</td></tr>
+          <tr><td><strong>L8 · Exports</strong></td><td>PDF, GeoPackage, Shapefile, CityJSON…</td><td class="n">L6 · L7</td><td class="n">7 385</td></tr>
+          <tr><td><strong>L9 · Admin → CLI</strong></td><td>piloter la chaîne PLU en ligne de commande</td><td class="n">L3</td><td class="n">3 564 + 417</td></tr>
+          <tr><td>Hors v1</td><td>volet agent (non repris, D-12), briques SaaS</td><td class="n">—</td><td class="n">2 726 · 916</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note-mesure">Lignes propres de l'ancien code, front + edge functions : un ordre de grandeur. La vélocité se mesure sur L1.</p>
+
+    <div class="encadre">
+      <h3>L6 · Ce qui manque à l'estimation</h3>
+      <ul class="puces">
+        <li>Comparables sans nombre de pièces, rayon fin dépendant des sources en direct : réglés par <code>dvf_mutation</code> en base.</li>
+        <li>Sitadel pas encore branché : à faire en L5.</li>
+        <li>Photos cassées (le bucket appelé n'existe pas) : S3.</li>
+        <li>Drapeaux d'abonnement supprimés ; la suite « annonce, mandat » n'est pas reprise (D-12).</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section id="methode">
+    <span class="eyebrow">La méthode</span>
+    <h2>Une fonctionnalité à la fois, rien sans arbitrage</h2>
+    <ol class="boucle">
+      <li><b>Scanner</b><br>l'ancien code, chaque point cité en <code>fichier:ligne</code></li>
+      <li><b>Écrire la fiche</b><br>une ligne par comportement, captures à l'appui</li>
+      <li class="cle"><b>Arbitrer</b><br>toi : garder, simplifier, abandonner, reporter</li>
+      <li><b>Concevoir</b><br>données, API, jobs, écrans</li>
+      <li><b>Tester d'abord</b><br>cas tirés de l'ancien comportement</li>
+      <li><b>Coder</b><br>une PR par fonctionnalité</li>
+      <li><b>Recetter</b><br>ancien et nouveau côte à côte</li>
+      <li><b>Clore</b><br>CI verte, fiche à jour</li>
+    </ol>
+    <p class="mesure" style="margin-top:18px">
+      La recette se joue sur trois communes : Maisons-Alfort (94046, PLUi à secteurs), Tours (37261, PLU de
+      grande ville) et une petite commune en carte communale ou au RNU, à choisir.
+    </p>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section id="outillage">
+    <span class="eyebrow">L'outillage</span>
+    <h2>Une stack par worktree, des agents en parallèle</h2>
+    <div class="mesure">
+      <p>
+        Chaque copie de travail du dépôt, clone principal ou worktree git, démarre sa propre stack
+        complète et isolée, avec la même commande. C'est le mécanisme de <code>castor.php</code> de
+        <code>windoo/saas</code>, porté en tâches Node.
+      </p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Au démarrage</th><th>Comment</th></tr></thead>
+        <tbody>
+          <tr><td>Reconnaître un worktree</td><td>Racine de la copie ≠ racine du dépôt principal (<code>git rev-parse</code>).</td></tr>
+          <tr><td>Isoler la stack</td><td>Projet Compose nommé d'après le dossier : conteneurs et volumes séparés.</td></tr>
+          <tr><td>Décaler les ports</td><td><code>crc32(branche) % 400 + 5</code>, ajouté au port de base de Postgres, Redis, MinIO, de l'API et du front. <code>docker-compose.override.yaml</code> et <code>.env.local</code> sont générés et ignorés par git.</td></tr>
+          <tr><td>Séparer les sessions</td><td>Cookie de session suffixé par le worktree : un cookie ignore le port.</td></tr>
+          <tr><td>Remplir la base</td><td>Seed déterministe depuis les fixtures des trois communes de référence, sans appel externe.</td></tr>
+          <tr><td>Tester sans Internet</td><td>Tests d'intégration sur la base du worktree ; réponses des API publiques enregistrées.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul class="puces mesure">
+      <li><strong>Des agents en parallèle</strong> : chacun code dans son worktree, avec sa base, ses ports et ses tests, sans gêner les autres.</li>
+      <li><strong>À terme, des instances éphémères</strong> : la même commande démarre une stack sur une machine vierge (agent dans le cloud, environnement éphémère par branche), puisque rien ne dépend d'une base partagée ni d'un service externe.</li>
+      <li><strong>Point de vigilance</strong> : 400 décalages possibles, donc deux branches peuvent tomber sur les mêmes ports. Le démarrage vérifie qu'ils sont libres et le dit clairement sinon.</li>
+    </ul>
+
+    <h3>Le reste</h3>
+    <div class="table-wrap">
+      <table>
+        <tbody>
+          <tr><td><strong>CI</strong></td><td>Types, lint, tests unitaires et d'intégration, migrations rejouées depuis zéro, contrôle « base bête », build.</td></tr>
+          <tr><td><strong>Couverture</strong></td><td>Seuil à cliquet, au moins 90 % sur le domaine.</td></tr>
+          <tr><td><strong>CD</strong></td><td>Les PR visent <code>master</code>, qui déploie la production. <code>staging</code> est une copie de <code>master</code> dans laquelle on pré-fusionne les branches en cours, pour les essayer ensemble sur le serveur de staging avant leur PR ; elle est régulièrement reprise depuis <code>master</code>. Des environnements éphémères par branche viendront dans un second temps.</td></tr>
+          <tr><td><strong>Migrations</strong></td><td>SQL versionné, appliqué uniquement par la CD.</td></tr>
+          <tr><td><strong>Sauvegardes</strong></td><td>Restauration à un instant donné, dump nocturne chez un autre fournisseur, test de restauration hebdomadaire.</td></tr>
+          <tr><td><strong>Observabilité</strong></td><td>Sentry, logs structurés, alertes sur la file, le coût LLM et les erreurs de tuiles.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section id="risques">
+    <span class="eyebrow">Risques</span>
+    <h2>Ce qui peut mal tourner</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Risque</th><th>Parade</th></tr></thead>
+        <tbody>
+          <tr><td>Une réécriture longue qui ne livre rien</td><td>Tranches verticales, staging dès L0 ; l'ancienne application tourne jusqu'à la bascule.</td></tr>
+          <tr><td>Des comportements perdus en route</td><td>Fiches arbitrées, recette comparée.</td></tr>
+          <tr><td>L3 bloqué par l'extracteur voisin</td><td>L1, L2, L4 et L5 avancent sans lui.</td></tr>
+          <tr><td>Le coût LLM de reconstruction</td><td>N'extraire que les segments modifiés.</td></tr>
+          <tr><td>Drizzle encore en 0.x</td><td>Version épinglée, accès confiné aux repositories.</td></tr>
+          <tr><td>Une API publique qui change</td><td>Un adaptateur par source, des tests de contrat.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section id="decisions-prises">
+    <span class="eyebrow">Décisions prises</span>
+    <h2>Ce qui est tranché</h2>
+    <p class="mesure">Le 29/09/2026. Une décision se rouvre sur un fait nouveau, pas sur une préférence.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>N°</th><th>Décision</th><th>Plutôt que</th><th>Pourquoi</th></tr></thead>
+        <tbody>
+          <tr><td class="k">D-01</td><td><strong>Logiciel autonome</strong></td><td>la constellation</td><td>Posséder toute la chaîne technique.</td></tr>
+          <tr><td class="k">D-02</td><td><strong>v1 gratuite, e-mail et mot de passe</strong></td><td>un SaaS complet dès la v1</td><td>Des bases stables d'abord.</td></tr>
+          <tr><td class="k">D-03</td><td><strong>Réécriture intégrale, sans migration de données</strong></td><td>migrer</td><td>0 étude, 0 estimation en base.</td></tr>
+          <tr><td class="k">D-04</td><td><strong>NestJS : API, worker, CLI</strong></td><td>Sails.js</td><td>Un code, trois points d'entrée ; Waterline ignore PostGIS.</td></tr>
+          <tr><td class="k">D-05</td><td><strong>Base « bête », BullMQ et Redis</strong></td><td>pg-boss</td><td>pg-boss installe 5 fonctions SQL et fait de la base la file.</td></tr>
+          <tr><td class="k">D-06</td><td><strong>Drizzle</strong></td><td>Prisma</td><td>SQL spatial typé, pgvector natif ; Prisma 7.10 n'a pas de type géométrique.</td></tr>
+          <tr><td class="k">D-07</td><td><strong>L'estimation dans la v1 (L6)</strong></td><td>la reporter</td><td>Partie clé du produit.</td></tr>
+          <tr><td class="k">D-08</td><td><strong>Fonds IGN en direct, surveillés</strong></td><td>un proxy de tuiles</td><td>Aucune panne de tuiles dans l'historique ; proxy sur critère.</td></tr>
+          <tr><td class="k">D-09</td><td><strong>Une stack par worktree</strong></td><td>une stack locale unique</td><td>Des agents en parallèle, puis des instances éphémères.</td></tr>
+                    <tr><td class="k">D-10</td><td><strong>PostgreSQL 18</strong></td><td>PostgreSQL 17</td><td>Dernière majeure (18.6), supportée jusqu'au 14/11/2030 ; PostGIS 3.6 et pgvector 0.8.5 existent pour elle.</td></tr>
+          <tr><td class="k">D-11</td><td><strong>Déploiement par branches : <code>master</code> → production, <code>staging</code> → serveur de staging</strong></td><td>staging automatique et production sur tag</td><td>Les PR visent <code>master</code> ; <code>staging</code> reçoit les branches en cours pré-fusionnées et repart régulièrement de <code>master</code>. Environnements éphémères par branche plus tard.</td></tr>
+          <tr><td class="k">D-12</td><td><strong>Volet agent non repris au départ</strong></td><td>le porter en v1</td><td>Clients, annonces, mandats, rapprochement, fiche IA et profil professionnel : un autre métier, sans usage (tables vides), et le mandat pèse réglementairement.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note-mesure">Versions relevées le 29/09 : npm (<code>prisma</code> 7.10.0, 8.0.0-rc.19 en « latest » ; <code>drizzle-orm</code> 0.45.3 ; <code>pg-boss</code> 12.35.0), postgresql.org (18.6, pas de 19), Docker Hub (<code>postgis/postgis:18-3.6</code>, <code>pgvector/pgvector:0.8.5-pg18</code>).</p>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section id="decisions">
+    <span class="eyebrow">Décisions ouvertes</span>
+    <h2>Reste à trancher</h2>
+    <div class="table-wrap">
+      <table>
+        <tbody>
+          <tr><td><strong>Propriété</strong></td><td>À quel nom ouvrir le dépôt, le cloud, le domaine, le compte LLM, Sentry ?</td></tr>
+          <tr><td><strong>Hébergeur</strong></td><td>Lequel, en fin de L0 : Postgres 18 avec PostGIS et pgvector, Redis, S3, dans l'UE.</td></tr>
+          <tr><td><strong>LLM</strong></td><td>Garder Azure OpenAI sur un compte propre, ou changer ?</td></tr>
+          <tr><td><strong>Extracteur voisin</strong></td><td>Caler son format de sortie sur <code>reglement_segment</code>.</td></tr>
+          <tr><td><strong>Fonds de carte</strong></td><td>Quel taux d'erreurs de tuiles déclenche le proxy ?</td></tr>
+          <tr><td><strong>Recette</strong></td><td>Quelle petite commune en carte communale ou au RNU ?</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer class="pied">
+    Plan du 29/09/2026, révision 6. Ancien code : <span class="mono">bimtheon-studio/ardha</span> @ <span class="mono">2a7f9a0</span>.
+    Base : <span class="mono">bimtheon-core</span>, comptages en lecture seule le 29/09. Détail dans
+    <span class="mono">ardha-app/docs/reecriture/</span>.
+  </footer>
+
+</div>
