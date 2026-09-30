@@ -11,16 +11,24 @@ export function testDatabaseUrl(): string {
   return url;
 }
 
-/** Config de test ; le nom de cookie, unique, isole aussi les compteurs du limiteur dans Redis. */
-export function testConfig(): Config {
+/**
+ * Config de test. Le nom de cookie et le préfixe des files, uniques, isolent dans Redis les compteurs
+ * du limiteur et les jobs (le worker de développement ne les voit pas). Sources enregistrées : aucun
+ * appel à Internet.
+ */
+export function testConfig(overrides: NodeJS.ProcessEnv = {}): Config {
   loadLocalEnv();
+  const id = randomBytes(4).toString('hex');
   return readConfig({
     ...process.env,
     NODE_ENV: 'test',
     DATABASE_URL: testDatabaseUrl(),
     WEB_ORIGIN: 'http://127.0.0.1:14000',
-    SESSION_COOKIE_NAME: `test_${randomBytes(4).toString('hex')}`,
+    SESSION_COOKIE_NAME: `test_${id}`,
+    QUEUE_PREFIX: `test:${id}`,
+    ARDHA_SOURCES: 'recorded',
     TRUST_PROXY: '1',
     LOG_LEVEL: 'silent',
+    ...overrides,
   });
 }

@@ -13,13 +13,18 @@ import {
 import { AccountsModule } from '../accounts/accounts.module.ts';
 import type { Config } from '../config/config.ts';
 import { ConfigModule } from '../config/config.module.ts';
+import { GeoModule } from '../geo/geo.module.ts';
+import { IngestionModule } from '../ingestion/ingestion.module.ts';
+import { QueuesModule } from '../shared/queues.ts';
+import { RedisModule } from '../shared/redis.ts';
+import { GEO_COMMANDS } from './geo.commands.ts';
 
 @Module({})
 export class CliModule {
   static forConfig(config?: Config) {
     return {
       module: CliModule,
-      imports: [ConfigModule.forConfig(config), DbModule, AccountsModule],
+      imports: [ConfigModule.forConfig(config), DbModule, RedisModule, QueuesModule.forRoot(), AccountsModule, GeoModule, IngestionModule],
       providers: [
         MigrateCommand,
         SeedCommand,
@@ -28,6 +33,7 @@ export class CliModule {
         DeactivateCommand,
         ReactivateCommand,
         ListUsersCommand,
+        ...GEO_COMMANDS,
       ],
     };
   }

@@ -23,7 +23,7 @@ export function useMe() {
 export function useLogin() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (body: Login) => callApi(authRoutes.login, body),
+    mutationFn: (body: Login) => callApi(authRoutes.login, { body }),
     onSuccess: (u) => client.setQueryData(ME_KEY, u),
   });
 }
@@ -31,7 +31,7 @@ export function useLogin() {
 export function useSignup() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (body: Signup) => callApi(authRoutes.signup, body),
+    mutationFn: (body: Signup) => callApi(authRoutes.signup, { body }),
     onSuccess: (u) => client.setQueryData(ME_KEY, u),
   });
 }

@@ -27,7 +27,7 @@ export function ResetPassword() {
     if (!body) return;
     setPending(true);
     try {
-      await callApi(authRoutes.passwordReset, body);
+      await callApi(authRoutes.passwordReset, { body });
       await navigate('/login', { replace: true, state: { info: 'Mot de passe changé. Connectez-vous avec le nouveau.' } });
     } catch (error) {
       form.showError(error);

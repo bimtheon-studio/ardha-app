@@ -1,0 +1,5 @@
+{
+  "url": "https://data.geopf.fr/geocodage/search?q=place+Jean+Jaur%C3%A8s+Tours&limit=5&index=address",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8"
+}

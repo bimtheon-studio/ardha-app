@@ -2,6 +2,8 @@
 //  - le domaine (`src/domain`) est pur : aucun import hors de son dossier ;
 //  - le contrat (`src/contracts`) ne dépend que du domaine et de zod ;
 //  - Drizzle ne sort pas de `src/db` et des repositories (D-06) ;
+//  - seuls le worker et la CLI touchent aux sources publiques (`src/sources`, `src/ingestion`) :
+//    l'API ne sort jamais (PLAN §3), et `fetch` n'existe que dans `src/sources/http.ts` ;
 //  - le front n'importe du back que le contrat et le domaine (`@contracts`, `@domain`).
 import js from '@eslint/js';
 import reactHooks from 'eslint-plugin-react-hooks';
@@ -9,6 +11,14 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 const restrict = (...motifs) => ['error', { patterns: motifs }];
+
+const DRIZZLE = { group: ['drizzle-orm', 'drizzle-orm/*'], message: 'Drizzle reste dans src/db et les repositories (D-06).' };
+const SOURCES = {
+  group: ['**/sources/*', '**/ingestion/*'],
+  message: 'Seuls le worker et la CLI appellent les sources publiques (PLAN §3) : l’API dépose un job.',
+};
+/** Ce qui a le droit de sortir vers l'extérieur, ou de piloter ce qui sort. */
+const OUTBOUND = ['src/worker/**/*.ts', 'src/cli/**/*.ts', 'src/ingestion/**/*.ts', 'src/sources/**/*.ts'];
 
 export default tseslint.config(
   { ignores: ['**/dist/**', '**/coverage/**', 'node_modules/**', 'frontend/node_modules/**', 'docs/**', 'tools/inventaire-ancien.mjs', 'tools/rendre-inventaire.mjs'] },
@@ -35,12 +45,24 @@ export default tseslint.config(
   { files: ['**/*.js', 'drizzle.config.ts'], ...tseslint.configs.disableTypeChecked },
   {
     files: ['src/**/*.ts'],
-    ignores: ['src/db/**', 'src/**/*.repository.ts', 'src/**/*.test.ts'],
+    ignores: ['src/db/**', 'src/**/*.repository.ts', 'src/**/*.test.ts', ...OUTBOUND],
+    rules: { 'no-restricted-imports': restrict(DRIZZLE, SOURCES) },
+  },
+  {
+    files: OUTBOUND,
+    ignores: ['src/**/*.repository.ts', 'src/**/*.test.ts'],
+    rules: { 'no-restricted-imports': restrict(DRIZZLE) },
+  },
+  {
+    files: ['src/db/**/*.ts', 'src/**/*.repository.ts'],
+    ignores: ['src/**/*.test.ts'],
+    rules: { 'no-restricted-imports': restrict(SOURCES) },
+  },
+  {
+    files: ['src/**/*.ts'],
+    ignores: ['src/sources/http.ts', 'src/**/*.test.ts'],
     rules: {
-      'no-restricted-imports': restrict({
-        group: ['drizzle-orm', 'drizzle-orm/*'],
-        message: 'Drizzle reste dans src/db et les repositories (D-06).',
-      }),
+      'no-restricted-globals': ['error', { name: 'fetch', message: 'Les appels sortants passent par Http (src/sources/http.ts), depuis le worker.' }],
     },
   },
   {

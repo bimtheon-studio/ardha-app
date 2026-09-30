@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { redisConnection } from './worker.module.ts';
+import { redisConnection } from './queues.ts';
 
 describe('connexionRedis', () => {
   it('lit hôte, port et base', () => {

@@ -9,6 +9,16 @@ function schema(s: z.ZodType, io: 'input' | 'output'): unknown {
   return z.toJSONSchema(s, { io, unrepresentable: 'any' });
 }
 
+function describeParameters(shape: z.ZodObject | undefined, place: 'path' | 'query'): unknown[] {
+  if (!shape) return [];
+  return Object.entries(shape.shape).map(([name, field]) => ({
+    name,
+    in: place,
+    required: place === 'path' || !field.safeParse(undefined).success,
+    schema: schema(field, 'input'),
+  }));
+}
+
 export function documentOpenApi(routes: Record<string, Route>, version: string): Document {
   const doc: Document = {
     openapi: '3.1.0',
@@ -29,11 +39,17 @@ export function documentOpenApi(routes: Record<string, Route>, version: string):
         default: { description: 'Erreur', content: { 'application/json': { schema: schema(ApiError, 'output') } } },
       },
     };
+    const parameters = [
+      ...describeParameters(r.params, 'path'),
+      ...describeParameters(r.query, 'query'),
+    ];
+    if (parameters.length > 0) operation.parameters = parameters;
     if (r.body) {
       operation.requestBody = { required: true, content: { 'application/json': { schema: schema(r.body, 'input') } } };
     }
     if (r.authenticated) operation.security = [{ session: [] }];
-    doc.paths[r.path] = { ...doc.paths[r.path], [r.method.toLowerCase()]: operation };
+    const path = r.path.replace(/:([A-Za-z]+)/g, '{$1}');
+    doc.paths[path] = { ...doc.paths[path], [r.method.toLowerCase()]: operation };
   }
   return doc;
 }

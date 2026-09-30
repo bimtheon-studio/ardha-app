@@ -3,10 +3,31 @@
 // bête » : tables, types, index, clés, contraintes ; jamais de logique en base. Seuls les défauts
 // `uuidv7()` et `now()`, natifs de PostgreSQL 18.
 import { sql } from 'drizzle-orm';
-import { index, jsonb, pgEnum, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import {
+  customType,
+  index,
+  integer,
+  jsonb,
+  pgEnum,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core';
 
 const id = () => uuid().primaryKey().default(sql`uuidv7()`);
 const timestampTz = () => timestamp({ withTimezone: true, mode: 'date' });
+
+/**
+ * Surface PostGIS en WGS84. Drizzle ne connaît que les points : les repositories lisent par
+ * `ST_AsGeoJSON` et écrivent par `ST_GeomFromGeoJSON`.
+ */
+const multiPolygon = customType<{ data: string; driverData: string }>({
+  dataType: () => 'geometry(MultiPolygon, 4326)',
+});
+// Le type `geometry` de Drizzle perd le SRID en migration : point décrit à la main, lu par ST_X / ST_Y.
+const point = customType<{ data: string; driverData: string }>({ dataType: () => 'geometry(Point, 4326)' });
 
 export const userRole = pgEnum('user_role', ['admin', 'user']);
 export const auditOrigin = pgEnum('audit_origin', ['api', 'cli', 'worker']);
@@ -76,6 +97,67 @@ export const auditLog = pgTable(
   (t) => [index().on(t.createdAt), index().on(t.actorId), index().on(t.action)],
 );
 
+/** Données de référence : les communes dont on a chargé au moins une source (geo.api.gouv.fr). */
+export const commune = pgTable('communes', {
+  /** Code INSEE (`94046`, `2A004`, `75111` pour un arrondissement). */
+  code: text().primaryKey(),
+  name: text().notNull(),
+  departmentCode: text().notNull(),
+  postcodes: text().array().notNull().default(sql`'{}'::text[]`),
+  /** `[longitude, latitude]`. */
+  center: point(),
+  contour: multiPolygon(),
+  updatedAt: timestampTz().notNull().defaultNow(),
+});
+
+/** Données de référence : le cadastre Etalab, chargé commune par commune, remplacé à chaque millésime. */
+export const parcel = pgTable(
+  'parcels',
+  {
+    /** IDU, 14 caractères. */
+    id: text().primaryKey(),
+    communeCode: text()
+      .notNull()
+      .references(() => commune.code, { onDelete: 'cascade' }),
+    prefix: text().notNull(),
+    section: text().notNull(),
+    number: text().notNull(),
+    /** Contenance cadastrale, en m² ; parfois absente. */
+    contenance: integer(),
+    geometry: multiPolygon().notNull(),
+    /** Millésime du cadastre Etalab (`2026-09-01`). */
+    version: text().notNull(),
+  },
+  (t) => [index().on(t.communeCode), index('parcels_geometry_index').using('gist', t.geometry)],
+);
+
+export const sourceStatus = pgEnum('source_status', ['queued', 'loading', 'ready', 'failed']);
+
+/**
+ * État d'une source de référence sur un périmètre (le cadastre d'une commune…) : ce que le worker
+ * a chargé, quand, et ce qui reste à faire. L'état du travail vit ici, pas dans Redis (PLAN §3).
+ */
+export const sourceState = pgTable(
+  'source_states',
+  {
+    source: text().notNull(),
+    /** Périmètre : code INSEE pour le cadastre. */
+    scope: text().notNull(),
+    status: sourceStatus().notNull(),
+    /** Version chargée (millésime), gardée pendant un rechargement. */
+    version: text(),
+    itemCount: integer(),
+    requestedAt: timestampTz().notNull().defaultNow(),
+    startedAt: timestampTz(),
+    loadedAt: timestampTz(),
+    attempts: integer().notNull().default(0),
+    error: text(),
+    updatedAt: timestampTz().notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.source, t.scope] }), index().on(t.status)],
+);
+
 export type UserRow = typeof user.$inferSelect;
 export type SessionRow = typeof session.$inferSelect;
 export type PasswordResetRow = typeof passwordReset.$inferSelect;
+export type SourceStateRow = typeof sourceState.$inferSelect;

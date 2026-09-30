@@ -8,7 +8,7 @@ import { callApi, CallError } from './client';
 describe('appeler', () => {
   it('envoie le corps en JSON et valide la réponse', async () => {
     const calls = fakeApi({ 'POST /api/auth/login': { status: 200, body: alice } });
-    await expect(callApi(authRoutes.login, { email: 'a@b.fr', password: 'x' })).resolves.toEqual(alice);
+    await expect(callApi(authRoutes.login, { body: { email: 'a@b.fr', password: 'x' } })).resolves.toEqual(alice);
     expect(calls).toEqual([{ key: 'POST /api/auth/login', body: { email: 'a@b.fr', password: 'x' } }]);
   });
 
@@ -19,7 +19,7 @@ describe('appeler', () => {
 
   it('traduit une erreur de l’API, avec ses champs', async () => {
     fakeApi({ 'POST /api/auth/signup': { status: 409, body: { message: 'Déjà utilisée.', fields: { email: 'Déjà utilisée.' } } } });
-    const e = await callApi(authRoutes.signup, { email: 'a@b.fr', name: 'A', password: 'x' }).catch((x: unknown) => x);
+    const e = await callApi(authRoutes.signup, { body: { email: 'a@b.fr', name: 'A', password: 'x' } }).catch((x: unknown) => x);
     expect(e).toBeInstanceOf(CallError);
     expect(e).toMatchObject({ status: 409, message: 'Déjà utilisée.', fields: { email: 'Déjà utilisée.' } });
   });

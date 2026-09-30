@@ -1,6 +1,6 @@
 // Client de l'API, tiré des routes du contrat (`src/contracts`) : chemin, méthode, corps et réponse
 // typés, réponse validée à l'arrivée.
-import { type BodyOf, ApiError, type ResponseOf, type Route } from '@contracts';
+import { ApiError, type NeedsRequest, type RequestOf, type ResponseOf, type Route, urlOf } from '@contracts';
 
 export class CallError extends Error {
   constructor(
@@ -15,14 +15,21 @@ export class CallError extends Error {
 
 const OFFLINE = 'Le serveur ne répond pas. Vérifiez votre connexion et réessayez.';
 
-export async function callApi<R extends Route>(route: R, ...body: BodyOf<R> extends undefined ? [] : [BodyOf<R>]): Promise<ResponseOf<R>> {
+type Parts = { body?: unknown; query?: Record<string, unknown>; params?: Record<string, unknown> };
+
+export async function callApi<R extends Route>(
+  route: R,
+  ...request: NeedsRequest<R> extends true ? [RequestOf<R>] : []
+): Promise<ResponseOf<R>> {
+  const { body, query, params } = (request[0] ?? {}) as Parts;
+  const hasBody = body !== undefined;
   let response: Response;
   try {
-    response = await fetch(route.path, {
+    response = await fetch(urlOf(route, params, query), {
       method: route.method,
       credentials: 'same-origin',
-      headers: { Accept: 'application/json', ...(body.length > 0 && { 'Content-Type': 'application/json' }) },
-      ...(body.length > 0 && { body: JSON.stringify(body[0]) }),
+      headers: { Accept: 'application/json', ...(hasBody && { 'Content-Type': 'application/json' }) },
+      ...(hasBody && { body: JSON.stringify(body) }),
     });
   } catch {
     throw new CallError(0, OFFLINE);

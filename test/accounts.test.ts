@@ -11,7 +11,7 @@ import { Clock } from '../src/shared/clock.ts';
 import { AccountsModule } from '../src/accounts/accounts.module.ts';
 import { ConfigModule } from '../src/config/config.module.ts';
 import { UsersService } from '../src/accounts/users.service.ts';
-import { MaintenanceProcessor, PURGE_JOB } from '../src/worker/maintenance.ts';
+import { MaintenanceProcessor, PURGE_JOB, Reconciliation } from '../src/worker/maintenance.ts';
 import { TestClock } from './test-app.ts';
 import { testConfig } from './env.ts';
 
@@ -28,7 +28,7 @@ beforeAll(async () => {
   clock = new TestClock();
   module = await Test.createTestingModule({
     imports: [ConfigModule.forConfig(testConfig()), DbModule, AccountsModule],
-    providers: [MaintenanceProcessor],
+    providers: [MaintenanceProcessor, { provide: Reconciliation, useValue: { run: async () => [] } }],
   })
     .overrideProvider(Clock)
     .useValue(clock)

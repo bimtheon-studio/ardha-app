@@ -8,6 +8,9 @@ import { LoggerModule } from 'nestjs-pino';
 import { AuthController } from './auth.controller.ts';
 import { DbModule } from '../db/db.module.ts';
 import { AccountsModule } from '../accounts/accounts.module.ts';
+import { GeoModule } from '../geo/geo.module.ts';
+import { QueuesModule } from '../shared/queues.ts';
+import { GeoController } from './geo.controller.ts';
 import { type Config, CONFIG } from '../config/config.ts';
 import { ConfigModule } from '../config/config.module.ts';
 import { ErrorFilter } from './http/error-filter.ts';
@@ -28,7 +31,9 @@ export class ApiModule implements NestModule {
         LoggerModule.forRootAsync({ inject: [CONFIG], useFactory: loggingOptions }),
         DbModule,
         RedisModule,
+        QueuesModule.forRoot(),
         AccountsModule,
+        GeoModule,
         ThrottlerModule.forRootAsync({
           inject: [REDIS, CONFIG],
           useFactory: (redis: Redis, c: Config) => ({
@@ -37,7 +42,7 @@ export class ApiModule implements NestModule {
           }),
         }),
       ],
-      controllers: [AuthController, SystemController],
+      controllers: [AuthController, GeoController, SystemController],
       providers: [
         { provide: APP_GUARD, useClass: SessionGuard },
         { provide: APP_FILTER, useClass: ErrorFilter },

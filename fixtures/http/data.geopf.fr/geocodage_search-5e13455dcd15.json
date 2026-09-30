@@ -1,0 +1,5 @@
+{
+  "url": "https://data.geopf.fr/geocodage/search?q=9+rue+pasteur&limit=5&index=address",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8"
+}

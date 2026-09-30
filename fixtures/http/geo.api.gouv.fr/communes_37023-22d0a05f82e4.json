@@ -1,0 +1,5 @@
+{
+  "url": "https://geo.api.gouv.fr/communes/37023?fields=nom%2Ccode%2CcodesPostaux%2CcodeDepartement%2Ccentre%2Ccontour&format=json",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8"
+}
