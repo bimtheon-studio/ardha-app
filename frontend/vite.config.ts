@@ -1,4 +1,4 @@
-// Front (Vite). Ports et API lus dans `.env.local` à la racine (généré par `pnpm demarrer`, aux
+// Front (Vite). Ports et API lus dans `.env.local` à la racine (généré par `pnpm start`, aux
 // ports du worktree) : `/api` est relayé vers l'API, le cookie de session reste de même origine.
 import path from 'node:path';
 

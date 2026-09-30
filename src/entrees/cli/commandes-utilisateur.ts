@@ -26,29 +26,29 @@ abstract class CommandeAvecEmail extends CommandRunner {
 }
 
 @Command({
-  name: 'utilisateur:creer-admin',
-  description: 'Crée un administrateur ; sans --mot-de-passe-stdin, affiche un lien pour choisir le mot de passe',
+  name: 'user:create-admin',
+  description: 'Crée un administrateur ; sans --password-stdin, affiche un lien pour choisir le mot de passe',
 })
 export class CommandeCreerAdmin extends CommandeAvecEmail {
   constructor(private readonly utilisateurs: UtilisateursService) {
     super();
   }
 
-  @Option({ flags: '-n, --nom <nom>', description: 'Nom affiché', required: true })
+  @Option({ flags: '-n, --name <name>', description: 'Nom affiché', required: true })
   lireNom(valeur: string): string {
     return valeur;
   }
 
-  @Option({ flags: '--mot-de-passe-stdin', description: 'Lit le mot de passe sur l’entrée standard' })
+  @Option({ flags: '--password-stdin', description: 'Lit le mot de passe sur l’entrée standard' })
   lireStdin(): boolean {
     return true;
   }
 
-  async run(_: string[], options: OptionsEmail & { nom: string; motDePasseStdin?: boolean }): Promise<void> {
-    const motDePasse = options.motDePasseStdin ? await lireEntreeStandard() : undefined;
+  async run(_: string[], options: OptionsEmail & { name: string; passwordStdin?: boolean }): Promise<void> {
+    const motDePasse = options.passwordStdin ? await lireEntreeStandard() : undefined;
     const { utilisateur, lien } = await this.utilisateurs.creerAdmin({
       email: options.email,
-      nom: options.nom,
+      nom: options.name,
       ...(motDePasse !== undefined && { motDePasse }),
     });
     console.log(`Administrateur créé : ${utilisateur.email} (${utilisateur.id}).`);
@@ -59,7 +59,7 @@ export class CommandeCreerAdmin extends CommandeAvecEmail {
 }
 
 @Command({
-  name: 'utilisateur:reinitialiser-mot-de-passe',
+  name: 'user:reset-password',
   description: 'Crée un lien à usage unique (24 h) pour choisir un nouveau mot de passe ; annule le précédent',
 })
 export class CommandeReinitialiser extends CommandeAvecEmail {
@@ -73,7 +73,7 @@ export class CommandeReinitialiser extends CommandeAvecEmail {
   }
 }
 
-@Command({ name: 'utilisateur:desactiver', description: 'Désactive un compte et ferme ses sessions' })
+@Command({ name: 'user:deactivate', description: 'Désactive un compte et ferme ses sessions' })
 export class CommandeDesactiver extends CommandeAvecEmail {
   constructor(private readonly utilisateurs: UtilisateursService) {
     super();
@@ -85,7 +85,7 @@ export class CommandeDesactiver extends CommandeAvecEmail {
   }
 }
 
-@Command({ name: 'utilisateur:reactiver', description: 'Réactive un compte désactivé' })
+@Command({ name: 'user:reactivate', description: 'Réactive un compte désactivé' })
 export class CommandeReactiver extends CommandeAvecEmail {
   constructor(private readonly utilisateurs: UtilisateursService) {
     super();
@@ -97,7 +97,7 @@ export class CommandeReactiver extends CommandeAvecEmail {
   }
 }
 
-@Command({ name: 'utilisateur:lister', description: 'Liste les comptes' })
+@Command({ name: 'user:list', description: 'Liste les comptes' })
 export class CommandeLister extends CommandRunner {
   constructor(private readonly utilisateurs: UtilisateursService) {
     super();

@@ -12,7 +12,7 @@ export function MotDePasseOublie() {
           valable 24 heures.
         </p>
         <p className="text-center">
-          <Link to="/connexion" className="text-primary underline-offset-4 hover:underline">
+          <Link to="/login" className="text-primary underline-offset-4 hover:underline">
             Retour à la connexion
           </Link>
         </p>

@@ -64,10 +64,10 @@ export function Connexion() {
           Se connecter
         </Button>
         <div className="flex flex-col items-center gap-1 text-sm">
-          <Link to="/inscription" state={location.state} className="text-primary underline-offset-4 hover:underline">
+          <Link to="/signup" state={location.state} className="text-primary underline-offset-4 hover:underline">
             Pas de compte ? S’inscrire
           </Link>
-          <Link to="/mot-de-passe-oublie" className="text-muted-foreground underline-offset-4 hover:underline">
+          <Link to="/forgot-password" className="text-muted-foreground underline-offset-4 hover:underline">
             Mot de passe oublié ?
           </Link>
         </div>

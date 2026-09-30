@@ -18,5 +18,5 @@ export function lienUtilisable(lien: LienReinitialisation, maintenant: Date): bo
 
 /** URL du lien, côté front. Le jeton voyage dans l'ancre : il n'apparaît ni dans les journaux du serveur, ni dans le Referer. */
 export function urlLienReinitialisation(origineWeb: string, jeton: string): string {
-  return `${origineWeb.replace(/\/+$/, '')}/reinitialiser#${encodeURIComponent(jeton)}`;
+  return `${origineWeb.replace(/\/+$/, '')}/reset-password#${encodeURIComponent(jeton)}`;
 }

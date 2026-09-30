@@ -31,13 +31,13 @@ const valeurCookie = (c: string) => c.split(';')[0]!;
 
 async function inscrire(email = 'alice@exemple.fr', ip = '10.0.0.1') {
   return http()
-    .post('/api/auth/inscription')
+    .post('/api/auth/signup')
     .set('X-Forwarded-For', ip)
     .send({ email, nom: 'Alice Martin', motDePasse: MOT_DE_PASSE });
 }
 
 async function connecter(email: string, motDePasse: string, ip = '10.0.0.2') {
-  return http().post('/api/auth/connexion').set('X-Forwarded-For', ip).send({ email, motDePasse });
+  return http().post('/api/auth/login').set('X-Forwarded-For', ip).send({ email, motDePasse });
 }
 
 async function journal(): Promise<{ action: string; details: Record<string, unknown> }[]> {
@@ -54,7 +54,7 @@ describe('inscription', () => {
     expect(cookie).toMatch(/HttpOnly/);
     expect(cookie).toMatch(/SameSite=Lax/);
     expect(cookie).toMatch(/Max-Age=2592000/); // 30 jours
-    const moi = await http().get('/api/auth/moi').set('Cookie', valeurCookie(cookie));
+    const moi = await http().get('/api/auth/me').set('Cookie', valeurCookie(cookie));
     expect(moi.status).toBe(200);
     expect(moi.body.email).toBe('alice@exemple.fr');
   });
@@ -80,7 +80,7 @@ describe('inscription', () => {
   });
 
   it('rend un message par champ quand le formulaire est invalide', async () => {
-    const r = await http().post('/api/auth/inscription').send({ email: 'alice', nom: '', motDePasse: 'court' });
+    const r = await http().post('/api/auth/signup').send({ email: 'alice', nom: '', motDePasse: 'court' });
     expect(r.status).toBe(400);
     expect(r.body).toEqual({
       message: 'Certains champs sont à corriger.',
@@ -133,43 +133,43 @@ describe('connexion', () => {
 
 describe('session', () => {
   it('sans cookie, « qui suis-je » répond 401 avec un message en français', async () => {
-    const r = await http().get('/api/auth/moi');
+    const r = await http().get('/api/auth/me');
     expect(r.status).toBe(401);
     expect(r.body).toEqual({ message: 'Vous devez vous connecter.' });
   });
 
   it('un cookie inventé ne mène à rien', async () => {
-    const r = await http().get('/api/auth/moi').set('Cookie', `${t.config.SESSION_COOKIE_NAME}=invente`);
+    const r = await http().get('/api/auth/me').set('Cookie', `${t.config.SESSION_COOKIE_NAME}=invente`);
     expect(r.status).toBe(401);
   });
 
   it('la déconnexion ferme la session et efface le cookie', async () => {
     const cookie = valeurCookie(cookieDe(await inscrire()));
-    const r = await http().post('/api/auth/deconnexion').set('Cookie', cookie);
+    const r = await http().post('/api/auth/logout').set('Cookie', cookie);
     expect(r.status).toBe(204);
     expect(cookieDe(r)).toMatch(/Expires=Thu, 01 Jan 1970/);
-    expect((await http().get('/api/auth/moi').set('Cookie', cookie)).status).toBe(401);
+    expect((await http().get('/api/auth/me').set('Cookie', cookie)).status).toBe(401);
     expect((await pool.query('SELECT count(*)::int AS n FROM session')).rows[0].n).toBe(0);
   });
 
   it('la déconnexion sans session répond tout de même 204', async () => {
-    expect((await http().post('/api/auth/deconnexion')).status).toBe(204);
+    expect((await http().post('/api/auth/logout')).status).toBe(204);
   });
 
   it('se prolonge à l’usage : 30 jours à partir de la dernière activité', async () => {
     const cookie = valeurCookie(cookieDe(await inscrire()));
     t.horloge.avancer(20 * JOUR);
-    const r = await http().get('/api/auth/moi').set('Cookie', cookie);
+    const r = await http().get('/api/auth/me').set('Cookie', cookie);
     expect(r.status).toBe(200);
     expect(cookieDe(r)).toMatch(/Max-Age=2592000/);
     t.horloge.avancer(20 * JOUR); // 40 jours après la connexion, 20 après la dernière activité
-    expect((await http().get('/api/auth/moi').set('Cookie', cookie)).status).toBe(200);
+    expect((await http().get('/api/auth/me').set('Cookie', cookie)).status).toBe(200);
   });
 
   it('expire après 30 jours sans usage', async () => {
     const cookie = valeurCookie(cookieDe(await inscrire()));
     t.horloge.avancer(30 * JOUR + 1000);
-    expect((await http().get('/api/auth/moi').set('Cookie', cookie)).status).toBe(401);
+    expect((await http().get('/api/auth/me').set('Cookie', cookie)).status).toBe(401);
     expect((await pool.query('SELECT count(*)::int AS n FROM session')).rows[0].n).toBe(0);
   });
 
@@ -177,16 +177,16 @@ describe('session', () => {
     const cookie = valeurCookie(cookieDe(await inscrire()));
     for (const _ of [29, 58, 87]) {
       t.horloge.avancer(29 * JOUR);
-      expect((await http().get('/api/auth/moi').set('Cookie', cookie)).status).toBe(200);
+      expect((await http().get('/api/auth/me').set('Cookie', cookie)).status).toBe(200);
     }
     t.horloge.avancer(4 * JOUR); // 91 jours
-    expect((await http().get('/api/auth/moi').set('Cookie', cookie)).status).toBe(401);
+    expect((await http().get('/api/auth/me').set('Cookie', cookie)).status).toBe(401);
   });
 
   it('se ferme quand le compte est désactivé', async () => {
     const cookie = valeurCookie(cookieDe(await inscrire()));
     await t.app.get(UtilisateursService).desactiver('alice@exemple.fr');
-    expect((await http().get('/api/auth/moi').set('Cookie', cookie)).status).toBe(401);
+    expect((await http().get('/api/auth/me').set('Cookie', cookie)).status).toBe(401);
   });
 });
 
@@ -211,7 +211,7 @@ describe('limitation des tentatives (Q7)', () => {
 
   it('ne limite pas « qui suis-je »', async () => {
     const cookie = valeurCookie(cookieDe(await inscrire()));
-    for (let i = 0; i < 8; i++) expect((await http().get('/api/auth/moi').set('Cookie', cookie)).status).toBe(200);
+    for (let i = 0; i < 8; i++) expect((await http().get('/api/auth/me').set('Cookie', cookie)).status).toBe(200);
   });
 });
 
@@ -221,13 +221,13 @@ describe('réinitialisation par lien (Q9)', () => {
     return decodeURIComponent(new URL(url).hash.slice(1));
   }
   const reinitialiser = (jeton: string, motDePasse: string) =>
-    http().post('/api/auth/reinitialisation').set('X-Forwarded-For', '10.3.0.1').send({ jeton, motDePasse });
+    http().post('/api/auth/password-reset').set('X-Forwarded-For', '10.3.0.1').send({ jeton, motDePasse });
 
   it('change le mot de passe, ferme toutes les sessions, et ne sert qu’une fois', async () => {
     const cookie = valeurCookie(cookieDe(await inscrire()));
     const jeton = await lien();
     expect((await reinitialiser(jeton, 'nouveau mot de passe solide')).status).toBe(204);
-    expect((await http().get('/api/auth/moi').set('Cookie', cookie)).status).toBe(401);
+    expect((await http().get('/api/auth/me').set('Cookie', cookie)).status).toBe(401);
     expect((await connecter('alice@exemple.fr', 'nouveau mot de passe solide')).status).toBe(200);
     expect((await connecter('alice@exemple.fr', MOT_DE_PASSE, '10.3.0.9')).status).toBe(401);
     const encore = await reinitialiser(jeton, 'encore un autre mot de passe');
@@ -266,23 +266,23 @@ describe('réinitialisation par lien (Q9)', () => {
 
 describe('protection contre les requêtes intersites', () => {
   it('refuse une origine étrangère', async () => {
-    const r = await http().post('/api/auth/connexion').set('Origin', 'https://malveillant.example').send({ email: 'a@b.fr', motDePasse: 'x' });
+    const r = await http().post('/api/auth/login').set('Origin', 'https://malveillant.example').send({ email: 'a@b.fr', motDePasse: 'x' });
     expect(r.status).toBe(403);
     expect(r.body).toEqual({ message: 'Accès refusé.' });
   });
 
   it('refuse une requête intersite signalée par le navigateur', async () => {
-    const r = await http().post('/api/auth/deconnexion').set('Sec-Fetch-Site', 'cross-site');
+    const r = await http().post('/api/auth/logout').set('Sec-Fetch-Site', 'cross-site');
     expect(r.status).toBe(403);
   });
 
   it('accepte l’origine du front', async () => {
-    const r = await http().post('/api/auth/connexion').set('Origin', 'http://127.0.0.1:14000').send({ email: 'a@b.fr', motDePasse: 'x' });
+    const r = await http().post('/api/auth/login').set('Origin', 'http://127.0.0.1:14000').send({ email: 'a@b.fr', motDePasse: 'x' });
     expect(r.status).toBe(401);
   });
 
   it('refuse un corps qui n’est pas du JSON (formulaire intersite)', async () => {
-    const r = await http().post('/api/auth/connexion').set('Content-Type', 'text/plain').send('email=a@b.fr');
+    const r = await http().post('/api/auth/login').set('Content-Type', 'text/plain').send('email=a@b.fr');
     expect(r.status).toBe(415);
     expect(r.body).toEqual({ message: 'Format de requête non pris en charge.' });
   });
@@ -290,7 +290,7 @@ describe('protection contre les requêtes intersites', () => {
 
 describe('système', () => {
   it('santé : base et Redis joignables', async () => {
-    const r = await http().get('/api/sante');
+    const r = await http().get('/api/health');
     expect(r.status).toBe(200);
     expect(r.body).toEqual({ statut: 'ok', base: 'ok', redis: 'ok' });
   });
@@ -299,7 +299,7 @@ describe('système', () => {
     const r = await http().get('/api/openapi.json');
     expect(r.status).toBe(200);
     expect(r.body.openapi).toBe('3.1.0');
-    expect(Object.keys(r.body.paths)).toContain('/api/auth/connexion');
+    expect(Object.keys(r.body.paths)).toContain('/api/auth/login');
   });
 
   it('une route inconnue répond 404 en français', async () => {

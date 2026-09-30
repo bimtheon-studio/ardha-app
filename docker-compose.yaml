@@ -1,4 +1,4 @@
-# Dépendances locales d'Ardha. Ne pas lancer directement : `pnpm demarrer` génère d'abord
+# Dépendances locales d'Ardha. Ne pas lancer directement : `pnpm start` génère d'abord
 # `docker-compose.override.yaml` (ports du worktree, mots de passe locaux), ignoré par git.
 # Les ports ne sont publiés que sur 127.0.0.1.
 services:

@@ -40,7 +40,7 @@ Arbitrage : `D-xx` quand une décision le tranche déjà ; `Qn` renvoie aux ques
 | 9 | Connexion centrale BIMtheon ID sur `*.bimtheon.com`, garde anti-boucle de 15 s | `src/lib/connexionCentrale.ts:19-60`, `src/pages/Auth.tsx:36-45` | abandonner (D-01) | |
 | 10 | Session Supabase : JWT rafraîchi automatiquement, persisté en `localStorage` (ou cookie `.bimtheon.com` de 400 jours) | `src/integrations/supabase/client.ts:56-63`, `src/integrations/supabase/sessionPartagee.ts:29` | simplifier : sessions en base, cookie `httpOnly`, 30 jours glissants, 90 jours au plus (Q3) | pas d'expiration effective côté utilisateur |
 | 11 | Rôles `user`, `admin`, `platform_admin`, hiérarchie `platform_admin ⊃ admin` | `src/hooks/useAuth.ts:25-35`, `supabase/functions/_shared/admin-auth` (test `src/utils/__tests__/adminAuth.test.ts:10-20`) | simplifier (PLAN §4 : rôle admin ou utilisateur) | `platform_admin` fusionne dans `admin` |
-| 12 | Accès au produit refusé (`core.acces_produit = 'refuse'`) : écran « Votre compte n'a pas accès à Ardha », contact `support@bimtheon.com` | `src/components/ProtectedRoute.tsx:60-103`, `:152-154` | abandonner (D-01) ; remplacé par `utilisateur:desactiver` en CLI (Q5) | |
+| 12 | Accès au produit refusé (`core.acces_produit = 'refuse'`) : écran « Votre compte n'a pas accès à Ardha », contact `support@bimtheon.com` | `src/components/ProtectedRoute.tsx:60-103`, `:152-154` | abandonner (D-01) ; remplacé par `user:deactivate` en CLI (Q5) | |
 | 13 | Modules conditionnés à l'abonnement (`requiredFeature`), écran « n'est pas inclus dans votre abonnement » | `src/components/ProtectedRoute.tsx:20-58`, `:161-163`, `src/App.tsx:92-107` | abandonner (D-02 : v1 gratuite) | |
 | 14 | Route réservée aux admins (`requireAdmin`), sinon écran d'accès refusé | `src/components/ProtectedRoute.tsx:155-160`, `src/App.tsx:108-112` | garder | l'écran d'admin lui-même devient la CLI (L9) |
 | 15 | Garde de route : écran de chargement tant que session et droits ne sont pas résolus ; « pas encore résolu » n'est jamais « refusé » | `src/components/ProtectedRoute.tsx:142-146`, `src/hooks/useAuth.ts:105-106` | garder | |
@@ -103,17 +103,17 @@ Aucune règle métier d'urbanisme dans ce lot. Règles de sécurité retenues ou
   (origine `api`, `cli` ou `worker`, acteur, action, cible, détails sans secret, IP).
 - **Règles pures** (`src/domaine`) : politique de mot de passe, normalisation de l'e-mail, échéances de
   session, lien de réinitialisation.
-- **Contrat** (`src/contrats`) : `POST /api/auth/inscription`, `POST /api/auth/connexion`,
-  `POST /api/auth/deconnexion`, `GET /api/auth/moi`, `POST /api/auth/reinitialisation`,
-  `GET /api/sante` ; document OpenAPI sur `GET /api/openapi.json`.
+- **Contrat** (`src/contrats`) : `POST /api/auth/signup`, `POST /api/auth/login`,
+  `POST /api/auth/logout`, `GET /api/auth/me`, `POST /api/auth/password-reset`,
+  `GET /api/health` ; document OpenAPI sur `GET /api/openapi.json`.
 - **API** : toute route exige une session sauf `@Publique()` ; `@RoleRequis('admin')` pour les routes
   d'administration ; limiteur sur la connexion (IP et e-mail), l'inscription et la réinitialisation
   (IP) ; contrôle d'origine sur toute requête qui modifie.
 - **Worker** : file `maintenance`, purge quotidienne (4 h, Europe/Paris) des sessions expirées et des
   liens périmés ou utilisés.
-- **CLI** : `utilisateur:creer-admin`, `utilisateur:reinitialiser-mot-de-passe`,
-  `utilisateur:desactiver`, `utilisateur:reactiver`, `utilisateur:lister`, `migrer`, `semer`.
-- **Écrans** : `/connexion`, `/inscription`, `/mot-de-passe-oublie`, `/reinitialiser#<jeton>`,
+- **CLI** : `user:create-admin`, `user:reset-password`,
+  `user:deactivate`, `user:reactivate`, `user:list`, `migrate`, `seed`.
+- **Écrans** : `/login`, `/signup`, `/forgot-password`, `/reset-password#<jeton>`,
   accueil protégé dans la coquille (menu du compte, déconnexion), 404.
 
 ## Recette
@@ -124,18 +124,18 @@ Chromium (headless), sur le clone principal (ports +0) **et**, en même temps, s
 
 | Étape | Clone | Worktree |
 |---|---|---|
-| `/` sans session mène à `/connexion` | ✓ | ✓ |
+| `/` sans session mène à `/login` | ✓ | ✓ |
 | inscription : mot de passe trop court refusé avant l'envoi | ✓ | ✓ |
 | inscription réussie, accueil « Bonjour Camille Recette » | ✓ | ✓ |
 | session conservée au rechargement ; cookie `httpOnly`, `SameSite=Lax` | ✓ | ✓ |
 | déconnexion par le menu du compte | ✓ | ✓ |
 | mauvais mot de passe refusé, bon mot de passe accepté | ✓ | ✓ |
 | 404 en français | ✓ | ✓ |
-| administrateur créé par `utilisateur:creer-admin`, mot de passe choisi par le lien, connexion | ✓ | ✓ |
+| administrateur créé par `user:create-admin`, mot de passe choisi par le lien, connexion | ✓ | ✓ |
 | le lien ne sert qu'une fois | ✓ | ✓ |
 | les comptes d'une stack sont invisibles depuis l'autre | ✓ | ✓ |
 
-`ARDHA_DECALAGE=0 pnpm demarrer` depuis le worktree, pendant que le clone tourne : refus avec la liste
+`ARDHA_PORT_OFFSET=0 pnpm start` depuis le worktree, pendant que le clone tourne : refus avec la liste
 des ports pris et la commande pour en sortir, sans toucher à la configuration en place.
 
 Aucun écart de comportement hors des écarts assumés ci-dessous.
@@ -164,7 +164,7 @@ Posées au porteur du produit et arbitrées le 30/09/2026.
 | Q2 | Règles de mot de passe | 12 caractères minimum, 128 maximum, aucune règle de composition, refus des mots de passe les plus courants |
 | Q3 | Durée de session | 30 jours glissants (prolongée à chaque usage), 90 jours maximum |
 | Q4 | Onboarding et profil foncier/immobilier | abandonner les deux ; le nom est demandé à l'inscription, obligatoire |
-| Q5 | Désactiver un compte (remplace « accès refusé ») | commande CLI `utilisateur:desactiver`, qui coupe aussi ses sessions |
+| Q5 | Désactiver un compte (remplace « accès refusé ») | commande CLI `user:deactivate`, qui coupe aussi ses sessions |
 | Q6 | Retour à la page demandée après connexion | oui (corrige #8) |
 | Q7 | Anti-force brute et énumération des comptes | `@nestjs/throttler` (module officiel de Nest), compteurs dans Redis : 5 échecs par e-mail et par IP en 15 min puis attente ; « e-mail déjà utilisé » gardé à l'inscription |
 | Q8 | Page d'accueil publique quand on est déconnecté | non : `/` renvoie directement vers la connexion |

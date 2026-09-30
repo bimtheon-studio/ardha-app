@@ -27,7 +27,7 @@ export function Coquille() {
 
   async function seDeconnecter() {
     await deconnexion.mutateAsync().catch(() => undefined);
-    await naviguer('/connexion', { replace: true });
+    await naviguer('/login', { replace: true });
   }
 
   return (

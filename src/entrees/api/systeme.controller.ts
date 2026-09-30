@@ -16,7 +16,7 @@ export class SystemeController {
     @Inject(REDIS) private readonly redis: Redis,
   ) {}
 
-  @Get('sante')
+  @Get('health')
   @Publique()
   async sante(@Res({ passthrough: true }) reponse: Response): Promise<Sante> {
     const [base, redis] = await Promise.all([

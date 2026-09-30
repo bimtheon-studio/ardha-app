@@ -14,26 +14,26 @@ Docker avec Compose.
 ```bash
 mise install
 pnpm install
-pnpm demarrer          # dépendances Docker, migrations, seed, puis API + worker + front au premier plan
+pnpm start          # dépendances Docker, migrations, seed, puis API + worker + front au premier plan
 ```
 
 Le front s'ouvre sur l'adresse affichée (`http://127.0.0.1:14000` dans le clone principal).
-Ctrl-C arrête l'API, le worker et le front ; les conteneurs restent (`pnpm arreter` pour les arrêter).
+Ctrl-C arrête l'API, le worker et le front ; les conteneurs restent (`pnpm stop` pour les arrêter).
 
 Créer un administrateur (la commande affiche un lien pour choisir son mot de passe) :
 
 ```bash
-pnpm cli utilisateur:creer-admin --email admin@exemple.fr --nom "Prénom Nom"
+pnpm cli user:create-admin --email admin@exemple.fr --name "Prénom Nom"
 ```
 
 ### Une stack par worktree
 
 Chaque copie de travail (clone principal ou `git worktree`) a sa propre stack : conteneurs, volumes,
-base, ports et cookie de session. `pnpm demarrer` reconnaît un worktree et décale tous les ports de
+base, ports et cookie de session. `pnpm start` reconnaît un worktree et décale tous les ports de
 `crc32(branche) % 400 + 5` ; le clone principal garde les ports de base. Il génère
 `docker-compose.override.yaml` et `.env.local` (ignorés par git ; mots de passe locaux tirés au
 hasard) et vérifie que les ports sont libres. En cas de collision :
-`ARDHA_DECALAGE=<0..404> pnpm demarrer`.
+`ARDHA_PORT_OFFSET=<0..404> pnpm start`.
 
 | Service | Clone principal | Worktree |
 |---|---|---|
@@ -47,12 +47,12 @@ hasard) et vérifie que les ports sont libres. En cas de collision :
 
 | Commande | Effet |
 |---|---|
-| `pnpm demarrer [--infra]` | stack complète ; `--infra` s'arrête après migrations et seed |
-| `pnpm arreter` · `pnpm detruire` · `pnpm etat` | arrêter ; supprimer conteneurs et volumes ; ports et conteneurs |
+| `pnpm start [--infra]` | stack complète ; `--infra` s'arrête après migrations et seed |
+| `pnpm stop` · `pnpm destroy` · `pnpm status` | arrêter ; supprimer conteneurs et volumes ; ports et conteneurs |
 | `pnpm test` | tests des outils, du back (intégration sur la base `ardha_test` du worktree) et du front, avec couverture |
 | `pnpm lint` · `pnpm typecheck` | lint (dont les frontières de l'architecture) ; types |
 | `pnpm doctrine [--base]` | contrôle « base bête » des migrations ; `--base` : aussi le schéma migré |
-| `pnpm migration:generer` | nouvelle migration SQL depuis `src/base/schema.ts` |
+| `pnpm migration:generate` | nouvelle migration SQL depuis `src/base/schema.ts` |
 | `pnpm cli <commande>` | CLI métier (`pnpm cli --help`) |
 
 ## Structure

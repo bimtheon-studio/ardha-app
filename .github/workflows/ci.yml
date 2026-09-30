@@ -37,7 +37,7 @@ jobs:
         run: pnpm doctrine
 
       - name: Stack (Postgres, Redis, MinIO), migrations depuis zéro, seed
-        run: pnpm demarrer --infra
+        run: pnpm start --infra
 
       - name: Doctrine « base bête » — schéma migré
         run: pnpm doctrine --base

@@ -5,7 +5,7 @@ import type pg from 'pg';
 
 import { migrer, POOL } from '../../base/base.ts';
 
-@Command({ name: 'migrer', description: 'Joue les migrations en attente (en production : par la CD uniquement)' })
+@Command({ name: 'migrate', description: 'Joue les migrations en attente (en production : par la CD uniquement)' })
 export class CommandeMigrer extends CommandRunner {
   constructor(@Inject(POOL) private readonly pool: pg.Pool) {
     super();
@@ -17,11 +17,11 @@ export class CommandeMigrer extends CommandRunner {
   }
 }
 
-@Command({ name: 'semer', description: 'Remplit la base de développement depuis les fixtures (idempotent, sans appel externe)' })
+@Command({ name: 'seed', description: 'Remplit la base de développement depuis les fixtures (idempotent, sans appel externe)' })
 export class CommandeSemer extends CommandRunner {
   async run(): Promise<void> {
     // L0 n'a pas encore de données de référence : les fixtures des communes de référence arrivent
-    // avec L1 (cadastre) et L3 (PLU). Les comptes se créent par `utilisateur:creer-admin`.
+    // avec L1 (cadastre) et L3 (PLU). Les comptes se créent par `user:create-admin`.
     console.log('Seed : rien à semer en L0.');
   }
 }

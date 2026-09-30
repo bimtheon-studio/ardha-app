@@ -343,7 +343,7 @@ Prises en route pendant L0, le 30/09/2026, par l'agent de réécriture. Elles ne
 | DT-08 | Ports de base 13000 (API), 14000 (front), 15432, 16379, 19000/19500 | 3000, 5173, 5432, 6379, 9000 | sur cette machine, d'autres stacks suivent le même décalage `crc32 % 400 + 5` à partir de 5432 et 6379 : partager la base mènerait à des collisions systématiques |
 | DT-09 | pgvector **0.8.5 compilé depuis son tag** dans une image dérivée de `postgis/postgis:18-3.6` | le paquet PGDG | le dépôt PGDG ne garde que la dernière version (0.8.6 au 30/09) : l'image ne serait pas reproductible. Passer en 0.8.6 est une montée de correctif à décider |
 | DT-10 | MinIO local : fork communautaire `pgsty/minio`, version épinglée | `minio/minio` | l'image officielle n'est plus publiée sur Docker Hub (fait constaté le 30/09). Sans effet sur la production : l'API parle S3 |
-| DT-11 | Mots de passe locaux (Postgres, MinIO) tirés au hasard au premier `pnpm demarrer`, dans les fichiers ignorés | mots de passe de développement dans `docker-compose.yaml` | aucune valeur de secret dans un fichier suivi ; ports publiés sur 127.0.0.1 seulement |
+| DT-11 | Mots de passe locaux (Postgres, MinIO) tirés au hasard au premier `pnpm start`, dans les fichiers ignorés | mots de passe de développement dans `docker-compose.yaml` | aucune valeur de secret dans un fichier suivi ; ports publiés sur 127.0.0.1 seulement |
 | DT-12 | Limiteur : `@nestjs/throttler` avec un stockage Redis écrit pour Ardha, fenêtre fixe de 15 min | stockage `@nest-lab/throttler-storage-redis` | celui-ci ne déclare pas Nest 12. Le module compte les **tentatives** (réussies comprises), pas seulement les échecs |
 | DT-13 | Session : jeton opaque de 32 octets, seule son empreinte SHA-256 en base ; CSRF : cookie `SameSite=Lax`, contrôle `Origin` et `Sec-Fetch-Site`, corps JSON obligatoire | JWT | révocable immédiatement (déconnexion, désactivation, réinitialisation) |
 | DT-14 | argon2id par `@node-rs/argon2`, paramètres de l'OWASP (19 Mio, 2 passes) ; vérification leurre quand le compte n'existe pas | bcrypt | la feuille de route demande argon2id ; durée de réponse identique, compte existant ou non |
@@ -351,6 +351,7 @@ Prises en route pendant L0, le 30/09/2026, par l'agent de réécriture. Elles ne
 | DT-16 | Front : React 19.3, React Router 8, Vite 8, Tailwind 4 ; primitives shadcn/ui reprises, polices auto-hébergées (`@fontsource`) | Tailwind 3 ; Google Fonts | versions courantes ; le front ne charge rien hors d'Ardha sauf les tuiles IGN (D-08) |
 | DT-17 | Logs structurés par pino (`nestjs-pino`), cookies et en-têtes d'authentification masqués | logger de Nest | logs JSON exploitables en production (PLAN §8) |
 | DT-18 | ESLint 10 + typescript-eslint ; frontières d'architecture en `no-restricted-imports` | règles de revue | la CI fait respecter le domaine pur, Drizzle confiné, le front limité au contrat |
+| DT-19 | Commandes, options, variables d'environnement et routes **en anglais** : `pnpm start`, `stop`, `destroy`, `status`, `migrate`, `seed` ; CLI `user:create-admin`… ; `ARDHA_PORT_OFFSET` ; `/api/auth/login`, `/login`… Le français reste pour le modèle métier, le code, les commentaires et les textes affichés | tout en français | consigne du porteur du produit, 30/09/2026 (celle-ci est arbitrée) |
 
 ## 12. Questions ouvertes
 
@@ -369,6 +370,8 @@ vers des comptes pas encore recréés) ; aucune migration ne les a réinjectées
 
 ## Journal
 
+- **30/09/2026** — surfaces en anglais (DT-19) : commandes pnpm et CLI, options, routes de l'API et du
+  front ; `pnpm status` affiche des liens cliquables et l'état de chaque service. Recette rejouée.
 - **30/09/2026** — **L0 livré sur `master`** (b86d58d et suivant). Fiche F-00 scannée, arbitrée (Q1 à Q9),
   codée, recettée dans le clone et dans un worktree en même temps. Structure revue par le porteur du
   produit : back à la racine, `frontend/` à part. Décisions techniques DT-01 à DT-18 consignées, à

@@ -62,7 +62,7 @@ export function Inscription() {
           Créer mon compte
         </Button>
         <p className="text-center text-sm">
-          <Link to="/connexion" state={location.state} className="text-primary underline-offset-4 hover:underline">
+          <Link to="/login" state={location.state} className="text-primary underline-offset-4 hover:underline">
             Déjà un compte ? Se connecter
           </Link>
         </p>

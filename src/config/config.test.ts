@@ -10,7 +10,7 @@ describe('lireConfig', () => {
   });
 
   it('dit clairement ce qui manque', () => {
-    expect(() => lireConfig({})).toThrow(/DATABASE_URL[\s\S]*pnpm demarrer/);
+    expect(() => lireConfig({})).toThrow(/DATABASE_URL[\s\S]*pnpm start/);
   });
 
   it('reconnaît la production', () => {

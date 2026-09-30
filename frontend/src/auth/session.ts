@@ -9,7 +9,7 @@ export const CLE_MOI = ['auth', 'moi'] as const;
 /** `null` : pas de session. Une autre erreur (serveur injoignable) remonte telle quelle : « illisible » n'est pas « déconnecté ». */
 async function lireMoi(): Promise<Utilisateur | null> {
   try {
-    return await appeler(routesAuth.moi);
+    return await appeler(routesAuth.me);
   } catch (e) {
     if (e instanceof ErreurAppel && e.statut === 401) return null;
     throw e;
@@ -23,7 +23,7 @@ export function useMoi() {
 export function useConnexion() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (corps: Connexion) => appeler(routesAuth.connexion, corps),
+    mutationFn: (corps: Connexion) => appeler(routesAuth.login, corps),
     onSuccess: (u) => client.setQueryData(CLE_MOI, u),
   });
 }
@@ -31,7 +31,7 @@ export function useConnexion() {
 export function useInscription() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (corps: Inscription) => appeler(routesAuth.inscription, corps),
+    mutationFn: (corps: Inscription) => appeler(routesAuth.signup, corps),
     onSuccess: (u) => client.setQueryData(CLE_MOI, u),
   });
 }
@@ -39,7 +39,7 @@ export function useInscription() {
 export function useDeconnexion() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: () => appeler(routesAuth.deconnexion),
+    mutationFn: () => appeler(routesAuth.logout),
     onSettled: () => {
       client.clear();
       client.setQueryData(CLE_MOI, null);

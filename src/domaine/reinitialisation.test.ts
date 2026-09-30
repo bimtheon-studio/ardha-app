@@ -19,7 +19,7 @@ describe('lien de réinitialisation', () => {
 
   it('porte le jeton dans l’ancre, pas dans la requête', () => {
     expect(urlLienReinitialisation('http://127.0.0.1:14000/', 'ab-c_d')).toBe(
-      'http://127.0.0.1:14000/reinitialiser#ab-c_d',
+      'http://127.0.0.1:14000/reset-password#ab-c_d',
     );
   });
 });

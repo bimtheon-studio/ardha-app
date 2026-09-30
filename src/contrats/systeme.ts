@@ -10,9 +10,9 @@ export const Sante = z.object({
 export type Sante = z.infer<typeof Sante>;
 
 export const routesSysteme = {
-  sante: route({
+  health: route({
     methode: 'GET',
-    chemin: '/api/sante',
+    chemin: '/api/health',
     resume: 'État de l’API et de ses dépendances',
     corps: undefined,
     reponse: Sante,

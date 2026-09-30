@@ -43,11 +43,11 @@ beforeEach(async () => {
   await pool.query('TRUNCATE utilisateur, session, reinitialisation_mot_de_passe, journal_audit CASCADE');
 });
 
-describe('utilisateur:creer-admin', () => {
+describe('user:create-admin', () => {
   it('sans mot de passe : compte admin sans hash, et lien pour le choisir', async () => {
     const { utilisateur, lien } = await service.creerAdmin({ email: ' Admin@Ardha.fr ', nom: 'Admin' });
     expect(utilisateur).toMatchObject({ email: 'admin@ardha.fr', role: 'admin', motDePasseHash: null });
-    expect(lien?.url).toMatch(/^http:\/\/127\.0\.0\.1:14000\/reinitialiser#[A-Za-z0-9_-]{43}$/);
+    expect(lien?.url).toMatch(/^http:\/\/127\.0\.0\.1:14000\/reset-password#[A-Za-z0-9_-]{43}$/);
     const jeton = decodeURIComponent(new URL(lien!.url).hash.slice(1));
     await auth.reinitialiser({ jeton, motDePasse: 'mot de passe admin solide' }, ctx);
     const ouverte = await auth.connecter({ email: 'admin@ardha.fr', motDePasse: 'mot de passe admin solide' }, ctx);

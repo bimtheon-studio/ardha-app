@@ -1,5 +1,5 @@
 // Configuration, lue une fois dans l'environnement et validée. En développement, `.env.local` (généré
-// par `pnpm demarrer`, aux ports du worktree) complète l'environnement sans jamais l'écraser.
+// par `pnpm start`, aux ports du worktree) complète l'environnement sans jamais l'écraser.
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 
@@ -35,7 +35,7 @@ export function lireConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const r = Schema.safeParse(env);
   if (!r.success) {
     const details = r.error.issues.map((i) => `  ${i.path.join('.')} : ${i.message}`).join('\n');
-    throw new Error(`Configuration invalide :\n${details}\n(en local : \`pnpm demarrer\` génère .env.local)`);
+    throw new Error(`Configuration invalide :\n${details}\n(en local : \`pnpm start\` génère .env.local)`);
   }
   return { ...r.data, production: r.data.NODE_ENV === 'production' };
 }

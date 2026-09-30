@@ -1,6 +1,6 @@
-// `pnpm demarrer | arreter | detruire | etat` : la stack locale, isolée par worktree (D-09).
+// `pnpm start | stop | destroy | status` : la stack locale, isolée par worktree (D-09).
 //
-// `demarrer` reconnaît un worktree, décale les ports d'après la branche, génère
+// `start` reconnaît un worktree, décale les ports d'après la branche, génère
 // `docker-compose.override.yaml` et `.env.local`, vérifie que les ports sont libres, lance les
 // dépendances (Postgres, Redis, MinIO), joue les migrations et le seed, puis l'API, le worker et le
 // front au premier plan (Ctrl-C les arrête ; les conteneurs restent). `--infra` s'arrête avant.
@@ -8,6 +8,7 @@ import { execFileSync, spawn, spawnSync, type ChildProcess } from 'node:child_pr
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { adresses, lien } from './adresses.ts';
 import { contexteCourant, type Contexte } from './contexte.ts';
 import { nouveauxSecrets, override, secretsExistants, upsertBloc, variables } from './fichiers.ts';
 import { portVraimentLibre } from './libre.ts';
@@ -21,10 +22,18 @@ function afficherContexte(ctx: Contexte): void {
     ? `Worktree isolé « ${ctx.projet} » (branche ${ctx.branche}, décalage +${ctx.decalage})`
     : `Clone principal « ${ctx.projet} » (branche ${ctx.branche}, décalage +${ctx.decalage})`;
   console.log(`\n${titre}`);
-  for (const service of [...SERVICES_LOCAUX, ...SERVICES_DOCKER]) {
-    console.log(`  ${LIBELLES[service].padEnd(16)} 127.0.0.1:${ctx.ports[service]}`);
+  console.log(`  Cookie de session : ${ctx.cookieSession}\n`);
+}
+
+/** Adresses de la stack, cliquables ; avec `etat`, une pastille dit si chacune répond. */
+async function afficherAdresses(ctx: Contexte, etat: boolean): Promise<void> {
+  const terminal = Boolean(process.stdout.isTTY);
+  for (const a of adresses(ctx)) {
+    const pastille = etat ? ((await portVraimentLibre(ctx.ports[a.service])) ? '○ ' : '● ') : '';
+    console.log(`  ${pastille}${a.libelle.padEnd(16)} ${lien(a.url, terminal)}`);
   }
-  console.log(`  ${'Cookie'.padEnd(16)} ${ctx.cookieSession}\n`);
+  if (etat) console.log('\n  ● répond  ○ arrêté');
+  console.log('');
 }
 
 function ecrireFichiers(ctx: Contexte): void {
@@ -61,7 +70,7 @@ async function verifierPorts(ctx: Contexte, services: Service[]): Promise<void> 
         ...pris,
         '',
         'Deux branches peuvent tomber sur le même décalage. Libérez ces ports, ou forcez un autre décalage :',
-        `  ARDHA_DECALAGE=${ctx.decalage >= 404 ? 5 : ctx.decalage + 1} pnpm demarrer`,
+        `  ARDHA_PORT_OFFSET=${ctx.decalage >= 404 ? 5 : ctx.decalage + 1} pnpm start`,
         '(à redonner à chaque démarrage : il n\'est pas mémorisé).',
       ].join('\n'),
     );
@@ -99,14 +108,15 @@ async function demarrer(ctx: Contexte, infraSeule: boolean): Promise<void> {
   }
   // Le back compilé : la CLI (migrations, seed), l'API et le worker tournent sur `dist/`.
   lancer('pnpm', ['run', 'build:back'], ctx);
-  lancer('pnpm', ['run', 'migrer'], ctx);
-  lancer('pnpm', ['run', 'semer'], ctx);
+  lancer('pnpm', ['run', 'migrate'], ctx);
+  lancer('pnpm', ['run', 'seed'], ctx);
 
   if (infraSeule) {
     console.log('\nDépendances prêtes, base migrée et semée.');
     return;
   }
-  console.log(`\nFront : http://127.0.0.1:${ctx.ports.web}  ·  API : http://127.0.0.1:${ctx.ports.api}  ·  Ctrl-C pour arrêter\n`);
+  console.log('\nStack prête (Ctrl-C arrête l’API, le worker et le front) :');
+  await afficherAdresses(ctx, false);
   await auPremierPlan(ctx, {
     swc: ['run', 'dev:compiler'],
     api: ['run', 'dev:api'],
@@ -152,35 +162,36 @@ function arreter(ctx: Contexte): void {
 
 function detruire(ctx: Contexte, confirme: boolean): void {
   if (!ctx.estWorktree && !confirme) {
-    throw new Error('Clone principal : la destruction efface la base locale. Relancer avec `pnpm detruire --oui`.');
+    throw new Error('Clone principal : la destruction efface la base locale. Relancer avec `pnpm destroy --yes`.');
   }
   lancer('docker', ['compose', 'down', '-v', '--remove-orphans'], ctx);
   console.log(`Stack et volumes de « ${ctx.projet} » supprimés.`);
 }
 
-function etat(ctx: Contexte): void {
+async function etat(ctx: Contexte): Promise<void> {
   afficherContexte(ctx);
-  if (existsSync(path.join(ctx.racine, 'docker-compose.override.yaml'))) {
-    lancer('docker', ['compose', 'ps'], ctx);
-  } else {
-    console.log('Stack jamais démarrée ici (`pnpm demarrer`).');
+  if (!existsSync(path.join(ctx.racine, 'docker-compose.override.yaml'))) {
+    console.log('Stack jamais démarrée ici (`pnpm start`).');
+    return;
   }
+  await afficherAdresses(ctx, true);
+  lancer('docker', ['compose', 'ps', '--format', 'table {{.Service}}\t{{.Status}}'], ctx);
 }
 
 async function principal(): Promise<void> {
   const [commande, ...options] = process.argv.slice(2);
   const ctx = contexteCourant();
   switch (commande) {
-    case 'demarrer':
+    case 'start':
       return demarrer(ctx, options.includes('--infra'));
-    case 'arreter':
+    case 'stop':
       return arreter(ctx);
-    case 'detruire':
-      return detruire(ctx, options.includes('--oui'));
-    case 'etat':
+    case 'destroy':
+      return detruire(ctx, options.includes('--yes'));
+    case 'status':
       return etat(ctx);
     default:
-      throw new Error('Usage : node tools/stack/cli.ts demarrer [--infra] | arreter | detruire [--oui] | etat');
+      throw new Error('Usage : node tools/stack/cli.ts start [--infra] | stop | destroy [--yes] | status');
   }
 }
 

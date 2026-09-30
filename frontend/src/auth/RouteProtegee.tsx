@@ -15,7 +15,7 @@ export function RouteProtegee({ children }: { children: ReactNode }) {
   if (moi.isError) return <ErreurChargement onReessayer={() => void moi.refetch()} />;
   if (!moi.data) {
     const depuis = `${location.pathname}${location.search}${location.hash}`;
-    return <Navigate to="/connexion" replace state={{ depuis }} />;
+    return <Navigate to="/login" replace state={{ depuis }} />;
   }
   return <>{children}</>;
 }

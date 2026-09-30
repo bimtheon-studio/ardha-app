@@ -26,8 +26,8 @@ export class AuthController {
     @Inject(CONFIG) private readonly config: Config,
   ) {}
 
-  @Post(chemin(r.inscription.chemin))
-  @HttpCode(r.inscription.statut)
+  @Post(chemin(r.signup.chemin))
+  @HttpCode(r.signup.statut)
   @Publique()
   @SkipThrottle({ email: true })
   async inscription(
@@ -40,8 +40,8 @@ export class AuthController {
     return ouverte.utilisateur;
   }
 
-  @Post(chemin(r.connexion.chemin))
-  @HttpCode(r.connexion.statut)
+  @Post(chemin(r.login.chemin))
+  @HttpCode(r.login.statut)
   @Publique()
   async connexion(
     @Body(new Valider(Connexion)) corps: Connexion,
@@ -53,8 +53,8 @@ export class AuthController {
     return ouverte.utilisateur;
   }
 
-  @Post(chemin(r.deconnexion.chemin))
-  @HttpCode(r.deconnexion.statut)
+  @Post(chemin(r.logout.chemin))
+  @HttpCode(r.logout.statut)
   @Publique()
   @SkipThrottle({ ip: true, email: true })
   async deconnexion(@Req() requete: Request, @Res({ passthrough: true }) reponse: Response): Promise<void> {
@@ -63,15 +63,15 @@ export class AuthController {
     effacerCookieSession(reponse, this.config);
   }
 
-  @Get(chemin(r.moi.chemin))
-  @HttpCode(r.moi.statut)
+  @Get(chemin(r.me.chemin))
+  @HttpCode(r.me.statut)
   @SkipThrottle({ ip: true, email: true })
   moi(@UtilisateurCourant() utilisateur: Utilisateur): Utilisateur {
     return utilisateur;
   }
 
-  @Post(chemin(r.reinitialisation.chemin))
-  @HttpCode(r.reinitialisation.statut)
+  @Post(chemin(r.passwordReset.chemin))
+  @HttpCode(r.passwordReset.statut)
   @Publique()
   @SkipThrottle({ email: true })
   async reinitialisation(

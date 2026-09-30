@@ -49,7 +49,7 @@ describe('lireDecalageForce', () => {
   });
 
   it('refuse le reste, clairement', () => {
-    expect(() => lireDecalageForce('500')).toThrow(/ARDHA_DECALAGE/);
-    expect(() => lireDecalageForce('abc')).toThrow(/ARDHA_DECALAGE/);
+    expect(() => lireDecalageForce('500')).toThrow(/ARDHA_PORT_OFFSET/);
+    expect(() => lireDecalageForce('abc')).toThrow(/ARDHA_PORT_OFFSET/);
   });
 });

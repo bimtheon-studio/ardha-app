@@ -28,26 +28,26 @@ async function lancer(...args: string[]): Promise<void> {
 }
 
 describe('CLI', () => {
-  it('migrer est idempotent, semer ne fait rien en L0', async () => {
-    await lancer('migrer');
-    await lancer('semer');
+  it('migrate est idempotent, seed ne fait rien en L0', async () => {
+    await lancer('migrate');
+    await lancer('seed');
     expect(sortie).toEqual(['Migrations à jour.', 'Seed : rien à semer en L0.']);
   });
 
   it('crée un administrateur et affiche le lien pour choisir son mot de passe', async () => {
-    await lancer('utilisateur:creer-admin', '--email', 'admin@ardha.fr', '--nom', 'Admin');
+    await lancer('user:create-admin', '--email', 'admin@ardha.fr', '--name', 'Admin');
     expect(sortie[0]).toMatch(/^Administrateur créé : admin@ardha\.fr \(/);
-    expect(sortie[1]).toMatch(/Lien pour choisir le mot de passe, valable jusqu'au .*\nhttp:\/\/127\.0\.0\.1:14000\/reinitialiser#/);
+    expect(sortie[1]).toMatch(/Lien pour choisir le mot de passe, valable jusqu'au .*\nhttp:\/\/127\.0\.0\.1:14000\/reset-password#/);
   });
 
   it('liste, réinitialise, désactive et réactive', async () => {
-    await lancer('utilisateur:lister');
-    await lancer('utilisateur:creer-admin', '-e', 'admin@ardha.fr', '-n', 'Admin');
-    await lancer('utilisateur:lister');
-    await lancer('utilisateur:reinitialiser-mot-de-passe', '--email', 'admin@ardha.fr');
-    await lancer('utilisateur:desactiver', '--email', 'admin@ardha.fr');
-    await lancer('utilisateur:lister');
-    await lancer('utilisateur:reactiver', '--email', 'admin@ardha.fr');
+    await lancer('user:list');
+    await lancer('user:create-admin', '-e', 'admin@ardha.fr', '-n', 'Admin');
+    await lancer('user:list');
+    await lancer('user:reset-password', '--email', 'admin@ardha.fr');
+    await lancer('user:deactivate', '--email', 'admin@ardha.fr');
+    await lancer('user:list');
+    await lancer('user:reactivate', '--email', 'admin@ardha.fr');
     expect(sortie[0]).toBe('Aucun compte.');
     expect(sortie[3]).toMatch(/^admin@ardha\.fr\tadmin\tmot de passe à choisir\tAdmin\tcréé le /);
     expect(sortie[4]).toMatch(/^Lien à transmettre, valable jusqu'au /);

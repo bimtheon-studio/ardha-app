@@ -27,8 +27,8 @@ export function Reinitialiser() {
     if (!corps) return;
     setEnCours(true);
     try {
-      await appeler(routesAuth.reinitialisation, corps);
-      await naviguer('/connexion', { replace: true, state: { info: 'Mot de passe changé. Connectez-vous avec le nouveau.' } });
+      await appeler(routesAuth.passwordReset, corps);
+      await naviguer('/login', { replace: true, state: { info: 'Mot de passe changé. Connectez-vous avec le nouveau.' } });
     } catch (erreur) {
       form.afficherErreur(erreur);
     } finally {
@@ -41,7 +41,7 @@ export function Reinitialiser() {
       <PageAuth titre="Lien incomplet" description="Ce lien ne contient pas de jeton">
         <p className="text-center text-sm">
           Demandez un nouveau lien à l’administrateur.{' '}
-          <Link to="/connexion" className="text-primary underline-offset-4 hover:underline">
+          <Link to="/login" className="text-primary underline-offset-4 hover:underline">
             Retour à la connexion
           </Link>
         </p>

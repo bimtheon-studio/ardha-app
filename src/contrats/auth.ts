@@ -63,45 +63,45 @@ export const Reinitialisation = z
 export type Reinitialisation = z.infer<typeof Reinitialisation>;
 
 export const routesAuth = {
-  inscription: route({
+  signup: route({
     methode: 'POST',
-    chemin: '/api/auth/inscription',
+    chemin: '/api/auth/signup',
     resume: 'Crée un compte et ouvre une session',
     corps: Inscription,
     reponse: Utilisateur,
     statut: 201,
     authentifiee: false,
   }),
-  connexion: route({
+  login: route({
     methode: 'POST',
-    chemin: '/api/auth/connexion',
+    chemin: '/api/auth/login',
     resume: 'Ouvre une session',
     corps: Connexion,
     reponse: Utilisateur,
     statut: 200,
     authentifiee: false,
   }),
-  deconnexion: route({
+  logout: route({
     methode: 'POST',
-    chemin: '/api/auth/deconnexion',
+    chemin: '/api/auth/logout',
     resume: 'Ferme la session courante',
     corps: undefined,
     reponse: undefined,
     statut: 204,
     authentifiee: false,
   }),
-  moi: route({
+  me: route({
     methode: 'GET',
-    chemin: '/api/auth/moi',
+    chemin: '/api/auth/me',
     resume: 'Utilisateur de la session courante',
     corps: undefined,
     reponse: Utilisateur,
     statut: 200,
     authentifiee: true,
   }),
-  reinitialisation: route({
+  passwordReset: route({
     methode: 'POST',
-    chemin: '/api/auth/reinitialisation',
+    chemin: '/api/auth/password-reset',
     resume: 'Change le mot de passe avec un lien à usage unique, et ferme toutes les sessions',
     corps: Reinitialisation,
     reponse: undefined,

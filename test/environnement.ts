@@ -1,5 +1,5 @@
 // Environnement des tests d'intégration : la base `ardha_test` et le Redis du worktree courant
-// (`.env.local`, généré par `pnpm demarrer`), ou les variables de la CI.
+// (`.env.local`, généré par `pnpm start`), ou les variables de la CI.
 import { randomBytes } from 'node:crypto';
 
 import { chargerEnvLocal, type Config, lireConfig } from '../src/config/config.ts';
@@ -7,7 +7,7 @@ import { chargerEnvLocal, type Config, lireConfig } from '../src/config/config.t
 export function urlBaseDeTest(): string {
   chargerEnvLocal();
   const url = process.env.DATABASE_URL_TEST;
-  if (!url) throw new Error('DATABASE_URL_TEST manquante : lancer `pnpm demarrer --infra` (ou la définir en CI).');
+  if (!url) throw new Error('DATABASE_URL_TEST manquante : lancer `pnpm start --infra` (ou la définir en CI).');
   return url;
 }
 

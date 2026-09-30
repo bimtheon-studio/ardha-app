@@ -9,7 +9,7 @@ import { Coquille } from './Coquille';
 
 describe('Coquille', () => {
   it('sans utilisateur connu (le temps d’une déconnexion), le menu montre une icône', () => {
-    fausseApi({ 'GET /api/auth/moi': sansSession });
+    fausseApi({ 'GET /api/auth/me': sansSession });
     render(
       <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter>

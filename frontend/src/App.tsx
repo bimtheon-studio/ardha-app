@@ -19,10 +19,10 @@ export function Routes_() {
   return (
     <Suspense fallback={<Chargement />}>
       <Routes>
-        <Route path="/connexion" element={<Connexion />} />
-        <Route path="/inscription" element={<Inscription />} />
-        <Route path="/mot-de-passe-oublie" element={<MotDePasseOublie />} />
-        <Route path="/reinitialiser" element={<Reinitialiser />} />
+        <Route path="/login" element={<Connexion />} />
+        <Route path="/signup" element={<Inscription />} />
+        <Route path="/forgot-password" element={<MotDePasseOublie />} />
+        <Route path="/reset-password" element={<Reinitialiser />} />
         {/* `/` mène à la connexion quand on n'a pas de session (F-00, Q8). */}
         <Route
           element={

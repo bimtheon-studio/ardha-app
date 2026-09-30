@@ -31,7 +31,7 @@ export function nomDeProjet(dossier: string): string {
 }
 
 /**
- * Déduit le contexte des infos git. `decalageForce` (variable `ARDHA_DECALAGE`) permet de sortir
+ * Déduit le contexte des infos git. `decalageForce` (variable `ARDHA_PORT_OFFSET`) permet de sortir
  * d'une collision de ports sans changer de branche.
  */
 export function contexteDepuis(git: InfosGit, decalageForce?: number): Contexte {
@@ -58,7 +58,7 @@ export function lireDecalageForce(valeur: string | undefined): number | undefine
   if (valeur === undefined || valeur === '') return undefined;
   const n = Number(valeur);
   if (!Number.isInteger(n) || n < 0 || n > 404) {
-    throw new Error(`ARDHA_DECALAGE doit être un entier entre 0 et 404 (reçu « ${valeur} »).`);
+    throw new Error(`ARDHA_PORT_OFFSET doit être un entier entre 0 et 404 (reçu « ${valeur} »).`);
   }
   return n;
 }
@@ -72,7 +72,7 @@ export function contexteCourant(dossier = process.cwd()): Contexte {
       dossierCommun: git('rev-parse', '--git-common-dir'),
       branche: git('rev-parse', '--abbrev-ref', 'HEAD'),
     },
-    lireDecalageForce(process.env.ARDHA_DECALAGE),
+    lireDecalageForce(process.env.ARDHA_PORT_OFFSET),
   );
 }
 

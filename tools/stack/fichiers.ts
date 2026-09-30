@@ -1,9 +1,9 @@
-// Fichiers locaux générés par `pnpm demarrer`, ignorés par git : l'override Compose et `.env.local`.
+// Fichiers locaux générés par `pnpm start`, ignorés par git : l'override Compose et `.env.local`.
 import { randomBytes } from 'node:crypto';
 
 import type { Contexte } from './contexte.ts';
 
-export const DEBUT_BLOC = '# >>> ardha stack (généré par `pnpm demarrer`, ne pas committer) >>>';
+export const DEBUT_BLOC = '# >>> ardha stack (généré par `pnpm start`, ne pas committer) >>>';
 export const FIN_BLOC = '# <<< ardha stack <<<';
 
 /** Mots de passe locaux : tirés au hasard au premier démarrage, puis conservés dans `.env.local`. */
@@ -31,7 +31,7 @@ export function secretsExistants(env: string): Secrets | null {
 export function override(ctx: Contexte, secrets: Secrets): string {
   const { ports } = ctx;
   return [
-    `# Généré par \`pnpm demarrer\` pour « ${ctx.projet} » (branche ${ctx.branche}, décalage +${ctx.decalage}).`,
+    `# Généré par \`pnpm start\` pour « ${ctx.projet} » (branche ${ctx.branche}, décalage +${ctx.decalage}).`,
     '# Ne pas committer (ignoré par git). Ports publiés sur 127.0.0.1 uniquement.',
     `name: ${ctx.projet}`,
     'services:',
