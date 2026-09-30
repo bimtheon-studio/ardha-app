@@ -41,7 +41,7 @@ async function login(email: string, password: string, ip = '10.0.0.2') {
 }
 
 async function auditLog(): Promise<{ action: string; details: Record<string, unknown> }[]> {
-  const r = await pool.query('SELECT action, details FROM journal_audit ORDER BY cree_le, id');
+  const r = await pool.query('SELECT action, details FROM audit_logs ORDER BY created_at, id');
   return r.rows;
 }
 
@@ -49,7 +49,7 @@ describe('inscription', () => {
   it('crée le compte, ouvre une session par cookie httpOnly et rend l’utilisateur', async () => {
     const r = await signup(' Alice@Exemple.FR ');
     expect(r.status).toBe(201);
-    expect(r.body).toMatchObject({ email: 'alice@exemple.fr', name: 'Alice Martin', role: 'utilisateur' });
+    expect(r.body).toMatchObject({ email: 'alice@exemple.fr', name: 'Alice Martin', role: 'user' });
     const cookie = cookieOf(r);
     expect(cookie).toMatch(/HttpOnly/);
     expect(cookie).toMatch(/SameSite=Lax/);
@@ -62,11 +62,11 @@ describe('inscription', () => {
   it('ne garde du jeton de session que son empreinte, et hache le mot de passe en argon2id', async () => {
     const r = await signup();
     const token = cookieValue(cookieOf(r)).split('=')[1]!;
-    const s = await pool.query('SELECT jeton_hash FROM session');
-    expect(s.rows[0].jeton_hash).not.toBe(token);
-    expect(s.rows[0].jeton_hash).toMatch(/^[0-9a-f]{64}$/);
-    const u = await pool.query('SELECT mot_de_passe_hash FROM utilisateur');
-    expect(u.rows[0].mot_de_passe_hash).toMatch(/^\$argon2id\$v=19\$m=19456,t=2,p=1\$/);
+    const s = await pool.query('SELECT token_hash FROM sessions');
+    expect(s.rows[0].token_hash).not.toBe(token);
+    expect(s.rows[0].token_hash).toMatch(/^[0-9a-f]{64}$/);
+    const u = await pool.query('SELECT password_hash FROM users');
+    expect(u.rows[0].password_hash).toMatch(/^\$argon2id\$v=19\$m=19456,t=2,p=1\$/);
   });
 
   it('refuse une adresse déjà utilisée, quelle que soit la casse', async () => {
@@ -149,7 +149,7 @@ describe('session', () => {
     expect(r.status).toBe(204);
     expect(cookieOf(r)).toMatch(/Expires=Thu, 01 Jan 1970/);
     expect((await http().get('/api/auth/me').set('Cookie', cookie)).status).toBe(401);
-    expect((await pool.query('SELECT count(*)::int AS n FROM session')).rows[0].n).toBe(0);
+    expect((await pool.query('SELECT count(*)::int AS n FROM sessions')).rows[0].n).toBe(0);
   });
 
   it('la déconnexion sans session répond tout de même 204', async () => {
@@ -170,7 +170,7 @@ describe('session', () => {
     const cookie = cookieValue(cookieOf(await signup()));
     t.clock.advance(30 * DAY + 1000);
     expect((await http().get('/api/auth/me').set('Cookie', cookie)).status).toBe(401);
-    expect((await pool.query('SELECT count(*)::int AS n FROM session')).rows[0].n).toBe(0);
+    expect((await pool.query('SELECT count(*)::int AS n FROM sessions')).rows[0].n).toBe(0);
   });
 
   it('expire 90 jours après la connexion, même utilisée tous les jours', async () => {

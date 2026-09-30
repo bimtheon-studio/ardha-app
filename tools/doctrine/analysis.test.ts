@@ -7,10 +7,10 @@ const rules = (sql: string) => checkMigration('m.sql', sql).map((v) => v.rule);
 describe('analyserMigration — ce qui est permis', () => {
   it('laisse passer tables, index, clés, contraintes, types', () => {
     const sql = `
-      CREATE TYPE "role" AS ENUM ('admin', 'utilisateur');
-      CREATE TABLE "utilisateur" ("id" uuid PRIMARY KEY DEFAULT uuidv7(), "email" text NOT NULL UNIQUE);
-      CREATE INDEX "i" ON "utilisateur" USING btree ("email");
-      ALTER TABLE "session" ADD CONSTRAINT "fk" FOREIGN KEY ("u") REFERENCES "utilisateur"("id") ON DELETE cascade;
+      CREATE TYPE "role" AS ENUM ('admin', 'user');
+      CREATE TABLE "users" ("id" uuid PRIMARY KEY DEFAULT uuidv7(), "email" text NOT NULL UNIQUE);
+      CREATE INDEX "i" ON "users" USING btree ("email");
+      ALTER TABLE "sessions" ADD CONSTRAINT "fk" FOREIGN KEY ("u") REFERENCES "users"("id") ON DELETE cascade;
       CREATE EXTENSION IF NOT EXISTS postgis;
       CREATE EXTENSION IF NOT EXISTS "vector";
     `;

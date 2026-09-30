@@ -40,7 +40,7 @@ beforeAll(async () => {
 });
 afterAll(() => module.close());
 beforeEach(async () => {
-  await pool.query('TRUNCATE utilisateur, session, reinitialisation_mot_de_passe, journal_audit CASCADE');
+  await pool.query('TRUNCATE users, sessions, password_resets, audit_logs CASCADE');
 });
 
 describe('user:create-admin', () => {
@@ -87,7 +87,7 @@ describe('désactivation (Q5)', () => {
     });
     await service.reactivate('bob@exemple.fr');
     await expect(auth.login({ email: 'bob@exemple.fr', password: 'cheval pomme agrafe' }, ctx)).resolves.toBeTruthy();
-    const actions = (await pool.query('SELECT action, origine AS origin FROM journal_audit ORDER BY cree_le, id')).rows;
+    const actions = (await pool.query('SELECT action, origin FROM audit_logs ORDER BY created_at, id')).rows;
     expect(actions).toContainEqual({ action: 'user.deactivated', origin: 'cli' });
     expect(actions).toContainEqual({ action: 'user.reactivated', origin: 'cli' });
   });
@@ -112,7 +112,7 @@ describe('purge du worker', () => {
     await auth.login({ email: 'c@exemple.fr', password: 'cheval pomme agrafe' }, ctx);
     const result = await module.get(MaintenanceProcessor).process({ name: PURGE_JOB } as never);
     expect(result).toEqual({ sessions: 1, links: 1 });
-    expect((await pool.query('SELECT count(*)::int AS n FROM session')).rows[0].n).toBe(1);
+    expect((await pool.query('SELECT count(*)::int AS n FROM sessions')).rows[0].n).toBe(1);
   });
 
   it('refuse une tâche inconnue', async () => {

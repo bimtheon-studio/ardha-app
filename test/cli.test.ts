@@ -15,7 +15,7 @@ beforeAll(() => {
 });
 afterAll(() => pool.end());
 beforeEach(async () => {
-  await pool.query('TRUNCATE utilisateur, session, reinitialisation_mot_de_passe, journal_audit CASCADE');
+  await pool.query('TRUNCATE users, sessions, password_resets, audit_logs CASCADE');
   output = [];
   vi.spyOn(console, 'log').mockImplementation((...m: unknown[]) => void output.push(m.join(' ')));
 });

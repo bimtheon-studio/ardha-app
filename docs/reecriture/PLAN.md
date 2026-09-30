@@ -111,7 +111,7 @@ Aujourd'hui, une étude est une ligne de `etudes` avec six blocs JSON typés `an
 clés `localStorage`. Les données publiques y sont recopiées au moment de l'étude, sans dire d'où elles
 viennent. Le modèle visé sépare les deux familles, et le calcul retient ce qu'il a utilisé.
 
-**C'est une première esquisse.** Le modèle de l'étude évoluera en itérant dessus, à partir de L2 ; ce qui
+**C'est une première esquisse**, rédigée en français ; en base, les noms seront en anglais (DT-19). Le modèle de l'étude évoluera en itérant dessus, à partir de L2 ; ce qui
 est acquis, c'est la séparation des deux familles et le lien par version.
 
 **Données client** — appartiennent à l'utilisateur ; sauvegardées, jamais reconstruites.
@@ -351,7 +351,7 @@ Prises en route pendant L0, le 30/09/2026, par l'agent de réécriture. Elles ne
 | DT-16 | Front : React 19.3, React Router 8, Vite 8, Tailwind 4 ; primitives shadcn/ui reprises, polices auto-hébergées (`@fontsource`) | Tailwind 3 ; Google Fonts | versions courantes ; le front ne charge rien hors d'Ardha sauf les tuiles IGN (D-08) |
 | DT-17 | Logs structurés par pino (`nestjs-pino`), cookies et en-têtes d'authentification masqués | logger de Nest | logs JSON exploitables en production (PLAN §8) |
 | DT-18 | ESLint 10 + typescript-eslint ; frontières d'architecture en `no-restricted-imports` | règles de revue | la CI fait respecter le domaine pur, Drizzle confiné, le front limité au contrat |
-| DT-19 | **Le code en anglais** : dossiers, fichiers, identifiants, commandes pnpm (`start`, `stop`, `destroy`, `status`, `migrate`, `seed`) et CLI (`user:create-admin`…), options, variables (`ARDHA_PORT_OFFSET`), routes (`/api/auth/login`, `/login`…), champs JSON (`name`, `password`, `token`, `fields`), codes d'erreur et actions du journal. Restent en français : le modèle en base (tables et colonnes, nommées explicitement dans `src/db/schema.ts`), les commentaires et les textes affichés | tout en français | consigne du porteur du produit, 30/09/2026 (arbitrée) ; CLAUDE.md mis à jour |
+| DT-19 | **Tout en anglais** : dossiers, fichiers, identifiants, commandes pnpm (`start`, `stop`, `destroy`, `status`, `migrate`, `seed`) et CLI (`user:create-admin`…), options, variables (`ARDHA_PORT_OFFSET`), routes (`/api/auth/login`, `/login`…), champs JSON (`name`, `password`, `token`, `fields`), codes d'erreur, actions du journal, **tables et colonnes** (au pluriel : `users`, `sessions`, `password_resets`, `audit_logs` ; `user` est un mot réservé de PostgreSQL). Restent en français : les commentaires et les textes affichés. Les noms d'entités de §4 (`etude`, `parcelle`…) se traduisent à la conception de chaque lot | tout en français | consigne du porteur du produit, 30/09/2026 (arbitrée) ; CLAUDE.md mis à jour |
 
 ## 12. Questions ouvertes
 
@@ -370,8 +370,9 @@ vers des comptes pas encore recréés) ; aucune migration ne les a réinjectées
 
 ## Journal
 
-- **30/09/2026** — code entièrement en anglais (DT-19), renommé par l'arbre syntaxique ; base inchangée
-  (drizzle-kit : aucun changement de schéma).
+- **30/09/2026** — code puis base en anglais (DT-19) : identifiants renommés par l'arbre syntaxique ;
+  tables `users`, `sessions`, `password_resets`, `audit_logs`. Migration `0001` régénérée
+  (`0001_accounts.sql`), jamais appliquée hors des postes de développement.
 - **30/09/2026** — surfaces en anglais (DT-19) : commandes pnpm et CLI, options, routes de l'API et du
   front ; `pnpm status` affiche des liens cliquables et l'état de chaque service. Recette rejouée.
 - **30/09/2026** — **L0 livré sur `master`** (b86d58d et suivant). Fiche F-00 scannée, arbitrée (Q1 à Q9),

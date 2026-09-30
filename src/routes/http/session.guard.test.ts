@@ -30,7 +30,7 @@ function guard(current: CurrentSession | null) {
   return new SessionGuard(new Reflector(), auth, config);
 }
 
-const alice = { id: '0190', email: 'a@b.fr', name: 'A', role: 'utilisateur' as const };
+const alice = { id: '0190', email: 'a@b.fr', name: 'A', role: 'user' as const };
 
 describe('SessionGuard', () => {
   it('ferme par défaut une route sans session', async () => {

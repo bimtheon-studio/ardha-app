@@ -41,5 +41,5 @@ export function renderAt(url: string | { pathname: string; state?: unknown }) {
   );
 }
 
-export const alice = { id: '01900000-0000-7000-8000-000000000001', email: 'alice@exemple.fr', name: 'Alice Martin', role: 'utilisateur' };
+export const alice = { id: '01900000-0000-7000-8000-000000000001', email: 'alice@exemple.fr', name: 'Alice Martin', role: 'user' };
 export const noSession = { status: 401, body: { message: 'Vous devez vous connecter.' } };

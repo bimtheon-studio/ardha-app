@@ -32,7 +32,7 @@ connexion par e-mail et mot de passe, **aucun e-mail envoyé en v1**, pas de pro
    `~/dev/windoo/saas/castor.php`), génère `docker-compose.override.yaml` et `.env.local` (ignorés par
    git), suffixe le cookie de session, **vérifie que les ports sont libres** et le dit clairement sinon,
    puis joue les migrations et le seed.
-5. **Base** : configuration Drizzle, première migration (`utilisateur`, `session`, `journal_audit`), et
+5. **Base** : configuration Drizzle, première migration (`users`, `sessions`, `audit_logs` — noms en anglais, DT-19), et
    un **contrôle de la doctrine « base bête »** qui échoue si une migration contient `CREATE FUNCTION`,
    `CREATE TRIGGER` ou `CREATE POLICY`.
 6. **CI** : un workflow GitHub Actions (types, lint, tests unitaires et d'intégration sur un Postgres de

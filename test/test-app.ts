@@ -47,7 +47,7 @@ export async function createTestApp(): Promise<TestApp> {
     config,
     clock,
     reset: async () => {
-      await pool.query('TRUNCATE utilisateur, session, reinitialisation_mot_de_passe, journal_audit CASCADE');
+      await pool.query('TRUNCATE users, sessions, password_resets, audit_logs CASCADE');
       const keys = await redis.keys(`ardha:${config.SESSION_COOKIE_NAME}:limite:*`);
       if (keys.length > 0) await redis.del(...keys);
     },

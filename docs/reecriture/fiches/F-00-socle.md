@@ -72,7 +72,7 @@ Aucune règle métier d'urbanisme dans ce lot. Règles de sécurité retenues ou
 
 - **Sources externes** : aucune.
 - **Lu / écrit** : `auth.users` (Supabase), `ardha.user_roles`, `ardha.agent_profiles`,
-  `ardha.user_subscriptions`, `core.acces_produit` → `utilisateur`, `session`, `journal_audit`
+  `ardha.user_subscriptions`, `core.acces_produit` → `users`, `sessions`, `password_resets`, `audit_logs`
   (données client, PLAN §4).
 
 ## Cas limites et bugs connus
@@ -95,12 +95,12 @@ Aucune règle métier d'urbanisme dans ce lot. Règles de sécurité retenues ou
 
 ## Conception cible
 
-- **Données** (client, `src/db/schema.ts`, migration `drizzle/0001_socle.sql`) :
-  `utilisateur` (e-mail normalisé unique, nom, hash argon2id — nul tant qu'un compte créé par la CLI
-  n'a pas choisi son mot de passe —, rôle `admin` ou `utilisateur`, date de désactivation) ;
-  `session` (empreinte SHA-256 du jeton, échéance glissante, échéance absolue, IP, agent) ;
-  `reinitialisation_mot_de_passe` (empreinte, échéance, date d'utilisation) ; `journal_audit`
-  (origine `api`, `cli` ou `worker`, acteur, action, cible, détails sans secret, IP).
+- **Données** (client, `src/db/schema.ts`, migration `drizzle/0001_accounts.sql`) :
+  `users` (e-mail normalisé unique, nom, hash argon2id — nul tant qu'un compte créé par la CLI
+  n'a pas choisi son mot de passe —, rôle `admin` ou `user`, date de désactivation) ;
+  `sessions` (empreinte SHA-256 du jeton, échéance glissante, échéance absolue, IP, agent) ;
+  `password_resets` (empreinte, échéance, date d'utilisation) ; `audit_logs` (origine `api`, `cli`
+  ou `worker`, acteur, action, cible, détails sans secret, IP).
 - **Règles pures** (`src/domain`) : politique de mot de passe, normalisation de l'e-mail, échéances de
   session, lien de réinitialisation.
 - **Contrat** (`src/contracts`) : `POST /api/auth/signup`, `POST /api/auth/login`,

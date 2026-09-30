@@ -70,7 +70,7 @@ export class AuthService {
     const created = await this.users.create({
       email,
       name: request.name.trim(),
-      role: 'utilisateur',
+      role: 'user',
       passwordHash: await this.passwords.hash(request.password),
     });
     if (!created) throw new DomainError('email-taken', undefined, { email: 'Cette adresse e-mail est déjà utilisée.' });

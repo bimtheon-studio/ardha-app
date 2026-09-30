@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 import { route } from './routes.ts';
 
-export const Role = z.enum(['admin', 'utilisateur']);
+export const Role = z.enum(['admin', 'user']);
 export type Role = z.infer<typeof Role>;
 
 export const User = z.object({

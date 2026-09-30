@@ -1,11 +1,11 @@
 {
-  "id": "f8a5078d-42fa-4dd5-a179-ac42c6dd69c2",
+  "id": "07a765db-9876-4fdc-ab6e-35b05f841acf",
   "prevId": "610406b4-bad2-47db-9b64-7ce215f736d2",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.journal_audit": {
-      "name": "journal_audit",
+    "public.audit_logs": {
+      "name": "audit_logs",
       "schema": "",
       "columns": {
         "id": {
@@ -15,22 +15,22 @@
           "notNull": true,
           "default": "uuidv7()"
         },
-        "cree_le": {
-          "name": "cree_le",
+        "created_at": {
+          "name": "created_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
         },
-        "origine": {
-          "name": "origine",
-          "type": "origine_audit",
+        "origin": {
+          "name": "origin",
+          "type": "audit_origin",
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
         },
-        "acteur_id": {
-          "name": "acteur_id",
+        "actor_id": {
+          "name": "actor_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -41,8 +41,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "cible_id": {
-          "name": "cible_id",
+        "target_id": {
+          "name": "target_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -62,11 +62,11 @@
         }
       },
       "indexes": {
-        "journal_audit_cree_le_index": {
-          "name": "journal_audit_cree_le_index",
+        "audit_logs_created_at_index": {
+          "name": "audit_logs_created_at_index",
           "columns": [
             {
-              "expression": "cree_le",
+              "expression": "created_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -77,11 +77,11 @@
           "method": "btree",
           "with": {}
         },
-        "journal_audit_acteur_id_index": {
-          "name": "journal_audit_acteur_id_index",
+        "audit_logs_actor_id_index": {
+          "name": "audit_logs_actor_id_index",
           "columns": [
             {
-              "expression": "acteur_id",
+              "expression": "actor_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -92,8 +92,8 @@
           "method": "btree",
           "with": {}
         },
-        "journal_audit_action_index": {
-          "name": "journal_audit_action_index",
+        "audit_logs_action_index": {
+          "name": "audit_logs_action_index",
           "columns": [
             {
               "expression": "action",
@@ -109,12 +109,12 @@
         }
       },
       "foreignKeys": {
-        "journal_audit_acteur_id_utilisateur_id_fk": {
-          "name": "journal_audit_acteur_id_utilisateur_id_fk",
-          "tableFrom": "journal_audit",
-          "tableTo": "utilisateur",
+        "audit_logs_actor_id_users_id_fk": {
+          "name": "audit_logs_actor_id_users_id_fk",
+          "tableFrom": "audit_logs",
+          "tableTo": "users",
           "columnsFrom": [
-            "acteur_id"
+            "actor_id"
           ],
           "columnsTo": [
             "id"
@@ -129,8 +129,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.reinitialisation_mot_de_passe": {
-      "name": "reinitialisation_mot_de_passe",
+    "public.password_resets": {
+      "name": "password_resets",
       "schema": "",
       "columns": {
         "id": {
@@ -140,44 +140,44 @@
           "notNull": true,
           "default": "uuidv7()"
         },
-        "utilisateur_id": {
-          "name": "utilisateur_id",
+        "user_id": {
+          "name": "user_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "jeton_hash": {
-          "name": "jeton_hash",
+        "token_hash": {
+          "name": "token_hash",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "cree_le": {
-          "name": "cree_le",
+        "created_at": {
+          "name": "created_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
         },
-        "expire_le": {
-          "name": "expire_le",
+        "expires_at": {
+          "name": "expires_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
         },
-        "utilise_le": {
-          "name": "utilise_le",
+        "used_at": {
+          "name": "used_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         }
       },
       "indexes": {
-        "reinitialisation_mot_de_passe_utilisateur_id_index": {
-          "name": "reinitialisation_mot_de_passe_utilisateur_id_index",
+        "password_resets_user_id_index": {
+          "name": "password_resets_user_id_index",
           "columns": [
             {
-              "expression": "utilisateur_id",
+              "expression": "user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -190,12 +190,12 @@
         }
       },
       "foreignKeys": {
-        "reinitialisation_mot_de_passe_utilisateur_id_utilisateur_id_fk": {
-          "name": "reinitialisation_mot_de_passe_utilisateur_id_utilisateur_id_fk",
-          "tableFrom": "reinitialisation_mot_de_passe",
-          "tableTo": "utilisateur",
+        "password_resets_user_id_users_id_fk": {
+          "name": "password_resets_user_id_users_id_fk",
+          "tableFrom": "password_resets",
+          "tableTo": "users",
           "columnsFrom": [
-            "utilisateur_id"
+            "user_id"
           ],
           "columnsTo": [
             "id"
@@ -206,11 +206,11 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "reinitialisation_mot_de_passe_jeton_hash_unique": {
-          "name": "reinitialisation_mot_de_passe_jeton_hash_unique",
+        "password_resets_token_hash_unique": {
+          "name": "password_resets_token_hash_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "jeton_hash"
+            "token_hash"
           ]
         }
       },
@@ -218,8 +218,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.session": {
-      "name": "session",
+    "public.sessions": {
+      "name": "sessions",
       "schema": "",
       "columns": {
         "id": {
@@ -229,40 +229,40 @@
           "notNull": true,
           "default": "uuidv7()"
         },
-        "utilisateur_id": {
-          "name": "utilisateur_id",
+        "user_id": {
+          "name": "user_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "jeton_hash": {
-          "name": "jeton_hash",
+        "token_hash": {
+          "name": "token_hash",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "cree_le": {
-          "name": "cree_le",
+        "created_at": {
+          "name": "created_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
         },
-        "derniere_activite_le": {
-          "name": "derniere_activite_le",
+        "last_activity_at": {
+          "name": "last_activity_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
         },
-        "expire_le": {
-          "name": "expire_le",
+        "expires_at": {
+          "name": "expires_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
         },
-        "expire_au_plus_tard_le": {
-          "name": "expire_au_plus_tard_le",
+        "absolute_expires_at": {
+          "name": "absolute_expires_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
@@ -273,19 +273,19 @@
           "primaryKey": false,
           "notNull": false
         },
-        "agent_utilisateur": {
-          "name": "agent_utilisateur",
+        "user_agent": {
+          "name": "user_agent",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         }
       },
       "indexes": {
-        "session_utilisateur_id_index": {
-          "name": "session_utilisateur_id_index",
+        "sessions_user_id_index": {
+          "name": "sessions_user_id_index",
           "columns": [
             {
-              "expression": "utilisateur_id",
+              "expression": "user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -296,11 +296,11 @@
           "method": "btree",
           "with": {}
         },
-        "session_expire_le_index": {
-          "name": "session_expire_le_index",
+        "sessions_expires_at_index": {
+          "name": "sessions_expires_at_index",
           "columns": [
             {
-              "expression": "expire_le",
+              "expression": "expires_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -313,12 +313,12 @@
         }
       },
       "foreignKeys": {
-        "session_utilisateur_id_utilisateur_id_fk": {
-          "name": "session_utilisateur_id_utilisateur_id_fk",
-          "tableFrom": "session",
-          "tableTo": "utilisateur",
+        "sessions_user_id_users_id_fk": {
+          "name": "sessions_user_id_users_id_fk",
+          "tableFrom": "sessions",
+          "tableTo": "users",
           "columnsFrom": [
-            "utilisateur_id"
+            "user_id"
           ],
           "columnsTo": [
             "id"
@@ -329,11 +329,11 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "session_jeton_hash_unique": {
-          "name": "session_jeton_hash_unique",
+        "sessions_token_hash_unique": {
+          "name": "sessions_token_hash_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "jeton_hash"
+            "token_hash"
           ]
         }
       },
@@ -341,8 +341,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.utilisateur": {
-      "name": "utilisateur",
+    "public.users": {
+      "name": "users",
       "schema": "",
       "columns": {
         "id": {
@@ -358,41 +358,41 @@
           "primaryKey": false,
           "notNull": true
         },
-        "nom": {
-          "name": "nom",
+        "name": {
+          "name": "name",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "mot_de_passe_hash": {
-          "name": "mot_de_passe_hash",
+        "password_hash": {
+          "name": "password_hash",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
         "role": {
           "name": "role",
-          "type": "role_utilisateur",
+          "type": "user_role",
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
-          "default": "'utilisateur'"
+          "default": "'user'"
         },
-        "desactive_le": {
-          "name": "desactive_le",
+        "deactivated_at": {
+          "name": "deactivated_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
-        "cree_le": {
-          "name": "cree_le",
+        "created_at": {
+          "name": "created_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
         },
-        "modifie_le": {
-          "name": "modifie_le",
+        "updated_at": {
+          "name": "updated_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
@@ -403,8 +403,8 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "utilisateur_email_unique": {
-          "name": "utilisateur_email_unique",
+        "users_email_unique": {
+          "name": "users_email_unique",
           "nullsNotDistinct": false,
           "columns": [
             "email"
@@ -417,8 +417,8 @@
     }
   },
   "enums": {
-    "public.origine_audit": {
-      "name": "origine_audit",
+    "public.audit_origin": {
+      "name": "audit_origin",
       "schema": "public",
       "values": [
         "api",
@@ -426,12 +426,12 @@
         "worker"
       ]
     },
-    "public.role_utilisateur": {
-      "name": "role_utilisateur",
+    "public.user_role": {
+      "name": "user_role",
       "schema": "public",
       "values": [
         "admin",
-        "utilisateur"
+        "user"
       ]
     }
   },
