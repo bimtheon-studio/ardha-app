@@ -7,3 +7,5 @@ docker-compose.override.yaml
 *.log
 .DS_Store
 .idea/
+/playwright-report/
+/test-results/

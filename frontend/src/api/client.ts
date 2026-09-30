@@ -17,11 +17,13 @@ const OFFLINE = 'Le serveur ne répond pas. Vérifiez votre connexion et réessa
 
 type Parts = { body?: unknown; query?: Record<string, unknown>; params?: Record<string, unknown> };
 
+/** Appelle une route ; `signal` annule l'appel (une saisie remplacée par la suivante). */
 export async function callApi<R extends Route>(
   route: R,
-  ...request: NeedsRequest<R> extends true ? [RequestOf<R>] : []
+  ...request: NeedsRequest<R> extends true ? [RequestOf<R>, AbortSignal?] : [undefined?, AbortSignal?]
 ): Promise<ResponseOf<R>> {
   const { body, query, params } = (request[0] ?? {}) as Parts;
+  const signal = request[1];
   const hasBody = body !== undefined;
   let response: Response;
   try {
@@ -30,8 +32,10 @@ export async function callApi<R extends Route>(
       credentials: 'same-origin',
       headers: { Accept: 'application/json', ...(hasBody && { 'Content-Type': 'application/json' }) },
       ...(hasBody && { body: JSON.stringify(body) }),
+      ...(signal && { signal }),
     });
-  } catch {
+  } catch (error) {
+    if (signal?.aborted) throw error;
     throw new CallError(0, OFFLINE);
   }
   if (!response.ok) {

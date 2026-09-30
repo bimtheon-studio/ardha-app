@@ -1,5 +1,5 @@
 # CI d'Ardha (PLAN §8) : types, lint, contrôle « base bête », tests unitaires et d'intégration sur
-# la stack Docker (migrations rejouées depuis une base vide), build.
+# la stack Docker (migrations rejouées depuis une base vide), build, tests e2e dans Chromium.
 # Chaque étape se rejoue en local avec la même commande `pnpm`.
 name: CI
 
@@ -47,6 +47,25 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Chromium des tests e2e
+        run: pnpm exec playwright install --with-deps chromium
+
+      # Stack jetable (base ardha_e2e, sources enregistrées, tuiles servies par le test) : sans Internet.
+      - name: Tests e2e
+        run: pnpm test:e2e
+        env:
+          # Le front vient d'être construit ; le Chromium de Playwright plutôt que celui du système.
+          E2E_SKIP_FRONT_BUILD: '1'
+          ARDHA_CHROMIUM: ''
+
+      - name: Rapport e2e
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
 
       - name: Journaux de la stack
         if: failure()

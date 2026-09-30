@@ -13,6 +13,7 @@ import { Signup } from '@/pages/Signup';
 const Home = lazy(() => import('@/pages/Home').then((m) => ({ default: m.Home })));
 const ForgotPassword = lazy(() => import('@/pages/ForgotPassword').then((m) => ({ default: m.ForgotPassword })));
 const ResetPassword = lazy(() => import('@/pages/ResetPassword').then((m) => ({ default: m.ResetPassword })));
+const MapPage = lazy(() => import('@/pages/MapPage').then((m) => ({ default: m.MapPage })));
 const NotFound = lazy(() => import('@/pages/NotFound').then((m) => ({ default: m.NotFound })));
 
 export function AppRoutes() {
@@ -32,6 +33,7 @@ export function AppRoutes() {
           }
         >
           <Route index element={<Home />} />
+          <Route path="map" element={<MapPage />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

@@ -1,5 +1,9 @@
-// Accueil connecté. En L0, un point d'arrivée ; les études arrivent en L2.
+// Accueil connecté. Les études enregistrées arrivent en L2 ; en L1, l'entrée vers la carte.
+import { Map } from 'lucide-react';
+import { Link } from 'react-router';
+
 import { useMe } from '@/auth/session';
+import { Button } from '@/components/ui/button';
 
 export function Home() {
   const { data: me } = useMe();
@@ -8,6 +12,11 @@ export function Home() {
       <p className="eyebrow text-primary">Accueil</p>
       <h1 className="text-4xl">Bonjour {me?.name}</h1>
       <p className="text-muted-foreground">Vos études apparaîtront ici.</p>
+      <Button asChild>
+        <Link to="/map">
+          <Map /> Choisir des parcelles
+        </Link>
+      </Button>
     </div>
   );
 }

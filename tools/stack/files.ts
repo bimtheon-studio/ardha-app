@@ -73,6 +73,8 @@ export function variables(ctx: Context, secrets: Secrets): Record<string, string
     API_PORT: String(ports.api),
     WEB_PORT: String(ports.web),
     WEB_ORIGIN: `http://127.0.0.1:${ports.web}`,
+    E2E_API_PORT: String(ports.e2eApi),
+    E2E_WEB_PORT: String(ports.e2eWeb),
     SESSION_COOKIE_NAME: ctx.cookieSession,
   };
 }

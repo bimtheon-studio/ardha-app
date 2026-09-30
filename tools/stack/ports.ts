@@ -14,6 +14,9 @@ export const BASE_PORTS = {
   redis: 16379,
   minio: 19000,
   minioConsole: 19500,
+  /** Stack jetable des tests e2e (`pnpm test:e2e`) : API et front, à côté de la stack de dev. */
+  e2eApi: 17000,
+  e2eWeb: 18000,
 } as const;
 
 export type Service = keyof typeof BASE_PORTS;
@@ -26,6 +29,8 @@ export const LABELS: Record<Service, string> = {
   redis: 'Redis',
   minio: 'MinIO (S3)',
   minioConsole: 'MinIO (console)',
+  e2eApi: 'API (e2e)',
+  e2eWeb: 'Front (e2e)',
 };
 
 /** Décalage d'un worktree : `crc32(branch) % 400 + 5`, soit 5 à 404. */

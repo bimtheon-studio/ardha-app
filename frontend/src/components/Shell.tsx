@@ -1,6 +1,6 @@
 // Coquille de l'application connectée : en-tête et menu du compte (F-00, #21).
 import { LogOut, User } from 'lucide-react';
-import { Link, Outlet, useNavigate } from 'react-router';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router';
 
 import { useLogout, useMe } from '@/auth/session';
 import { Button } from '@/components/ui/button';
@@ -33,9 +33,14 @@ export function Shell() {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="flex h-14 items-center justify-between border-b bg-card px-4">
-        <Link to="/" className="text-lg font-extrabold tracking-tight text-primary">
-          Ardha
-        </Link>
+        <nav className="flex items-center gap-6">
+          <Link to="/" className="text-lg font-extrabold tracking-tight text-primary">
+            Ardha
+          </Link>
+          <NavLink to="/map" className={({ isActive }) => `text-sm ${isActive ? 'font-semibold text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+            Carte
+          </NavLink>
+        </nav>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="icon" aria-label="Menu du compte">

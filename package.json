@@ -21,10 +21,11 @@
     "migrate": "node --enable-source-maps dist/cli/main.js migrate",
     "seed": "node --enable-source-maps dist/cli/main.js seed",
     "migration:generate": "drizzle-kit generate",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tools && pnpm --filter ./frontend run typecheck",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tools && tsc --noEmit -p e2e && pnpm --filter ./frontend run typecheck",
     "lint": "eslint .",
     "test": "vitest run --coverage && pnpm --filter ./frontend run test",
-    "doctrine": "node tools/doctrine/cli.ts"
+    "doctrine": "node tools/doctrine/cli.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@nestjs/bullmq": "12.0.0",
@@ -49,6 +50,7 @@
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@nestjs/testing": "12.1.1",
+    "@playwright/test": "1.63.0",
     "@swc/cli": "0.8.1",
     "@swc/core": "1.16.12",
     "@types/cookie-parser": "1.4.10",

@@ -12,10 +12,11 @@ export default mergeConfig(
       coverage: {
         provider: 'v8',
         include: ['src/**/*.{ts,tsx}'],
-        // Les primitives shadcn/ui sont du code de bibliothèque repris tel quel (PLAN §5).
-        exclude: ['src/**/*.test.{ts,tsx}', 'src/test/**', 'src/main.tsx', 'src/components/ui/**'],
+        // Les primitives shadcn/ui sont du code de bibliothèque repris tel quel (PLAN §5) ; le rendu
+        // Leaflet (`src/map/leaflet`) ne se dessine pas dans jsdom : il est couvert par l'e2e.
+        exclude: ['src/**/*.test.{ts,tsx}', 'src/test/**', 'src/main.tsx', 'src/components/ui/**', 'src/map/leaflet/**'],
         // Seuils à cliquet : `autoUpdate` les remonte en local, la CI échoue en dessous.
-        thresholds: { autoUpdate: process.env.CI ? false : (threshold: number) => Math.floor(threshold), lines: 97, functions: 93, branches: 94, statements: 96 },
+        thresholds: { autoUpdate: process.env.CI ? false : (threshold: number) => Math.floor(threshold), lines: 99, functions: 97, branches: 94, statements: 98 },
       },
     },
   }),

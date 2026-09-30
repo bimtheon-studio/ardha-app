@@ -7,20 +7,24 @@ import { vi } from 'vitest';
 import { AppRoutes } from '@/App';
 
 type TResponse = { status: number; body?: unknown };
-type Handler = (body: unknown) => TResponse;
+type Handler = (body: unknown, url: URL) => TResponse;
 
-/** Fausse API : une réponse par « MÉTHODE chemin », et la liste des appels reçus. */
+/**
+ * Fausse API : une réponse par « MÉTHODE chemin » (avec sa chaîne de requête, ou sans pour toutes),
+ * et la liste des appels reçus.
+ */
 export function fakeApi(routes: Record<string, TResponse | Handler>) {
   const calls: { key: string; body: unknown }[] = [];
   vi.stubGlobal(
     'fetch',
     vi.fn(async (path: string, init: RequestInit = {}) => {
       const key = `${init.method ?? 'GET'} ${path}`;
+      const url = new URL(path, 'http://ardha.test');
       const body = init.body ? JSON.parse(String(init.body)) : undefined;
       calls.push({ key, body });
-      const r = routes[key];
+      const r = routes[key] ?? routes[`${init.method ?? 'GET'} ${url.pathname}`];
       if (!r) throw new TypeError(`fetch non prévu : ${key}`);
-      const { status, body: output } = typeof r === 'function' ? r(body) : r;
+      const { status, body: output } = typeof r === 'function' ? r(body, url) : r;
       return new Response(status === 204 ? null : JSON.stringify(output ?? {}), {
         status: status,
         headers: { 'Content-Type': 'application/json' },
