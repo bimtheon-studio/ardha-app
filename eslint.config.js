@@ -8,7 +8,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-const restreindre = (...motifs) => ['error', { patterns: motifs }];
+const restrict = (...motifs) => ['error', { patterns: motifs }];
 
 export default tseslint.config(
   { ignores: ['**/dist/**', '**/coverage/**', 'node_modules/**', 'frontend/node_modules/**', 'docs/**', 'tools/inventaire-ancien.mjs', 'tools/rendre-inventaire.mjs'] },
@@ -37,7 +37,7 @@ export default tseslint.config(
     files: ['src/**/*.ts'],
     ignores: ['src/db/**', 'src/**/*.repository.ts', 'src/**/*.test.ts'],
     rules: {
-      'no-restricted-imports': restreindre({
+      'no-restricted-imports': restrict({
         group: ['drizzle-orm', 'drizzle-orm/*'],
         message: 'Drizzle reste dans src/db et les repositories (D-06).',
       }),
@@ -47,7 +47,7 @@ export default tseslint.config(
     files: ['src/domain/**/*.ts'],
     ignores: ['**/*.test.ts'],
     rules: {
-      'no-restricted-imports': restreindre({
+      'no-restricted-imports': restrict({
         regex: '^(?!\\./)',
         message: 'Le domaine est pur : ni framework, ni base, ni import hors de src/domain.',
       }),
@@ -57,7 +57,7 @@ export default tseslint.config(
     files: ['src/contracts/**/*.ts'],
     ignores: ['**/*.test.ts'],
     rules: {
-      'no-restricted-imports': restreindre({
+      'no-restricted-imports': restrict({
         regex: '^(?!\\./|\\.\\./domain/|zod$)',
         message: 'Le contrat ne dépend que de src/domain et de zod : le front l’importe.',
       }),
@@ -69,7 +69,7 @@ export default tseslint.config(
     plugins: { 'react-hooks': reactHooks },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      'no-restricted-imports': restreindre({
+      'no-restricted-imports': restrict({
         regex: '^\\.\\./',
         message: 'Du back, le front n’importe que @contracts et @domain ; dans le front, utiliser @/.',
       }),

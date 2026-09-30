@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import { contexteDepuis } from './context.ts';
+import { contextFrom } from './context.ts';
 import {
-  DEBUT_BLOC,
-  FIN_BLOC,
-  lireEnv,
-  nouveauxSecrets,
+  BLOCK_START,
+  BLOCK_END,
+  parseEnv,
+  newSecrets,
   override,
-  secretsExistants,
-  upsertBloc,
+  existingSecrets,
+  upsertBlock,
   variables,
 } from './files.ts';
 
-const ctx = contexteDepuis({ racine: '/dev/ardha-l1', dossierCommun: '/dev/ardha-app/.git', branche: 'l1' }, 7);
+const ctx = contextFrom({ root: '/dev/ardha-l1', commonDir: '/dev/ardha-app/.git', branch: 'l1' }, 7);
 const secrets = { postgres: 'pg-secret', minio: 'minio-secret' };
 
 describe('override', () => {
@@ -43,40 +43,42 @@ describe('variables', () => {
 
 describe('upsertBloc', () => {
   it('ajoute le bloc à la fin d’un fichier, sans toucher au reste', () => {
-    const sortie = upsertBloc('MA_VAR=1\n', { A: '1' });
-    expect(sortie).toBe(`MA_VAR=1\n\n${DEBUT_BLOC}\nA=1\n${FIN_BLOC}\n`);
+    const output = upsertBlock('MA_VAR=1\n', { A: '1' });
+    expect(output).toBe(`MA_VAR=1\n\n${BLOCK_START}\nA=1\n${BLOCK_END}\n`);
   });
 
   it('remplace un bloc existant en place', () => {
-    const premier = upsertBloc('AVANT=1\n', { A: '1' }) + 'APRES=2\n';
-    const second = upsertBloc(premier, { A: '2', B: '3' });
+    const first = upsertBlock('AVANT=1\n', { A: '1' }) + 'APRES=2\n';
+    const second = upsertBlock(first, { A: '2', B: '3' });
     expect(second).toContain('AVANT=1');
     expect(second).toContain('APRES=2');
     expect(second).toContain('A=2\nB=3');
     expect(second).not.toContain('A=1');
-    expect(second.split(DEBUT_BLOC)).toHaveLength(2);
+    expect(second.split(BLOCK_START)).toHaveLength(2);
   });
 
   it('crée le fichier quand il est vide', () => {
-    expect(upsertBloc('', { A: '1' })).toBe(`${DEBUT_BLOC}\nA=1\n${FIN_BLOC}\n`);
+    expect(upsertBlock('', { A: '1' })).toBe(`${BLOCK_START}\nA=1\n${BLOCK_END}\n`);
   });
 });
 
 describe('secrets', () => {
   it('relit les secrets d’un .env.local, pour ne pas changer le mot de passe d’un volume existant', () => {
-    const env = upsertBloc('', variables(ctx, secrets));
-    expect(secretsExistants(env)).toEqual(secrets);
-    expect(secretsExistants('AUTRE=1')).toBeNull();
+    const env = upsertBlock('', variables(ctx, secrets));
+    expect(existingSecrets(env)).toEqual(secrets);
+    expect(existingSecrets('AUTRE=1')).toBeNull();
+    // Un .env.local écrit avant le passage des noms en anglais.
+    expect(existingSecrets('ARDHA_POSTGRES_MOT_DE_PASSE=a\nARDHA_MINIO_MOT_DE_PASSE=b')).toEqual({ postgres: 'a', minio: 'b' });
   });
 
   it('tire des secrets différents à chaque fois, utilisables tels quels dans une URL', () => {
-    const a = nouveauxSecrets();
-    const b = nouveauxSecrets();
+    const a = newSecrets();
+    const b = newSecrets();
     expect(a.postgres).not.toBe(b.postgres);
     expect(a.postgres).toMatch(/^[A-Za-z0-9_-]{24}$/);
   });
 
   it('lireEnv ignore commentaires et lignes vides', () => {
-    expect([...lireEnv('# c\n\nA=1\nB = 2\n')]).toEqual([['A', '1'], ['B', '2']]);
+    expect([...parseEnv('# c\n\nA=1\nB = 2\n')]).toEqual([['A', '1'], ['B', '2']]);
   });
 });

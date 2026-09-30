@@ -3,25 +3,25 @@
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router';
 
-import { Chargement } from '@/components/Loading';
-import { ErreurChargement } from '@/components/LoadError';
+import { Loading } from '@/components/Loading';
+import { LoadError } from '@/components/LoadError';
 
-import { useMoi } from './session';
+import { useMe } from './session';
 
-export function RouteProtegee({ children }: { children: ReactNode }) {
-  const moi = useMoi();
+export function ProtectedRoute({ children }: { children: ReactNode }) {
+  const me = useMe();
   const location = useLocation();
-  if (moi.isPending) return <Chargement />;
-  if (moi.isError) return <ErreurChargement onReessayer={() => void moi.refetch()} />;
-  if (!moi.data) {
-    const depuis = `${location.pathname}${location.search}${location.hash}`;
-    return <Navigate to="/login" replace state={{ depuis }} />;
+  if (me.isPending) return <Loading />;
+  if (me.isError) return <LoadError onRetry={() => void me.refetch()} />;
+  if (!me.data) {
+    const from = `${location.pathname}${location.search}${location.hash}`;
+    return <Navigate to="/login" replace state={{ from }} />;
   }
   return <>{children}</>;
 }
 
 /** Page d'où l'on venait avant d'être envoyé vers la connexion ; l'accueil sinon. Jamais une URL externe. */
-export function pageDeRetour(etat: unknown): string {
-  const depuis = (etat as { depuis?: unknown } | null)?.depuis;
-  return typeof depuis === 'string' && depuis.startsWith('/') && !depuis.startsWith('//') ? depuis : '/';
+export function returnPath(status: unknown): string {
+  const from = (status as { from?: unknown } | null)?.from;
+  return typeof from === 'string' && from.startsWith('/') && !from.startsWith('//') ? from : '/';
 }

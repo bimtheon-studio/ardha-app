@@ -6,25 +6,25 @@ import { Label } from '@/components/ui/label';
 
 interface Props extends ComponentProps<typeof Input> {
   id: string;
-  libelle: string;
-  erreur?: string | undefined;
-  aide?: string;
+  label: string;
+  error?: string | undefined;
+  hint?: string;
 }
 
-export function Champ({ id, libelle, erreur, aide, ...saisie }: Props) {
-  const idMessage = `${id}-message`;
+export function Field({ id, label, error, hint, ...inputProps }: Props) {
+  const messageId = `${id}-message`;
   return (
     <div className="space-y-2">
-      <Label htmlFor={id}>{libelle}</Label>
-      <Input id={id} name={id} aria-invalid={erreur ? true : undefined} aria-describedby={erreur || aide ? idMessage : undefined} {...saisie} />
-      {erreur ? (
-        <p id={idMessage} className="text-sm text-destructive">
-          {erreur}
+      <Label htmlFor={id}>{label}</Label>
+      <Input id={id} name={id} aria-invalid={error ? true : undefined} aria-describedby={error || hint ? messageId : undefined} {...inputProps} />
+      {error ? (
+        <p id={messageId} className="text-sm text-destructive">
+          {error}
         </p>
       ) : (
-        aide && (
-          <p id={idMessage} className="text-sm text-muted-foreground">
-            {aide}
+        hint && (
+          <p id={messageId} className="text-sm text-muted-foreground">
+            {hint}
           </p>
         )
       )}

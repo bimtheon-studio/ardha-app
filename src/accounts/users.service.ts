@@ -1,34 +1,34 @@
 // Administration des comptes, pour la CLI : créer un administrateur, créer un lien de
 // réinitialisation (sans e-mail en v1, l'administrateur le transmet), désactiver, réactiver.
 import { Inject, Injectable } from '@nestjs/common';
-import { echeanceLien, normaliserEmail, urlLienReinitialisation } from '../domain/index.ts';
+import { linkDeadline, normalizeEmail, resetLinkUrl } from '../domain/index.ts';
 
-import { refuserMotDePasse } from './auth.service.ts';
-import { ReinitialisationsRepository } from './password-resets.repository.ts';
+import { rejectPassword } from './auth.service.ts';
+import { PasswordResetsRepository } from './password-resets.repository.ts';
 import { SessionsRepository } from './sessions.repository.ts';
-import type { LigneUtilisateur } from '../db/schema.ts';
-import { ErreurMetier } from '../shared/errors.ts';
-import { Horloge } from '../shared/clock.ts';
-import { nouveauJeton } from '../shared/tokens.ts';
-import { MotsDePasse } from '../shared/passwords.ts';
+import type { UserRow } from '../db/schema.ts';
+import { DomainError } from '../shared/errors.ts';
+import { Clock } from '../shared/clock.ts';
+import { newToken } from '../shared/tokens.ts';
+import { Passwords } from '../shared/passwords.ts';
 import { CONFIG, type Config } from '../config/config.ts';
-import { Journal } from '../audit/audit-log.ts';
-import { UtilisateursRepository } from './users.repository.ts';
+import { AuditLog } from '../audit/audit-log.ts';
+import { UsersRepository } from './users.repository.ts';
 
-export interface LienCree {
+export interface CreatedLink {
   url: string;
-  expireLe: Date;
+  expiresAt: Date;
 }
 
 @Injectable()
-export class UtilisateursService {
+export class UsersService {
   constructor(
-    private readonly utilisateurs: UtilisateursRepository,
+    private readonly users: UsersRepository,
     private readonly sessions: SessionsRepository,
-    private readonly reinitialisations: ReinitialisationsRepository,
-    private readonly motsDePasse: MotsDePasse,
-    private readonly journal: Journal,
-    private readonly horloge: Horloge,
+    private readonly passwordResets: PasswordResetsRepository,
+    private readonly passwords: Passwords,
+    private readonly auditLog: AuditLog,
+    private readonly clock: Clock,
     @Inject(CONFIG) private readonly config: Config,
   ) {}
 
@@ -36,58 +36,58 @@ export class UtilisateursService {
    * Crée un administrateur. Sans mot de passe fourni, le compte n'en a pas encore : on rend un lien
    * pour le choisir (le mot de passe ne passe ainsi ni par l'historique du shell, ni par l'écran).
    */
-  async creerAdmin(entree: { email: string; nom: string; motDePasse?: string }): Promise<{ utilisateur: LigneUtilisateur; lien?: LienCree }> {
-    const email = normaliserEmail(entree.email);
-    if (entree.motDePasse !== undefined) refuserMotDePasse(entree.motDePasse, email);
-    const cree = await this.utilisateurs.creer({
+  async createAdmin(input: { email: string; name: string; password?: string }): Promise<{ user: UserRow; link?: CreatedLink }> {
+    const email = normalizeEmail(input.email);
+    if (input.password !== undefined) rejectPassword(input.password, email);
+    const created = await this.users.create({
       email,
-      nom: entree.nom.trim(),
+      name: input.name.trim(),
       role: 'admin',
-      motDePasseHash: entree.motDePasse === undefined ? null : await this.motsDePasse.hacher(entree.motDePasse),
+      passwordHash: input.password === undefined ? null : await this.passwords.hash(input.password),
     });
-    if (!cree) throw new ErreurMetier('email-deja-utilise');
-    await this.journal.noter({ origine: 'cli', action: 'utilisateur.admin-cree', cibleId: cree.id, details: { email } });
-    if (entree.motDePasse !== undefined) return { utilisateur: cree };
-    return { utilisateur: cree, lien: await this.lienPour(cree) };
+    if (!created) throw new DomainError('email-taken');
+    await this.auditLog.record({ origin: 'cli', action: 'user.admin-created', targetId: created.id, details: { email } });
+    if (input.password !== undefined) return { user: created };
+    return { user: created, link: await this.linkFor(created) };
   }
 
-  async creerLienReinitialisation(email: string): Promise<LienCree> {
-    return this.lienPour(await this.exiger(email));
+  async createResetLink(email: string): Promise<CreatedLink> {
+    return this.linkFor(await this.requireUser(email));
   }
 
   /** Désactive le compte et ferme ses sessions ; rend le nombre de sessions fermées. */
-  async desactiver(email: string): Promise<number> {
-    const u = await this.exiger(email);
-    const maintenant = this.horloge.maintenant();
-    await this.utilisateurs.modifier(u.id, { desactiveLe: u.desactiveLe ?? maintenant }, maintenant);
-    const fermees = await this.sessions.supprimerDe(u.id);
-    await this.journal.noter({ origine: 'cli', action: 'utilisateur.desactive', cibleId: u.id, details: { sessionsFermees: fermees } });
-    return fermees;
+  async deactivate(email: string): Promise<number> {
+    const u = await this.requireUser(email);
+    const now = this.clock.now();
+    await this.users.update(u.id, { deactivatedAt: u.deactivatedAt ?? now }, now);
+    const closedCount = await this.sessions.removeForUser(u.id);
+    await this.auditLog.record({ origin: 'cli', action: 'user.deactivated', targetId: u.id, details: { closedSessions: closedCount } });
+    return closedCount;
   }
 
-  async reactiver(email: string): Promise<void> {
-    const u = await this.exiger(email);
-    await this.utilisateurs.modifier(u.id, { desactiveLe: null }, this.horloge.maintenant());
-    await this.journal.noter({ origine: 'cli', action: 'utilisateur.reactive', cibleId: u.id });
+  async reactivate(email: string): Promise<void> {
+    const u = await this.requireUser(email);
+    await this.users.update(u.id, { deactivatedAt: null }, this.clock.now());
+    await this.auditLog.record({ origin: 'cli', action: 'user.reactivated', targetId: u.id });
   }
 
-  lister(): Promise<LigneUtilisateur[]> {
-    return this.utilisateurs.lister();
+  list(): Promise<UserRow[]> {
+    return this.users.list();
   }
 
-  private async exiger(email: string): Promise<LigneUtilisateur> {
-    const u = await this.utilisateurs.parEmail(normaliserEmail(email));
-    if (!u) throw new ErreurMetier('utilisateur-inconnu');
+  private async requireUser(email: string): Promise<UserRow> {
+    const u = await this.users.byEmail(normalizeEmail(email));
+    if (!u) throw new DomainError('unknown-user');
     return u;
   }
 
-  private async lienPour(u: LigneUtilisateur): Promise<LienCree> {
-    const maintenant = this.horloge.maintenant();
-    const expireLe = echeanceLien(maintenant);
-    const { jeton, empreinte } = nouveauJeton();
-    await this.reinitialisations.annulerOuverts(u.id, maintenant);
-    await this.reinitialisations.creer(u.id, empreinte, maintenant, expireLe);
-    await this.journal.noter({ origine: 'cli', action: 'reinitialisation.lien-cree', cibleId: u.id, details: { expireLe } });
-    return { url: urlLienReinitialisation(this.config.WEB_ORIGIN, jeton), expireLe };
+  private async linkFor(u: UserRow): Promise<CreatedLink> {
+    const now = this.clock.now();
+    const expiresAt = linkDeadline(now);
+    const { token, tokenHash } = newToken();
+    await this.passwordResets.cancelOpen(u.id, now);
+    await this.passwordResets.create(u.id, tokenHash, now, expiresAt);
+    await this.auditLog.record({ origin: 'cli', action: 'password-reset.link-created', targetId: u.id, details: { expiresAt } });
+    return { url: resetLinkUrl(this.config.WEB_ORIGIN, token), expiresAt };
   }
 }

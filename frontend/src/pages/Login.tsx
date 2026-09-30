@@ -1,66 +1,66 @@
-import { Connexion as SchemaConnexion } from '@contracts';
+import { Login as LoginSchema } from '@contracts';
 import { Loader2, LogIn } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { pageDeRetour } from '@/auth/ProtectedRoute';
-import { useConnexion, useMoi } from '@/auth/session';
-import { Champ } from '@/components/Field';
-import { PageAuth } from '@/components/AuthPage';
-import { useFormulaire } from '@/components/useForm';
+import { returnPath } from '@/auth/ProtectedRoute';
+import { useLogin, useMe } from '@/auth/session';
+import { Field } from '@/components/Field';
+import { AuthPage } from '@/components/AuthPage';
+import { useForm } from '@/components/useForm';
 
-export function Connexion() {
+export function Login() {
   const location = useLocation();
-  const naviguer = useNavigate();
-  const moi = useMoi();
-  const connexion = useConnexion();
-  const form = useFormulaire(SchemaConnexion);
+  const navigate = useNavigate();
+  const me = useMe();
+  const login = useLogin();
+  const form = useForm(LoginSchema);
   const [email, setEmail] = useState('');
-  const [motDePasse, setMotDePasse] = useState('');
-  const retour = pageDeRetour(location.state);
+  const [password, setPassword] = useState('');
+  const returnTo = returnPath(location.state);
   const info = (location.state as { info?: string } | null)?.info;
 
-  if (moi.data) return <Navigate to={retour} replace />;
+  if (me.data) return <Navigate to={returnTo} replace />;
 
-  async function soumettre(e: FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault();
-    const corps = form.valider({ email, motDePasse });
-    if (!corps) return;
+    const body = form.validate({ email, password });
+    if (!body) return;
     try {
-      await connexion.mutateAsync(corps);
-      await naviguer(retour, { replace: true });
-    } catch (erreur) {
-      form.afficherErreur(erreur);
+      await login.mutateAsync(body);
+      await navigate(returnTo, { replace: true });
+    } catch (error) {
+      form.showError(error);
     }
   }
 
   return (
-    <PageAuth titre="Connexion" description="Connectez-vous à votre compte">
-      <form onSubmit={soumettre} className="space-y-4" noValidate>
+    <AuthPage title="Connexion" description="Connectez-vous à votre compte">
+      <form onSubmit={submit} className="space-y-4" noValidate>
         {info && (
           <Alert>
             <AlertDescription>{info}</AlertDescription>
           </Alert>
         )}
-        <Champ id="email" libelle="Adresse e-mail" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} erreur={form.champs.email} />
-        <Champ
+        <Field id="email" label="Adresse e-mail" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} error={form.fields.email} />
+        <Field
           id="motDePasse"
-          libelle="Mot de passe"
+          label="Mot de passe"
           type="password"
           autoComplete="current-password"
-          value={motDePasse}
-          onChange={(e) => setMotDePasse(e.target.value)}
-          erreur={form.champs.motDePasse}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          error={form.fields.password}
         />
         {form.message && (
           <Alert variant="destructive">
             <AlertDescription>{form.message}</AlertDescription>
           </Alert>
         )}
-        <Button type="submit" className="w-full" disabled={connexion.isPending}>
-          {connexion.isPending ? <Loader2 className="animate-spin" /> : <LogIn />}
+        <Button type="submit" className="w-full" disabled={login.isPending}>
+          {login.isPending ? <Loader2 className="animate-spin" /> : <LogIn />}
           Se connecter
         </Button>
         <div className="flex flex-col items-center gap-1 text-sm">
@@ -72,6 +72,6 @@ export function Connexion() {
           </Link>
         </div>
       </form>
-    </PageAuth>
+    </AuthPage>
   );
 }

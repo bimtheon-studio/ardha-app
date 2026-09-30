@@ -1,54 +1,54 @@
 // Inscription, connexion, déconnexion, session courante, réinitialisation par lien (F-00).
 import { Injectable } from '@nestjs/common';
 import {
-  dureeCookieMs,
-  echeancesInitiales,
-  MESSAGES_MOT_DE_PASSE,
-  normaliserEmail,
-  problemeMotDePasse,
-  prolongation,
-  sessionExpiree,
+  cookieDurationMs,
+  initialDeadlines,
+  PASSWORD_MESSAGES,
+  normalizeEmail,
+  passwordProblem,
+  renewal,
+  sessionExpired,
 } from '../domain/index.ts';
-import type { Connexion, Inscription, Reinitialisation, Utilisateur } from '../contracts/index.ts';
+import type { Login, Signup, PasswordReset, User } from '../contracts/index.ts';
 
-import type { LigneUtilisateur } from '../db/schema.ts';
-import { ErreurMetier } from '../shared/errors.ts';
-import { Horloge } from '../shared/clock.ts';
-import { empreinteJeton, nouveauJeton } from '../shared/tokens.ts';
-import { MotsDePasse } from '../shared/passwords.ts';
-import { Journal } from '../audit/audit-log.ts';
-import { UtilisateursRepository } from './users.repository.ts';
-import { ReinitialisationsRepository } from './password-resets.repository.ts';
+import type { UserRow } from '../db/schema.ts';
+import { DomainError } from '../shared/errors.ts';
+import { Clock } from '../shared/clock.ts';
+import { hashToken, newToken } from '../shared/tokens.ts';
+import { Passwords } from '../shared/passwords.ts';
+import { AuditLog } from '../audit/audit-log.ts';
+import { UsersRepository } from './users.repository.ts';
+import { PasswordResetsRepository } from './password-resets.repository.ts';
 import { SessionsRepository } from './sessions.repository.ts';
 
-export interface ContexteRequete {
+export interface RequestContext {
   ip: string | null;
-  agentUtilisateur: string | null;
+  userAgent: string | null;
 }
 
-export interface SessionOuverte {
-  utilisateur: Utilisateur;
+export interface OpenedSession {
+  user: User;
   /** Jeton en clair, pour le cookie. Jamais stocké. */
-  jeton: string;
-  dureeCookieMs: number;
+  token: string;
+  cookieDurationMs: number;
 }
 
-export interface SessionCourante {
-  utilisateur: Utilisateur;
+export interface CurrentSession {
+  user: User;
   sessionId: string;
   /** Présent quand la session vient d'être prolongée : le cookie doit l'être aussi. */
-  nouvelleDureeCookieMs?: number;
+  renewedCookieMs?: number;
 }
 
-export function versUtilisateur(u: LigneUtilisateur): Utilisateur {
-  return { id: u.id, email: u.email, nom: u.nom, role: u.role };
+export function toUser(u: UserRow): User {
+  return { id: u.id, email: u.email, name: u.name, role: u.role };
 }
 
-export function refuserMotDePasse(motDePasse: string, email: string): void {
-  const probleme = problemeMotDePasse(motDePasse, email);
-  if (probleme) {
-    throw new ErreurMetier('mot-de-passe-refuse', MESSAGES_MOT_DE_PASSE[probleme], {
-      motDePasse: MESSAGES_MOT_DE_PASSE[probleme],
+export function rejectPassword(password: string, email: string): void {
+  const problem = passwordProblem(password, email);
+  if (problem) {
+    throw new DomainError('password-rejected', PASSWORD_MESSAGES[problem], {
+      password: PASSWORD_MESSAGES[problem],
     });
   }
 }
@@ -56,109 +56,109 @@ export function refuserMotDePasse(motDePasse: string, email: string): void {
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly utilisateurs: UtilisateursRepository,
+    private readonly users: UsersRepository,
     private readonly sessions: SessionsRepository,
-    private readonly reinitialisations: ReinitialisationsRepository,
-    private readonly motsDePasse: MotsDePasse,
-    private readonly journal: Journal,
-    private readonly horloge: Horloge,
+    private readonly passwordResets: PasswordResetsRepository,
+    private readonly passwords: Passwords,
+    private readonly auditLog: AuditLog,
+    private readonly clock: Clock,
   ) {}
 
-  async inscrire(demande: Inscription, ctx: ContexteRequete): Promise<SessionOuverte> {
-    const email = normaliserEmail(demande.email);
-    refuserMotDePasse(demande.motDePasse, email);
-    const cree = await this.utilisateurs.creer({
+  async signup(request: Signup, ctx: RequestContext): Promise<OpenedSession> {
+    const email = normalizeEmail(request.email);
+    rejectPassword(request.password, email);
+    const created = await this.users.create({
       email,
-      nom: demande.nom.trim(),
+      name: request.name.trim(),
       role: 'utilisateur',
-      motDePasseHash: await this.motsDePasse.hacher(demande.motDePasse),
+      passwordHash: await this.passwords.hash(request.password),
     });
-    if (!cree) throw new ErreurMetier('email-deja-utilise', undefined, { email: 'Cette adresse e-mail est déjà utilisée.' });
-    await this.journal.noter({ origine: 'api', action: 'utilisateur.inscrit', acteurId: cree.id, cibleId: cree.id, ip: ctx.ip });
-    return this.ouvrirSession(cree, ctx);
+    if (!created) throw new DomainError('email-taken', undefined, { email: 'Cette adresse e-mail est déjà utilisée.' });
+    await this.auditLog.record({ origin: 'api', action: 'user.signed-up', actorId: created.id, targetId: created.id, ip: ctx.ip });
+    return this.openSession(created, ctx);
   }
 
-  async connecter(demande: Connexion, ctx: ContexteRequete): Promise<SessionOuverte> {
-    const email = normaliserEmail(demande.email);
-    const u = await this.utilisateurs.parEmail(email);
-    const valide = await this.motsDePasse.verifier(u?.motDePasseHash, demande.motDePasse);
-    if (!u || !valide) {
-      await this.journal.noter({ origine: 'api', action: 'connexion.echouee', cibleId: u?.id, details: { email }, ip: ctx.ip });
-      throw new ErreurMetier('identifiants-invalides');
+  async login(request: Login, ctx: RequestContext): Promise<OpenedSession> {
+    const email = normalizeEmail(request.email);
+    const u = await this.users.byEmail(email);
+    const valid = await this.passwords.verify(u?.passwordHash, request.password);
+    if (!u || !valid) {
+      await this.auditLog.record({ origin: 'api', action: 'login.failed', targetId: u?.id, details: { email }, ip: ctx.ip });
+      throw new DomainError('invalid-credentials');
     }
     // Le compte désactivé ne se dit qu'une fois le mot de passe vérifié : l'information ne sert qu'à son titulaire.
-    if (u.desactiveLe) {
-      await this.journal.noter({ origine: 'api', action: 'connexion.refusee-compte-desactive', cibleId: u.id, ip: ctx.ip });
-      throw new ErreurMetier('compte-desactive');
+    if (u.deactivatedAt) {
+      await this.auditLog.record({ origin: 'api', action: 'login.refused-deactivated', targetId: u.id, ip: ctx.ip });
+      throw new DomainError('account-deactivated');
     }
-    const ouverte = await this.ouvrirSession(u, ctx);
-    await this.journal.noter({ origine: 'api', action: 'connexion.reussie', acteurId: u.id, ip: ctx.ip });
-    return ouverte;
+    const opened = await this.openSession(u, ctx);
+    await this.auditLog.record({ origin: 'api', action: 'login.succeeded', actorId: u.id, ip: ctx.ip });
+    return opened;
   }
 
-  async deconnecter(jeton: string | undefined, ctx: ContexteRequete): Promise<void> {
-    if (!jeton) return;
-    const trouvee = await this.sessions.parEmpreinte(empreinteJeton(jeton));
-    if (!trouvee) return;
-    await this.sessions.supprimer(trouvee.session.id);
-    await this.journal.noter({ origine: 'api', action: 'deconnexion', acteurId: trouvee.utilisateur.id, ip: ctx.ip });
+  async logout(token: string | undefined, ctx: RequestContext): Promise<void> {
+    if (!token) return;
+    const found = await this.sessions.byTokenHash(hashToken(token));
+    if (!found) return;
+    await this.sessions.remove(found.session.id);
+    await this.auditLog.record({ origin: 'api', action: 'logout', actorId: found.user.id, ip: ctx.ip });
   }
 
   /** Session valide du jeton, prolongée au besoin ; `null` si le jeton ne mène à rien d'utilisable. */
-  async sessionCourante(jeton: string | undefined): Promise<SessionCourante | null> {
-    if (!jeton) return null;
-    const trouvee = await this.sessions.parEmpreinte(empreinteJeton(jeton));
-    if (!trouvee) return null;
-    const { session, utilisateur } = trouvee;
-    const maintenant = this.horloge.maintenant();
-    if (sessionExpiree(session, maintenant) || utilisateur.desactiveLe) {
-      await this.sessions.supprimer(session.id);
+  async currentSession(token: string | undefined): Promise<CurrentSession | null> {
+    if (!token) return null;
+    const found = await this.sessions.byTokenHash(hashToken(token));
+    if (!found) return null;
+    const { session, user } = found;
+    const now = this.clock.now();
+    if (sessionExpired(session, now) || user.deactivatedAt) {
+      await this.sessions.remove(session.id);
       return null;
     }
-    const courante: SessionCourante = { utilisateur: versUtilisateur(utilisateur), sessionId: session.id };
-    const expireLe = prolongation(session, maintenant);
-    if (expireLe) {
-      await this.sessions.prolonger(session.id, expireLe, maintenant);
-      courante.nouvelleDureeCookieMs = dureeCookieMs({ ...session, expireLe }, maintenant);
+    const current: CurrentSession = { user: toUser(user), sessionId: session.id };
+    const expiresAt = renewal(session, now);
+    if (expiresAt) {
+      await this.sessions.renew(session.id, expiresAt, now);
+      current.renewedCookieMs = cookieDurationMs({ ...session, expiresAt }, now);
     }
-    return courante;
+    return current;
   }
 
-  async reinitialiser(demande: Reinitialisation, ctx: ContexteRequete): Promise<void> {
-    const empreinte = empreinteJeton(demande.jeton);
-    const maintenant = this.horloge.maintenant();
-    const lien = await this.reinitialisations.parEmpreinte(empreinte);
-    const u = lien && (await this.utilisateurs.parId(lien.utilisateurId));
-    if (!lien || !u || lien.utiliseLe || lien.expireLe <= maintenant) throw new ErreurMetier('lien-invalide');
+  async resetPassword(request: PasswordReset, ctx: RequestContext): Promise<void> {
+    const tokenHash = hashToken(request.token);
+    const now = this.clock.now();
+    const link = await this.passwordResets.byTokenHash(tokenHash);
+    const u = link && (await this.users.byId(link.userId));
+    if (!link || !u || link.usedAt || link.expiresAt <= now) throw new DomainError('invalid-link');
     // La politique d'abord : un mot de passe refusé ne consomme pas le lien.
-    refuserMotDePasse(demande.motDePasse, u.email);
-    const hash = await this.motsDePasse.hacher(demande.motDePasse);
-    if (!(await this.reinitialisations.consommer(empreinte, maintenant))) throw new ErreurMetier('lien-invalide');
-    await this.utilisateurs.modifier(u.id, { motDePasseHash: hash }, maintenant);
-    const fermees = await this.sessions.supprimerDe(u.id);
-    await this.journal.noter({
-      origine: 'api',
-      action: 'mot-de-passe.reinitialise',
-      acteurId: u.id,
-      cibleId: u.id,
-      details: { sessionsFermees: fermees },
+    rejectPassword(request.password, u.email);
+    const hash = await this.passwords.hash(request.password);
+    if (!(await this.passwordResets.consume(tokenHash, now))) throw new DomainError('invalid-link');
+    await this.users.update(u.id, { passwordHash: hash }, now);
+    const closedCount = await this.sessions.removeForUser(u.id);
+    await this.auditLog.record({
+      origin: 'api',
+      action: 'password.reset',
+      actorId: u.id,
+      targetId: u.id,
+      details: { closedSessions: closedCount },
       ip: ctx.ip,
     });
   }
 
-  private async ouvrirSession(u: LigneUtilisateur, ctx: ContexteRequete): Promise<SessionOuverte> {
-    const maintenant = this.horloge.maintenant();
-    const echeances = echeancesInitiales(maintenant);
-    const { jeton, empreinte } = nouveauJeton();
-    await this.sessions.creer({
-      utilisateurId: u.id,
-      jetonHash: empreinte,
-      ...echeances,
-      creeLe: maintenant,
-      derniereActiviteLe: maintenant,
+  private async openSession(u: UserRow, ctx: RequestContext): Promise<OpenedSession> {
+    const now = this.clock.now();
+    const deadlines = initialDeadlines(now);
+    const { token, tokenHash } = newToken();
+    await this.sessions.create({
+      userId: u.id,
+      tokenHash: tokenHash,
+      ...deadlines,
+      createdAt: now,
+      lastActivityAt: now,
       ip: ctx.ip,
-      agentUtilisateur: ctx.agentUtilisateur?.slice(0, 500) ?? null,
+      userAgent: ctx.userAgent?.slice(0, 500) ?? null,
     });
-    return { utilisateur: versUtilisateur(u), jeton, dureeCookieMs: dureeCookieMs(echeances, maintenant) };
+    return { user: toUser(u), token, cookieDurationMs: cookieDurationMs(deadlines, now) };
   }
 }

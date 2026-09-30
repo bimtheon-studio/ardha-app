@@ -5,52 +5,52 @@ import type { Redis } from 'ioredis';
 import type pg from 'pg';
 
 import { ApiModule } from '../src/routes/api.module.ts';
-import { configurer } from '../src/routes/app.ts';
+import { configureApp } from '../src/routes/app.ts';
 import { POOL } from '../src/db/db.ts';
-import { Horloge } from '../src/shared/clock.ts';
+import { Clock } from '../src/shared/clock.ts';
 import type { Config } from '../src/config/config.ts';
 import { REDIS } from '../src/shared/redis.ts';
-import { configDeTest } from './env.ts';
+import { testConfig } from './env.ts';
 
-export class HorlogeDeTest extends Horloge {
-  private decalageMs = 0;
-  override maintenant(): Date {
-    return new Date(Date.now() + this.decalageMs);
+export class TestClock extends Clock {
+  private offsetMs = 0;
+  override now(): Date {
+    return new Date(Date.now() + this.offsetMs);
   }
-  avancer(ms: number): void {
-    this.decalageMs += ms;
+  advance(ms: number): void {
+    this.offsetMs += ms;
   }
 }
 
-export interface ApplicationDeTest {
+export interface TestApp {
   app: NestExpressApplication;
   config: Config;
-  horloge: HorlogeDeTest;
-  vider(): Promise<void>;
-  fermer(): Promise<void>;
+  clock: TestClock;
+  reset(): Promise<void>;
+  close(): Promise<void>;
 }
 
-export async function applicationDeTest(): Promise<ApplicationDeTest> {
-  const config = configDeTest();
-  const horloge = new HorlogeDeTest();
-  const module = await Test.createTestingModule({ imports: [ApiModule.pour(config)] })
-    .overrideProvider(Horloge)
-    .useValue(horloge)
+export async function createTestApp(): Promise<TestApp> {
+  const config = testConfig();
+  const clock = new TestClock();
+  const module = await Test.createTestingModule({ imports: [ApiModule.forConfig(config)] })
+    .overrideProvider(Clock)
+    .useValue(clock)
     .setLogger({ log() {}, error() {}, warn() {} })
     .compile();
-  const app = configurer(module.createNestApplication<NestExpressApplication>({ logger: false }));
+  const app = configureApp(module.createNestApplication<NestExpressApplication>({ logger: false }));
   await app.init();
   const pool = app.get<pg.Pool>(POOL);
   const redis = app.get<Redis>(REDIS);
   return {
     app,
     config,
-    horloge,
-    vider: async () => {
+    clock,
+    reset: async () => {
       await pool.query('TRUNCATE utilisateur, session, reinitialisation_mot_de_passe, journal_audit CASCADE');
-      const cles = await redis.keys(`ardha:${config.SESSION_COOKIE_NAME}:limite:*`);
-      if (cles.length > 0) await redis.del(...cles);
+      const keys = await redis.keys(`ardha:${config.SESSION_COOKIE_NAME}:limite:*`);
+      if (keys.length > 0) await redis.del(...keys);
     },
-    fermer: () => app.close(),
+    close: () => app.close(),
   };
 }

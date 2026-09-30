@@ -3,13 +3,13 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { lireEnv } from '../stack/files.ts';
+import { parseEnv } from '../stack/files.ts';
 
-export function urlDeTest(): string | undefined {
-  const fichier = path.resolve(import.meta.dirname, '../../.env.local');
+export function testUrl(): string | undefined {
+  const file = path.resolve(import.meta.dirname, '../../.env.local');
   const url =
     process.env.DATABASE_URL_TEST ??
-    (existsSync(fichier) ? lireEnv(readFileSync(fichier, 'utf8')).get('DATABASE_URL_TEST') : undefined);
+    (existsSync(file) ? parseEnv(readFileSync(file, 'utf8')).get('DATABASE_URL_TEST') : undefined);
   if (!url && process.env.CI === 'true') {
     throw new Error('DATABASE_URL_TEST manquante en CI.');
   }

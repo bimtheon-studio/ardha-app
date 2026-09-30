@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { analyserMigration, neutraliser } from './analysis.ts';
+import { checkMigration, neutralize } from './analysis.ts';
 
-const regles = (sql: string) => analyserMigration('m.sql', sql).map((v) => v.regle);
+const rules = (sql: string) => checkMigration('m.sql', sql).map((v) => v.rule);
 
 describe('analyserMigration — ce qui est permis', () => {
   it('laisse passer tables, index, clés, contraintes, types', () => {
@@ -14,7 +14,7 @@ describe('analyserMigration — ce qui est permis', () => {
       CREATE EXTENSION IF NOT EXISTS postgis;
       CREATE EXTENSION IF NOT EXISTS "vector";
     `;
-    expect(regles(sql)).toEqual([]);
+    expect(rules(sql)).toEqual([]);
   });
 
   it('ignore les mots interdits dans les commentaires et les chaînes', () => {
@@ -24,11 +24,11 @@ describe('analyserMigration — ce qui est permis', () => {
          sur plusieurs lignes */
       COMMENT ON TABLE "t" IS 'on ne met jamais de create policy ; ni de do $$';
     `;
-    expect(regles(sql)).toEqual([]);
+    expect(rules(sql)).toEqual([]);
   });
 
   it('ne confond pas un nom de colonne avec une commande', () => {
-    expect(regles(`CREATE TABLE "t" ("do" text, "call" text, "trigger_at" timestamptz);`)).toEqual([]);
+    expect(rules(`CREATE TABLE "t" ("do" text, "call" text, "trigger_at" timestamptz);`)).toEqual([]);
   });
 });
 
@@ -49,23 +49,23 @@ describe('analyserMigration — ce qui est refusé', () => {
     ['CALL p();', 'appel de procédure (CALL)'],
     ["SELECT cron.schedule('x', '* * * * *', 'SELECT 1');", 'pg_cron'],
     ['CREATE AGGREGATE a (int) (sfunc = f, stype = int);', 'agrégat, opérateur ou langage'],
-  ])('%s', (sql, regle) => {
-    expect(regles(sql)).toContain(regle);
+  ])('%s', (sql, rule) => {
+    expect(rules(sql)).toContain(rule);
   });
 
   it('refuse une extension hors liste, dont pg_cron', () => {
-    expect(regles('CREATE EXTENSION pg_cron;')).toEqual(['pg_cron', 'extension non autorisée (pg_cron)']);
-    expect(regles('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')).toEqual(['extension non autorisée (uuid-ossp)']);
+    expect(rules('CREATE EXTENSION pg_cron;')).toEqual(['pg_cron', 'extension non autorisée (pg_cron)']);
+    expect(rules('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')).toEqual(['extension non autorisée (uuid-ossp)']);
   });
 
   it('donne le numéro de ligne et un extrait', () => {
-    const [v] = analyserMigration('0001.sql', 'CREATE TABLE t (id int);\n\n  CREATE TRIGGER x AFTER INSERT ON t EXECUTE FUNCTION f();');
-    expect(v).toMatchObject({ fichier: '0001.sql', ligne: 3, regle: 'trigger' });
-    expect(v?.extrait).toMatch(/^CREATE TRIGGER x/);
+    const [v] = checkMigration('0001.sql', 'CREATE TABLE t (id int);\n\n  CREATE TRIGGER x AFTER INSERT ON t EXECUTE FUNCTION f();');
+    expect(v).toMatchObject({ file: '0001.sql', line: 3, rule: 'trigger' });
+    expect(v?.excerpt).toMatch(/^CREATE TRIGGER x/);
   });
 
   it('voit une fonction malgré un corps à balise nommée', () => {
-    expect(regles('CREATE FUNCTION f() RETURNS int AS $corps$ SELECT 1 $corps$ LANGUAGE sql;')).toEqual([
+    expect(rules('CREATE FUNCTION f() RETURNS int AS $corps$ SELECT 1 $corps$ LANGUAGE sql;')).toEqual([
       'fonction ou procédure SQL',
     ]);
   });
@@ -74,7 +74,7 @@ describe('analyserMigration — ce qui est refusé', () => {
 describe('neutraliser', () => {
   it('garde la longueur et les retours à la ligne', () => {
     const sql = "SELECT 'a''b' -- c\n/* d\ne */ $x$ f $x$;";
-    const n = neutraliser(sql);
+    const n = neutralize(sql);
     expect(n).toHaveLength(sql.length);
     expect(n.split('\n')).toHaveLength(sql.split('\n').length);
     expect(n).not.toMatch(/[bcdf]/);

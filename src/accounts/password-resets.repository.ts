@@ -1,20 +1,20 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, gt, isNotNull, isNull, lte, or } from 'drizzle-orm';
 
-import { BASE, type Base } from '../db/db.ts';
-import { type LigneReinitialisation, reinitialisationMotDePasse as reinit } from '../db/schema.ts';
+import { DB, type Db } from '../db/db.ts';
+import { type PasswordResetRow, passwordReset as resets } from '../db/schema.ts';
 
 @Injectable()
-export class ReinitialisationsRepository {
-  constructor(@Inject(BASE) private readonly base: Base) {}
+export class PasswordResetsRepository {
+  constructor(@Inject(DB) private readonly db: Db) {}
 
-  async creer(utilisateurId: string, jetonHash: string, creeLe: Date, expireLe: Date): Promise<LigneReinitialisation> {
-    const [r] = await this.base.insert(reinit).values({ utilisateurId, jetonHash, creeLe, expireLe }).returning();
+  async create(userId: string, tokenHash: string, createdAt: Date, expiresAt: Date): Promise<PasswordResetRow> {
+    const [r] = await this.db.insert(resets).values({ userId, tokenHash, createdAt, expiresAt }).returning();
     return r!;
   }
 
-  async parEmpreinte(jetonHash: string): Promise<LigneReinitialisation | undefined> {
-    const [r] = await this.base.select().from(reinit).where(eq(reinit.jetonHash, jetonHash));
+  async byTokenHash(tokenHash: string): Promise<PasswordResetRow | undefined> {
+    const [r] = await this.db.select().from(resets).where(eq(resets.tokenHash, tokenHash));
     return r;
   }
 
@@ -22,28 +22,28 @@ export class ReinitialisationsRepository {
    * Consomme un lien encore valable, en une seule requête : deux utilisations simultanées du même
    * lien ne peuvent pas réussir toutes les deux.
    */
-  async consommer(jetonHash: string, maintenant: Date): Promise<LigneReinitialisation | undefined> {
-    const [r] = await this.base
-      .update(reinit)
-      .set({ utiliseLe: maintenant })
-      .where(and(eq(reinit.jetonHash, jetonHash), isNull(reinit.utiliseLe), gt(reinit.expireLe, maintenant)))
+  async consume(tokenHash: string, now: Date): Promise<PasswordResetRow | undefined> {
+    const [r] = await this.db
+      .update(resets)
+      .set({ usedAt: now })
+      .where(and(eq(resets.tokenHash, tokenHash), isNull(resets.usedAt), gt(resets.expiresAt, now)))
       .returning();
     return r;
   }
 
   /** Invalide les liens encore ouverts d'un utilisateur (un nouveau lien remplace l'ancien). */
-  async annulerOuverts(utilisateurId: string, maintenant: Date): Promise<void> {
-    await this.base
-      .update(reinit)
-      .set({ utiliseLe: maintenant })
-      .where(and(eq(reinit.utilisateurId, utilisateurId), isNull(reinit.utiliseLe)));
+  async cancelOpen(userId: string, now: Date): Promise<void> {
+    await this.db
+      .update(resets)
+      .set({ usedAt: now })
+      .where(and(eq(resets.userId, userId), isNull(resets.usedAt)));
   }
 
-  async purger(maintenant: Date): Promise<number> {
-    const r = await this.base
-      .delete(reinit)
-      .where(or(lte(reinit.expireLe, maintenant), isNotNull(reinit.utiliseLe)))
-      .returning({ id: reinit.id });
+  async purge(now: Date): Promise<number> {
+    const r = await this.db
+      .delete(resets)
+      .where(or(lte(resets.expiresAt, now), isNotNull(resets.usedAt)))
+      .returning({ id: resets.id });
     return r.length;
   }
 }

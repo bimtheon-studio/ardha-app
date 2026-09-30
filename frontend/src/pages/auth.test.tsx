@@ -3,27 +3,27 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
-import { pageDeRetour } from '@/auth/ProtectedRoute';
-import { initiales } from '@/components/Shell';
-import { afficher, alice, fausseApi, sansSession } from '@/test/helpers';
+import { returnPath } from '@/auth/ProtectedRoute';
+import { initials } from '@/components/Shell';
+import { renderAt, alice, fakeApi, noSession } from '@/test/helpers';
 
 describe('route protégée', () => {
   it('sans session, / mène à la connexion (Q8)', async () => {
-    fausseApi({ 'GET /api/auth/me': sansSession });
-    afficher('/');
+    fakeApi({ 'GET /api/auth/me': noSession });
+    renderAt('/');
     expect(await screen.findByRole('heading', { name: 'Connexion' })).toBeInTheDocument();
   });
 
   it('avec session, affiche l’accueil dans la coquille', async () => {
-    fausseApi({ 'GET /api/auth/me': { statut: 200, corps: alice } });
-    afficher('/');
+    fakeApi({ 'GET /api/auth/me': { status: 200, body: alice } });
+    renderAt('/');
     expect(await screen.findByRole('heading', { name: 'Bonjour Alice Martin' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Menu du compte' })).toHaveTextContent('AM');
   });
 
   it('serveur injoignable : un message et « Réessayer », pas une déconnexion', async () => {
-    fausseApi({ 'GET /api/auth/me': { statut: 503, corps: { message: 'Indisponible.' } } });
-    afficher('/');
+    fakeApi({ 'GET /api/auth/me': { status: 503, body: { message: 'Indisponible.' } } });
+    renderAt('/');
     // Une nouvelle tentative d'abord (un raté passager n'affiche rien), puis l'erreur.
     expect(await screen.findByText('Impossible de vérifier votre session', {}, { timeout: 4000 })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Connexion' })).not.toBeInTheDocument();
@@ -32,21 +32,21 @@ describe('route protégée', () => {
 
 describe('connexion', () => {
   it('valide avant d’envoyer, avec les messages du contrat', async () => {
-    const appels = fausseApi({ 'GET /api/auth/me': sansSession });
-    afficher('/login');
+    const calls = fakeApi({ 'GET /api/auth/me': noSession });
+    renderAt('/login');
     await userEvent.click(await screen.findByRole('button', { name: 'Se connecter' }));
     expect(screen.getByText('L’adresse e-mail est obligatoire.')).toBeInTheDocument();
     expect(screen.getByText('Le mot de passe est obligatoire.')).toBeInTheDocument();
     expect(screen.getByLabelText('Adresse e-mail')).toHaveAttribute('aria-invalid', 'true');
-    expect(appels.map((a) => a.cle)).toEqual(['GET /api/auth/me']);
+    expect(calls.map((a) => a.key)).toEqual(['GET /api/auth/me']);
   });
 
   it('affiche le refus de l’API', async () => {
-    fausseApi({
-      'GET /api/auth/me': sansSession,
-      'POST /api/auth/login': { statut: 401, corps: { message: 'Adresse e-mail ou mot de passe incorrect.' } },
+    fakeApi({
+      'GET /api/auth/me': noSession,
+      'POST /api/auth/login': { status: 401, body: { message: 'Adresse e-mail ou mot de passe incorrect.' } },
     });
-    afficher('/login');
+    renderAt('/login');
     await userEvent.type(await screen.findByLabelText('Adresse e-mail'), 'alice@exemple.fr');
     await userEvent.type(screen.getByLabelText('Mot de passe'), 'mauvais');
     await userEvent.click(screen.getByRole('button', { name: 'Se connecter' }));
@@ -54,16 +54,16 @@ describe('connexion', () => {
   });
 
   it('ramène à la page demandée avant la connexion (Q6)', async () => {
-    let connecte = false;
-    fausseApi({
-      'GET /api/auth/me': () => (connecte ? { statut: 200, corps: alice } : sansSession),
+    let loggedIn = false;
+    fakeApi({
+      'GET /api/auth/me': () => (loggedIn ? { status: 200, body: alice } : noSession),
       'POST /api/auth/login': () => {
-        connecte = true;
-        return { statut: 200, corps: alice };
+        loggedIn = true;
+        return { status: 200, body: alice };
       },
     });
     // État posé par la route protégée quand elle renvoie vers la connexion.
-    afficher({ pathname: '/login', state: { depuis: '/page-demandee' } });
+    renderAt({ pathname: '/login', state: { from: '/page-demandee' } });
     await userEvent.type(await screen.findByLabelText('Adresse e-mail'), 'alice@exemple.fr');
     await userEvent.type(screen.getByLabelText('Mot de passe'), 'cheval pomme agrafe');
     await userEvent.click(screen.getByRole('button', { name: 'Se connecter' }));
@@ -74,20 +74,20 @@ describe('connexion', () => {
 
 describe('inscription', () => {
   it('déjà connecté, /inscription et /connexion mènent à l’accueil', async () => {
-    fausseApi({ 'GET /api/auth/me': { statut: 200, corps: alice } });
-    afficher('/signup');
+    fakeApi({ 'GET /api/auth/me': { status: 200, body: alice } });
+    renderAt('/signup');
     expect(await screen.findByRole('heading', { name: 'Bonjour Alice Martin' })).toBeInTheDocument();
   });
 
   it('montre sous le champ l’adresse déjà utilisée', async () => {
-    fausseApi({
-      'GET /api/auth/me': sansSession,
+    fakeApi({
+      'GET /api/auth/me': noSession,
       'POST /api/auth/signup': {
-        statut: 409,
-        corps: { message: 'Cette adresse e-mail est déjà utilisée.', champs: { email: 'Cette adresse e-mail est déjà utilisée.' } },
+        status: 409,
+        body: { message: 'Cette adresse e-mail est déjà utilisée.', fields: { email: 'Cette adresse e-mail est déjà utilisée.' } },
       },
     });
-    afficher('/signup');
+    renderAt('/signup');
     await userEvent.type(await screen.findByLabelText('Nom'), 'Alice');
     await userEvent.type(screen.getByLabelText('Adresse e-mail'), 'alice@exemple.fr');
     await userEvent.type(screen.getByLabelText('Mot de passe'), 'cheval pomme agrafe');
@@ -96,8 +96,8 @@ describe('inscription', () => {
   });
 
   it('refuse un mot de passe trop court avant l’envoi (Q2)', async () => {
-    fausseApi({ 'GET /api/auth/me': sansSession });
-    afficher('/signup');
+    fakeApi({ 'GET /api/auth/me': noSession });
+    renderAt('/signup');
     await userEvent.type(await screen.findByLabelText('Nom'), 'Alice');
     await userEvent.type(screen.getByLabelText('Adresse e-mail'), 'alice@exemple.fr');
     await userEvent.type(screen.getByLabelText('Mot de passe'), 'court');
@@ -106,15 +106,15 @@ describe('inscription', () => {
   });
 
   it('une inscription réussie ouvre l’accueil', async () => {
-    let inscrit = false;
-    fausseApi({
-      'GET /api/auth/me': () => (inscrit ? { statut: 200, corps: alice } : sansSession),
+    let signedUp = false;
+    fakeApi({
+      'GET /api/auth/me': () => (signedUp ? { status: 200, body: alice } : noSession),
       'POST /api/auth/signup': () => {
-        inscrit = true;
-        return { statut: 201, corps: alice };
+        signedUp = true;
+        return { status: 201, body: alice };
       },
     });
-    afficher('/signup');
+    renderAt('/signup');
     await userEvent.type(await screen.findByLabelText('Nom'), 'Alice Martin');
     await userEvent.type(screen.getByLabelText('Adresse e-mail'), 'alice@exemple.fr');
     await userEvent.type(screen.getByLabelText('Mot de passe'), 'cheval pomme agrafe');
@@ -125,15 +125,15 @@ describe('inscription', () => {
 
 describe('déconnexion', () => {
   it('ferme la session et revient à la connexion', async () => {
-    let connecte = true;
-    fausseApi({
-      'GET /api/auth/me': () => (connecte ? { statut: 200, corps: alice } : sansSession),
+    let loggedIn = true;
+    fakeApi({
+      'GET /api/auth/me': () => (loggedIn ? { status: 200, body: alice } : noSession),
       'POST /api/auth/logout': () => {
-        connecte = false;
-        return { statut: 204 };
+        loggedIn = false;
+        return { status: 204 };
       },
     });
-    afficher('/');
+    renderAt('/');
     await userEvent.click(await screen.findByRole('button', { name: 'Menu du compte' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Se déconnecter' }));
     expect(await screen.findByRole('heading', { name: 'Connexion' })).toBeInTheDocument();
@@ -142,60 +142,60 @@ describe('déconnexion', () => {
 
 describe('réinitialisation (Q9)', () => {
   it('envoie le jeton de l’ancre, puis renvoie à la connexion avec un message', async () => {
-    const appels = fausseApi({ 'GET /api/auth/me': sansSession, 'POST /api/auth/password-reset': { statut: 204 } });
-    afficher('/reset-password#jeton-du-lien');
+    const calls = fakeApi({ 'GET /api/auth/me': noSession, 'POST /api/auth/password-reset': { status: 204 } });
+    renderAt('/reset-password#jeton-du-lien');
     await userEvent.type(await screen.findByLabelText('Nouveau mot de passe'), 'nouveau mot de passe solide');
     await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
     expect(await screen.findByText('Mot de passe changé. Connectez-vous avec le nouveau.')).toBeInTheDocument();
-    expect(appels.find((a) => a.cle === 'POST /api/auth/password-reset')?.corps).toEqual({
-      jeton: 'jeton-du-lien',
-      motDePasse: 'nouveau mot de passe solide',
+    expect(calls.find((a) => a.key === 'POST /api/auth/password-reset')?.body).toEqual({
+      token: 'jeton-du-lien',
+      password: 'nouveau mot de passe solide',
     });
   });
 
   it('affiche le refus d’un lien périmé', async () => {
-    fausseApi({
-      'GET /api/auth/me': sansSession,
-      'POST /api/auth/password-reset': { statut: 400, corps: { message: 'Ce lien n’est plus valable. Demandez-en un nouveau à l’administrateur.' } },
+    fakeApi({
+      'GET /api/auth/me': noSession,
+      'POST /api/auth/password-reset': { status: 400, body: { message: 'Ce lien n’est plus valable. Demandez-en un nouveau à l’administrateur.' } },
     });
-    afficher('/reset-password#vieux');
+    renderAt('/reset-password#vieux');
     await userEvent.type(await screen.findByLabelText('Nouveau mot de passe'), 'nouveau mot de passe solide');
     await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Ce lien n’est plus valable.');
   });
 
   it('sans jeton, le dit', async () => {
-    fausseApi({ 'GET /api/auth/me': sansSession });
-    afficher('/reset-password');
+    fakeApi({ 'GET /api/auth/me': noSession });
+    renderAt('/reset-password');
     expect(await screen.findByRole('heading', { name: 'Lien incomplet' })).toBeInTheDocument();
   });
 });
 
 describe('divers', () => {
   it('404 en français', async () => {
-    fausseApi({ 'GET /api/auth/me': sansSession });
-    afficher('/nulle-part');
+    fakeApi({ 'GET /api/auth/me': noSession });
+    renderAt('/nulle-part');
     expect(await screen.findByRole('heading', { name: 'Page introuvable' })).toBeInTheDocument();
   });
 
   it('mot de passe oublié : renvoie vers l’administrateur', async () => {
-    fausseApi({ 'GET /api/auth/me': sansSession });
-    afficher('/forgot-password');
+    fakeApi({ 'GET /api/auth/me': noSession });
+    renderAt('/forgot-password');
     expect(await screen.findByText(/L’administrateur peut vous transmettre un lien/)).toBeInTheDocument();
   });
 
   it('pageDeRetour n’accepte que les chemins internes', () => {
-    expect(pageDeRetour({ depuis: '/etudes?x=1' })).toBe('/etudes?x=1');
-    expect(pageDeRetour({ depuis: '//malveillant.example' })).toBe('/');
-    expect(pageDeRetour({ depuis: 'https://malveillant.example' })).toBe('/');
-    expect(pageDeRetour(null)).toBe('/');
+    expect(returnPath({ from: '/etudes?x=1' })).toBe('/etudes?x=1');
+    expect(returnPath({ from: '//malveillant.example' })).toBe('/');
+    expect(returnPath({ from: 'https://malveillant.example' })).toBe('/');
+    expect(returnPath(null)).toBe('/');
   });
 
   it('initiales', () => {
-    expect(initiales('Alice Martin')).toBe('AM');
-    expect(initiales('Jean-Pierre de la Fontaine')).toBe('JF');
-    expect(initiales('Bob')).toBe('BO');
-    expect(initiales('  ')).toBe('?');
+    expect(initials('Alice Martin')).toBe('AM');
+    expect(initials('Jean-Pierre de la Fontaine')).toBe('JF');
+    expect(initials('Bob')).toBe('BO');
+    expect(initials('  ')).toBe('?');
   });
 });
 

@@ -1,56 +1,56 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, lte, or } from 'drizzle-orm';
 
-import { BASE, type Base } from '../db/db.ts';
-import { type LigneSession, type LigneUtilisateur, session, utilisateur } from '../db/schema.ts';
+import { DB, type Db } from '../db/db.ts';
+import { type SessionRow, type UserRow, session, user } from '../db/schema.ts';
 
-export type NouvelleSession = Pick<
-  LigneSession,
-  'utilisateurId' | 'jetonHash' | 'expireLe' | 'expireAuPlusTardLe' | 'ip' | 'agentUtilisateur' | 'creeLe' | 'derniereActiviteLe'
+export type NewSession = Pick<
+  SessionRow,
+  'userId' | 'tokenHash' | 'expiresAt' | 'absoluteExpiresAt' | 'ip' | 'userAgent' | 'createdAt' | 'lastActivityAt'
 >;
 
 @Injectable()
 export class SessionsRepository {
-  constructor(@Inject(BASE) private readonly base: Base) {}
+  constructor(@Inject(DB) private readonly db: Db) {}
 
-  async creer(nouvelle: NouvelleSession): Promise<LigneSession> {
-    const [s] = await this.base.insert(session).values(nouvelle).returning();
+  async create(newSession: NewSession): Promise<SessionRow> {
+    const [s] = await this.db.insert(session).values(newSession).returning();
     return s!;
   }
 
-  async parEmpreinte(jetonHash: string): Promise<{ session: LigneSession; utilisateur: LigneUtilisateur } | undefined> {
-    const [ligne] = await this.base
-      .select({ session, utilisateur })
+  async byTokenHash(tokenHash: string): Promise<{ session: SessionRow; user: UserRow } | undefined> {
+    const [line] = await this.db
+      .select({ session, user })
       .from(session)
-      .innerJoin(utilisateur, eq(utilisateur.id, session.utilisateurId))
-      .where(eq(session.jetonHash, jetonHash));
-    return ligne;
+      .innerJoin(user, eq(user.id, session.userId))
+      .where(eq(session.tokenHash, tokenHash));
+    return line;
   }
 
-  async prolonger(id: string, expireLe: Date, maintenant: Date): Promise<void> {
-    await this.base.update(session).set({ expireLe, derniereActiviteLe: maintenant }).where(eq(session.id, id));
+  async renew(id: string, expiresAt: Date, now: Date): Promise<void> {
+    await this.db.update(session).set({ expiresAt, lastActivityAt: now }).where(eq(session.id, id));
   }
 
-  async supprimer(id: string): Promise<void> {
-    await this.base.delete(session).where(eq(session.id, id));
+  async remove(id: string): Promise<void> {
+    await this.db.delete(session).where(eq(session.id, id));
   }
 
   /** Ferme toutes les sessions d'un utilisateur ; rend leur nombre. */
-  async supprimerDe(utilisateurId: string): Promise<number> {
-    const r = await this.base.delete(session).where(eq(session.utilisateurId, utilisateurId)).returning({ id: session.id });
+  async removeForUser(userId: string): Promise<number> {
+    const r = await this.db.delete(session).where(eq(session.userId, userId)).returning({ id: session.id });
     return r.length;
   }
 
-  async purgerExpirees(maintenant: Date): Promise<number> {
-    const r = await this.base
+  async purgeExpired(now: Date): Promise<number> {
+    const r = await this.db
       .delete(session)
-      .where(or(lte(session.expireLe, maintenant), lte(session.expireAuPlusTardLe, maintenant)))
+      .where(or(lte(session.expiresAt, now), lte(session.absoluteExpiresAt, now)))
       .returning({ id: session.id });
     return r.length;
   }
 
   /** Pour les tests et la CLI : sessions d'un utilisateur. */
-  de(utilisateurId: string): Promise<LigneSession[]> {
-    return this.base.select().from(session).where(and(eq(session.utilisateurId, utilisateurId)));
+  forUser(userId: string): Promise<SessionRow[]> {
+    return this.db.select().from(session).where(and(eq(session.userId, userId)));
   }
 }

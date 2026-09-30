@@ -1,11 +1,11 @@
 // Sans e-mail en v1 (F-00, Q9) : l'administrateur crée un lien de réinitialisation et le transmet.
 import { Link } from 'react-router';
 
-import { PageAuth } from '@/components/AuthPage';
+import { AuthPage } from '@/components/AuthPage';
 
-export function MotDePasseOublie() {
+export function ForgotPassword() {
   return (
-    <PageAuth titre="Mot de passe oublié" description="Contactez l’administrateur d’Ardha">
+    <AuthPage title="Mot de passe oublié" description="Contactez l’administrateur d’Ardha">
       <div className="space-y-4 text-sm">
         <p>
           L’administrateur peut vous transmettre un lien pour choisir un nouveau mot de passe. Ce lien ne sert qu’une fois et reste
@@ -17,6 +17,6 @@ export function MotDePasseOublie() {
           </Link>
         </p>
       </div>
-    </PageAuth>
+    </AuthPage>
   );
 }

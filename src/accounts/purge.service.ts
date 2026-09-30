@@ -1,23 +1,23 @@
 // Ménage des comptes : sessions expirées, liens de réinitialisation périmés ou déjà utilisés.
 import { Injectable } from '@nestjs/common';
 
-import { Horloge } from '../shared/clock.ts';
-import { ReinitialisationsRepository } from './password-resets.repository.ts';
+import { Clock } from '../shared/clock.ts';
+import { PasswordResetsRepository } from './password-resets.repository.ts';
 import { SessionsRepository } from './sessions.repository.ts';
 
 @Injectable()
-export class PurgeComptes {
+export class AccountsPurge {
   constructor(
     private readonly sessions: SessionsRepository,
-    private readonly reinitialisations: ReinitialisationsRepository,
-    private readonly horloge: Horloge,
+    private readonly passwordResets: PasswordResetsRepository,
+    private readonly clock: Clock,
   ) {}
 
-  async purger(): Promise<{ sessions: number; liens: number }> {
-    const maintenant = this.horloge.maintenant();
+  async purge(): Promise<{ sessions: number; links: number }> {
+    const now = this.clock.now();
     return {
-      sessions: await this.sessions.purgerExpirees(maintenant),
-      liens: await this.reinitialisations.purger(maintenant),
+      sessions: await this.sessions.purgeExpired(now),
+      links: await this.passwordResets.purge(now),
     };
   }
 }

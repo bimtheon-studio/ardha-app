@@ -6,46 +6,46 @@ import type { Redis } from 'ioredis';
 import { LoggerModule } from 'nestjs-pino';
 
 import { AuthController } from './auth.controller.ts';
-import { BaseModule } from '../db/db.module.ts';
-import { ComptesModule } from '../accounts/accounts.module.ts';
+import { DbModule } from '../db/db.module.ts';
+import { AccountsModule } from '../accounts/accounts.module.ts';
 import { type Config, CONFIG } from '../config/config.ts';
 import { ConfigModule } from '../config/config.module.ts';
-import { FiltreErreurs } from './http/error-filter.ts';
-import { LIMITES, StockageRedisLimites } from './http/rate-limit.ts';
-import { optionsJournalisation } from '../shared/logs.ts';
-import { ControleOrigine } from './http/origin.ts';
+import { ErrorFilter } from './http/error-filter.ts';
+import { LIMITS, RedisRateLimitStorage } from './http/rate-limit.ts';
+import { loggingOptions } from '../shared/logs.ts';
+import { OriginCheck } from './http/origin.ts';
 import { SessionGuard } from './http/session.guard.ts';
 import { REDIS, RedisModule } from '../shared/redis.ts';
-import { SystemeController } from './system.controller.ts';
+import { SystemController } from './system.controller.ts';
 
 @Module({})
 export class ApiModule implements NestModule {
-  static pour(config?: Config) {
+  static forConfig(config?: Config) {
     return {
       module: ApiModule,
       imports: [
-        ConfigModule.pour(config),
-        LoggerModule.forRootAsync({ inject: [CONFIG], useFactory: optionsJournalisation }),
-        BaseModule,
+        ConfigModule.forConfig(config),
+        LoggerModule.forRootAsync({ inject: [CONFIG], useFactory: loggingOptions }),
+        DbModule,
         RedisModule,
-        ComptesModule,
+        AccountsModule,
         ThrottlerModule.forRootAsync({
           inject: [REDIS, CONFIG],
           useFactory: (redis: Redis, c: Config) => ({
-            throttlers: LIMITES,
-            storage: new StockageRedisLimites(redis, `ardha:${c.SESSION_COOKIE_NAME}:limite`),
+            throttlers: LIMITS,
+            storage: new RedisRateLimitStorage(redis, `ardha:${c.SESSION_COOKIE_NAME}:limite`),
           }),
         }),
       ],
-      controllers: [AuthController, SystemeController],
+      controllers: [AuthController, SystemController],
       providers: [
         { provide: APP_GUARD, useClass: SessionGuard },
-        { provide: APP_FILTER, useClass: FiltreErreurs },
+        { provide: APP_FILTER, useClass: ErrorFilter },
       ],
     };
   }
 
-  configure(consommateur: MiddlewareConsumer): void {
-    consommateur.apply(ControleOrigine).forRoutes('*');
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(OriginCheck).forRoutes('*');
   }
 }

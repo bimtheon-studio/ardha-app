@@ -38,8 +38,10 @@ sur ce qui n'en dépend pas.
 - Jobs : **BullMQ + Redis**. L'état du travail vit dans Postgres ; Redis se reconstruit.
 - **Seul le worker appelle l'extérieur** (API publiques, PDF, LLM). L'API ne lit que la base.
 - Stockage de fichiers : S3 (MinIO en local).
-- Vocabulaire métier en français dans le modèle (`etude`, `parcelle`, `regle`…), commentaires en
-  français.
+- **Le code est en anglais** : dossiers, fichiers, identifiants, commandes (pnpm, CLI), options,
+  variables d'environnement, routes (API et front), champs JSON, codes d'erreur (DT-19). **Restent en
+  français** : le modèle en base (tables et colonnes : `etude`, `parcelle`, `regle`…, nommées
+  explicitement dans le schéma Drizzle), les commentaires et les textes affichés à l'utilisateur.
 
 ## Environnement de développement
 

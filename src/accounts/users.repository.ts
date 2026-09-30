@@ -1,40 +1,40 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { asc, eq } from 'drizzle-orm';
 
-import { BASE, type Base } from '../db/db.ts';
-import { type LigneUtilisateur, utilisateur } from '../db/schema.ts';
+import { DB, type Db } from '../db/db.ts';
+import { type UserRow, user } from '../db/schema.ts';
 
-export type NouvelUtilisateur = Pick<LigneUtilisateur, 'email' | 'nom' | 'role' | 'motDePasseHash'>;
+export type NewUser = Pick<UserRow, 'email' | 'name' | 'role' | 'passwordHash'>;
 
 @Injectable()
-export class UtilisateursRepository {
-  constructor(@Inject(BASE) private readonly base: Base) {}
+export class UsersRepository {
+  constructor(@Inject(DB) private readonly db: Db) {}
 
-  async parEmail(email: string): Promise<LigneUtilisateur | undefined> {
-    const [u] = await this.base.select().from(utilisateur).where(eq(utilisateur.email, email));
+  async byEmail(email: string): Promise<UserRow | undefined> {
+    const [u] = await this.db.select().from(user).where(eq(user.email, email));
     return u;
   }
 
-  async parId(id: string): Promise<LigneUtilisateur | undefined> {
-    const [u] = await this.base.select().from(utilisateur).where(eq(utilisateur.id, id));
+  async byId(id: string): Promise<UserRow | undefined> {
+    const [u] = await this.db.select().from(user).where(eq(user.id, id));
     return u;
   }
 
   /** Rend `undefined` si l'adresse est déjà prise (contrainte d'unicité), sans lever d'erreur. */
-  async creer(nouvel: NouvelUtilisateur): Promise<LigneUtilisateur | undefined> {
-    const [u] = await this.base.insert(utilisateur).values(nouvel).onConflictDoNothing({ target: utilisateur.email }).returning();
+  async create(newUser: NewUser): Promise<UserRow | undefined> {
+    const [u] = await this.db.insert(user).values(newUser).onConflictDoNothing({ target: user.email }).returning();
     return u;
   }
 
-  async modifier(
+  async update(
     id: string,
-    champs: Partial<Pick<LigneUtilisateur, 'motDePasseHash' | 'desactiveLe' | 'role' | 'nom'>>,
-    maintenant: Date,
+    fields: Partial<Pick<UserRow, 'passwordHash' | 'deactivatedAt' | 'role' | 'name'>>,
+    now: Date,
   ): Promise<void> {
-    await this.base.update(utilisateur).set({ ...champs, modifieLe: maintenant }).where(eq(utilisateur.id, id));
+    await this.db.update(user).set({ ...fields, updatedAt: now }).where(eq(user.id, id));
   }
 
-  lister(): Promise<LigneUtilisateur[]> {
-    return this.base.select().from(utilisateur).orderBy(asc(utilisateur.creeLe));
+  list(): Promise<UserRow[]> {
+    return this.db.select().from(user).orderBy(asc(user.createdAt));
   }
 }

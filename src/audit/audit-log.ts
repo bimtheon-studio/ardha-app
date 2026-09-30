@@ -1,45 +1,45 @@
 // Journal d'audit : qui a fait quoi, quand. Les secrets n'y entrent jamais, même par mégarde.
 import { Inject, Injectable } from '@nestjs/common';
 
-import { BASE, type Base } from '../db/db.ts';
-import { journalAudit } from '../db/schema.ts';
+import { DB, type Db } from '../db/db.ts';
+import { auditLog } from '../db/schema.ts';
 
-export type Origine = 'api' | 'cli' | 'worker';
+export type AuditOrigin = 'api' | 'cli' | 'worker';
 
-export interface Evenement {
-  origine: Origine;
+export interface AuditEvent {
+  origin: AuditOrigin;
   action: string;
-  acteurId?: string | null;
-  cibleId?: string | null;
+  actorId?: string | null;
+  targetId?: string | null;
   details?: Record<string, unknown>;
   ip?: string | null;
 }
 
-export const MASQUE = '[masqué]';
-const CLES_SECRETES = /mot.?de.?passe|password|jeton|token|secret|cookie|hash/i;
+export const MASK = '[masqué]';
+const SECRET_KEYS = /mot.?de.?passe|password|jeton|token|secret|cookie|hash/i;
 
 /** Remplace, à toute profondeur, la valeur des clés qui ressemblent à un secret. */
-export function masquerSecrets(valeur: unknown): unknown {
-  if (Array.isArray(valeur)) return valeur.map(masquerSecrets);
-  if (valeur && typeof valeur === 'object') {
+export function maskSecrets(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(maskSecrets);
+  if (value && typeof value === 'object') {
     return Object.fromEntries(
-      Object.entries(valeur).map(([cle, v]) => [cle, CLES_SECRETES.test(cle) ? MASQUE : masquerSecrets(v)]),
+      Object.entries(value).map(([key, v]) => [key, SECRET_KEYS.test(key) ? MASK : maskSecrets(v)]),
     );
   }
-  return valeur;
+  return value;
 }
 
 @Injectable()
-export class Journal {
-  constructor(@Inject(BASE) private readonly base: Base) {}
+export class AuditLog {
+  constructor(@Inject(DB) private readonly db: Db) {}
 
-  async noter(e: Evenement): Promise<void> {
-    await this.base.insert(journalAudit).values({
-      origine: e.origine,
+  async record(e: AuditEvent): Promise<void> {
+    await this.db.insert(auditLog).values({
+      origin: e.origin,
       action: e.action,
-      acteurId: e.acteurId ?? null,
-      cibleId: e.cibleId ?? null,
-      details: masquerSecrets(e.details ?? {}) as Record<string, unknown>,
+      actorId: e.actorId ?? null,
+      targetId: e.targetId ?? null,
+      details: maskSecrets(e.details ?? {}) as Record<string, unknown>,
       ip: e.ip ?? null,
     });
   }

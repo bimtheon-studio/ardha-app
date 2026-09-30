@@ -3,17 +3,17 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 
-import { fausseApi, sansSession } from '@/test/helpers';
+import { fakeApi, noSession } from '@/test/helpers';
 
-import { Coquille } from './Shell';
+import { Shell } from './Shell';
 
 describe('Coquille', () => {
   it('sans utilisateur connu (le temps d’une déconnexion), le menu montre une icône', () => {
-    fausseApi({ 'GET /api/auth/me': sansSession });
+    fakeApi({ 'GET /api/auth/me': noSession });
     render(
       <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter>
-          <Coquille />
+          <Shell />
         </MemoryRouter>
       </QueryClientProvider>,
     );

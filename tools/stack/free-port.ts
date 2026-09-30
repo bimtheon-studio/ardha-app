@@ -1,17 +1,17 @@
 // Vérifie qu'un port TCP est libre, en tentant de l'écouter.
 import net from 'node:net';
 
-export function portLibre(port: number, hote = '0.0.0.0'): Promise<boolean> {
+export function portFree(port: number, host = '0.0.0.0'): Promise<boolean> {
   return new Promise((resolve) => {
-    const serveur = net.createServer();
-    serveur.once('error', () => resolve(false));
-    serveur.listen({ port, host: hote, exclusive: true }, () => {
-      serveur.close(() => resolve(true));
+    const server = net.createServer();
+    server.once('error', () => resolve(false));
+    server.listen({ port, host: host, exclusive: true }, () => {
+      server.close(() => resolve(true));
     });
   });
 }
 
 /** Libre sur toutes les interfaces et sur la boucle locale (Docker publie sur l'une ou l'autre). */
-export async function portVraimentLibre(port: number): Promise<boolean> {
-  return (await portLibre(port, '0.0.0.0')) && (await portLibre(port, '127.0.0.1'));
+export async function portReallyFree(port: number): Promise<boolean> {
+  return (await portFree(port, '0.0.0.0')) && (await portFree(port, '127.0.0.1'));
 }

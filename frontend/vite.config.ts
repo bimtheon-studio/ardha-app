@@ -6,22 +6,22 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv } from 'vite';
 
-const racine = path.resolve(import.meta.dirname, '..');
+const root = path.resolve(import.meta.dirname, '..');
 
 // `.env` et `.env.local` de la racine, sans préfixe : seule la configuration du serveur les lit.
-const env = loadEnv('', racine, '');
+const env = loadEnv('', root, '');
 const portWeb = Number(env.WEB_PORT ?? 14000);
 const portApi = Number(env.API_PORT ?? 13000);
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  envDir: racine,
+  envDir: root,
   resolve: {
     alias: {
       '@': path.resolve(import.meta.dirname, 'src'),
       // Seuls points de contact avec le back : le contrat et les règles pures (voir eslint.config.js).
-      '@contracts': path.resolve(racine, 'src/contracts/index.ts'),
-      '@domain': path.resolve(racine, 'src/domain/index.ts'),
+      '@contracts': path.resolve(root, 'src/contracts/index.ts'),
+      '@domain': path.resolve(root, 'src/domain/index.ts'),
     },
   },
   server: {

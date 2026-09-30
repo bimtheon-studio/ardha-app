@@ -1,7 +1,7 @@
 // Document OpenAPI 3.1, dérivé des routes décrites dans ce paquet.
 import { z } from 'zod';
 
-import { ErreurApi, type Route } from './routes.ts';
+import { ApiError, type Route } from './routes.ts';
 
 type Document = Record<string, unknown> & { paths: Record<string, Record<string, unknown>> };
 
@@ -18,22 +18,22 @@ export function documentOpenApi(routes: Record<string, Route>, version: string):
     },
     paths: {},
   };
-  for (const [nom, r] of Object.entries(routes)) {
+  for (const [name, r] of Object.entries(routes)) {
     const operation: Record<string, unknown> = {
-      operationId: nom,
-      summary: r.resume,
+      operationId: name,
+      summary: r.summary,
       responses: {
-        [r.statut]: r.reponse
-          ? { description: 'Succès', content: { 'application/json': { schema: schema(r.reponse, 'output') } } }
+        [r.status]: r.response
+          ? { description: 'Succès', content: { 'application/json': { schema: schema(r.response, 'output') } } }
           : { description: 'Succès, sans contenu' },
-        default: { description: 'Erreur', content: { 'application/json': { schema: schema(ErreurApi, 'output') } } },
+        default: { description: 'Erreur', content: { 'application/json': { schema: schema(ApiError, 'output') } } },
       },
     };
-    if (r.corps) {
-      operation.requestBody = { required: true, content: { 'application/json': { schema: schema(r.corps, 'input') } } };
+    if (r.body) {
+      operation.requestBody = { required: true, content: { 'application/json': { schema: schema(r.body, 'input') } } };
     }
-    if (r.authentifiee) operation.security = [{ session: [] }];
-    doc.paths[r.chemin] = { ...doc.paths[r.chemin], [r.methode.toLowerCase()]: operation };
+    if (r.authenticated) operation.security = [{ session: [] }];
+    doc.paths[r.path] = { ...doc.paths[r.path], [r.method.toLowerCase()]: operation };
   }
   return doc;
 }

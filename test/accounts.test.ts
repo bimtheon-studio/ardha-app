@@ -4,38 +4,38 @@ import type pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { AuthService } from '../src/accounts/auth.service.ts';
-import { BaseModule } from '../src/db/db.module.ts';
+import { DbModule } from '../src/db/db.module.ts';
 import { POOL } from '../src/db/db.ts';
-import { ErreurMetier } from '../src/shared/errors.ts';
-import { Horloge } from '../src/shared/clock.ts';
-import { ComptesModule } from '../src/accounts/accounts.module.ts';
+import { DomainError } from '../src/shared/errors.ts';
+import { Clock } from '../src/shared/clock.ts';
+import { AccountsModule } from '../src/accounts/accounts.module.ts';
 import { ConfigModule } from '../src/config/config.module.ts';
-import { UtilisateursService } from '../src/accounts/users.service.ts';
-import { MaintenanceProcessor, TACHE_PURGE } from '../src/worker/maintenance.ts';
-import { HorlogeDeTest } from './test-app.ts';
-import { configDeTest } from './env.ts';
+import { UsersService } from '../src/accounts/users.service.ts';
+import { MaintenanceProcessor, PURGE_JOB } from '../src/worker/maintenance.ts';
+import { TestClock } from './test-app.ts';
+import { testConfig } from './env.ts';
 
-const JOUR = 24 * 3600 * 1000;
-const ctx = { ip: '10.9.0.1', agentUtilisateur: 'vitest' };
+const DAY = 24 * 3600 * 1000;
+const ctx = { ip: '10.9.0.1', userAgent: 'vitest' };
 
 let module: Awaited<ReturnType<ReturnType<typeof Test.createTestingModule>['compile']>>;
-let horloge: HorlogeDeTest;
+let clock: TestClock;
 let pool: pg.Pool;
-let service: UtilisateursService;
+let service: UsersService;
 let auth: AuthService;
 
 beforeAll(async () => {
-  horloge = new HorlogeDeTest();
+  clock = new TestClock();
   module = await Test.createTestingModule({
-    imports: [ConfigModule.pour(configDeTest()), BaseModule, ComptesModule],
+    imports: [ConfigModule.forConfig(testConfig()), DbModule, AccountsModule],
     providers: [MaintenanceProcessor],
   })
-    .overrideProvider(Horloge)
-    .useValue(horloge)
+    .overrideProvider(Clock)
+    .useValue(clock)
     .compile();
   await module.init();
   pool = module.get(POOL);
-  service = module.get(UtilisateursService);
+  service = module.get(UsersService);
   auth = module.get(AuthService);
 });
 afterAll(() => module.close());
@@ -45,73 +45,73 @@ beforeEach(async () => {
 
 describe('user:create-admin', () => {
   it('sans mot de passe : compte admin sans hash, et lien pour le choisir', async () => {
-    const { utilisateur, lien } = await service.creerAdmin({ email: ' Admin@Ardha.fr ', nom: 'Admin' });
-    expect(utilisateur).toMatchObject({ email: 'admin@ardha.fr', role: 'admin', motDePasseHash: null });
-    expect(lien?.url).toMatch(/^http:\/\/127\.0\.0\.1:14000\/reset-password#[A-Za-z0-9_-]{43}$/);
-    const jeton = decodeURIComponent(new URL(lien!.url).hash.slice(1));
-    await auth.reinitialiser({ jeton, motDePasse: 'mot de passe admin solide' }, ctx);
-    const ouverte = await auth.connecter({ email: 'admin@ardha.fr', motDePasse: 'mot de passe admin solide' }, ctx);
-    expect(ouverte.utilisateur.role).toBe('admin');
+    const { user, link } = await service.createAdmin({ email: ' Admin@Ardha.fr ', name: 'Admin' });
+    expect(user).toMatchObject({ email: 'admin@ardha.fr', role: 'admin', passwordHash: null });
+    expect(link?.url).toMatch(/^http:\/\/127\.0\.0\.1:14000\/reset-password#[A-Za-z0-9_-]{43}$/);
+    const token = decodeURIComponent(new URL(link!.url).hash.slice(1));
+    await auth.resetPassword({ token, password: 'mot de passe admin solide' }, ctx);
+    const opened = await auth.login({ email: 'admin@ardha.fr', password: 'mot de passe admin solide' }, ctx);
+    expect(opened.user.role).toBe('admin');
   });
 
   it('avec mot de passe : se connecte aussitôt, pas de lien', async () => {
-    const r = await service.creerAdmin({ email: 'a@ardha.fr', nom: 'A', motDePasse: 'mot de passe admin solide' });
-    expect(r.lien).toBeUndefined();
-    await expect(auth.connecter({ email: 'a@ardha.fr', motDePasse: 'mot de passe admin solide' }, ctx)).resolves.toBeTruthy();
+    const r = await service.createAdmin({ email: 'a@ardha.fr', name: 'A', password: 'mot de passe admin solide' });
+    expect(r.link).toBeUndefined();
+    await expect(auth.login({ email: 'a@ardha.fr', password: 'mot de passe admin solide' }, ctx)).resolves.toBeTruthy();
   });
 
   it('applique la politique de mot de passe', async () => {
-    await expect(service.creerAdmin({ email: 'a@ardha.fr', nom: 'A', motDePasse: 'court' })).rejects.toThrow(
+    await expect(service.createAdmin({ email: 'a@ardha.fr', name: 'A', password: 'court' })).rejects.toThrow(
       'Le mot de passe doit faire au moins 12 caractères.',
     );
   });
 
   it('refuse une adresse déjà prise', async () => {
-    await service.creerAdmin({ email: 'a@ardha.fr', nom: 'A' });
-    await expect(service.creerAdmin({ email: 'A@ardha.fr', nom: 'A' })).rejects.toBeInstanceOf(ErreurMetier);
+    await service.createAdmin({ email: 'a@ardha.fr', name: 'A' });
+    await expect(service.createAdmin({ email: 'A@ardha.fr', name: 'A' })).rejects.toBeInstanceOf(DomainError);
   });
 
   it('un compte sans mot de passe ne s’ouvre avec aucun mot de passe', async () => {
-    await service.creerAdmin({ email: 'a@ardha.fr', nom: 'A' });
-    await expect(auth.connecter({ email: 'a@ardha.fr', motDePasse: '' }, ctx)).rejects.toMatchObject({ code: 'identifiants-invalides' });
+    await service.createAdmin({ email: 'a@ardha.fr', name: 'A' });
+    await expect(auth.login({ email: 'a@ardha.fr', password: '' }, ctx)).rejects.toMatchObject({ code: 'invalid-credentials' });
   });
 });
 
 describe('désactivation (Q5)', () => {
   it('désactive, ferme les sessions, puis réactive', async () => {
-    await auth.inscrire({ email: 'bob@exemple.fr', nom: 'Bob', motDePasse: 'cheval pomme agrafe' }, ctx);
-    await auth.connecter({ email: 'bob@exemple.fr', motDePasse: 'cheval pomme agrafe' }, ctx);
-    expect(await service.desactiver('bob@exemple.fr')).toBe(2);
-    await expect(auth.connecter({ email: 'bob@exemple.fr', motDePasse: 'cheval pomme agrafe' }, ctx)).rejects.toMatchObject({
-      code: 'compte-desactive',
+    await auth.signup({ email: 'bob@exemple.fr', name: 'Bob', password: 'cheval pomme agrafe' }, ctx);
+    await auth.login({ email: 'bob@exemple.fr', password: 'cheval pomme agrafe' }, ctx);
+    expect(await service.deactivate('bob@exemple.fr')).toBe(2);
+    await expect(auth.login({ email: 'bob@exemple.fr', password: 'cheval pomme agrafe' }, ctx)).rejects.toMatchObject({
+      code: 'account-deactivated',
     });
-    await service.reactiver('bob@exemple.fr');
-    await expect(auth.connecter({ email: 'bob@exemple.fr', motDePasse: 'cheval pomme agrafe' }, ctx)).resolves.toBeTruthy();
-    const actions = (await pool.query('SELECT action, origine FROM journal_audit ORDER BY cree_le, id')).rows;
-    expect(actions).toContainEqual({ action: 'utilisateur.desactive', origine: 'cli' });
-    expect(actions).toContainEqual({ action: 'utilisateur.reactive', origine: 'cli' });
+    await service.reactivate('bob@exemple.fr');
+    await expect(auth.login({ email: 'bob@exemple.fr', password: 'cheval pomme agrafe' }, ctx)).resolves.toBeTruthy();
+    const actions = (await pool.query('SELECT action, origine AS origin FROM journal_audit ORDER BY cree_le, id')).rows;
+    expect(actions).toContainEqual({ action: 'user.deactivated', origin: 'cli' });
+    expect(actions).toContainEqual({ action: 'user.reactivated', origin: 'cli' });
   });
 
   it('un compte inconnu est signalé', async () => {
-    await expect(service.desactiver('personne@exemple.fr')).rejects.toMatchObject({ code: 'utilisateur-inconnu' });
-    await expect(service.creerLienReinitialisation('personne@exemple.fr')).rejects.toMatchObject({ code: 'utilisateur-inconnu' });
+    await expect(service.deactivate('personne@exemple.fr')).rejects.toMatchObject({ code: 'unknown-user' });
+    await expect(service.createResetLink('personne@exemple.fr')).rejects.toMatchObject({ code: 'unknown-user' });
   });
 
   it('liste les comptes', async () => {
-    await service.creerAdmin({ email: 'a@ardha.fr', nom: 'A' });
-    await auth.inscrire({ email: 'b@exemple.fr', nom: 'B', motDePasse: 'cheval pomme agrafe' }, ctx);
-    expect((await service.lister()).map((u) => u.email)).toEqual(['a@ardha.fr', 'b@exemple.fr']);
+    await service.createAdmin({ email: 'a@ardha.fr', name: 'A' });
+    await auth.signup({ email: 'b@exemple.fr', name: 'B', password: 'cheval pomme agrafe' }, ctx);
+    expect((await service.list()).map((u) => u.email)).toEqual(['a@ardha.fr', 'b@exemple.fr']);
   });
 });
 
 describe('purge du worker', () => {
   it('supprime les sessions expirées et les liens périmés ou utilisés, garde le reste', async () => {
-    await auth.inscrire({ email: 'c@exemple.fr', nom: 'C', motDePasse: 'cheval pomme agrafe' }, ctx);
-    await service.creerLienReinitialisation('c@exemple.fr');
-    horloge.avancer(31 * JOUR);
-    await auth.connecter({ email: 'c@exemple.fr', motDePasse: 'cheval pomme agrafe' }, ctx);
-    const bilan = await module.get(MaintenanceProcessor).process({ name: TACHE_PURGE } as never);
-    expect(bilan).toEqual({ sessions: 1, liens: 1 });
+    await auth.signup({ email: 'c@exemple.fr', name: 'C', password: 'cheval pomme agrafe' }, ctx);
+    await service.createResetLink('c@exemple.fr');
+    clock.advance(31 * DAY);
+    await auth.login({ email: 'c@exemple.fr', password: 'cheval pomme agrafe' }, ctx);
+    const result = await module.get(MaintenanceProcessor).process({ name: PURGE_JOB } as never);
+    expect(result).toEqual({ sessions: 1, links: 1 });
     expect((await pool.query('SELECT count(*)::int AS n FROM session')).rows[0].n).toBe(1);
   });
 

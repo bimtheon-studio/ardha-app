@@ -2,26 +2,26 @@
 // de réinitialisation s'affichent ici et l'administrateur les transmet.
 import { Command, CommandRunner, Option } from 'nest-commander';
 
-import { UtilisateursService } from '../accounts/users.service.ts';
+import { UsersService } from '../accounts/users.service.ts';
 
-interface OptionsEmail {
+interface EmailOptions {
   email: string;
 }
 
-function dateFr(d: Date): string {
+function frenchDate(d: Date): string {
   return d.toLocaleString('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'short', timeStyle: 'short' });
 }
 
-async function lireEntreeStandard(): Promise<string> {
-  const morceaux: Buffer[] = [];
-  for await (const m of process.stdin) morceaux.push(m as Buffer);
-  return Buffer.concat(morceaux).toString('utf8').replace(/\r?\n$/, '');
+async function readStdin(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const m of process.stdin) chunks.push(m as Buffer);
+  return Buffer.concat(chunks).toString('utf8').replace(/\r?\n$/, '');
 }
 
-abstract class CommandeAvecEmail extends CommandRunner {
+abstract class EmailCommand extends CommandRunner {
   @Option({ flags: '-e, --email <email>', description: 'Adresse e-mail du compte', required: true })
-  lireEmail(valeur: string): string {
-    return valeur;
+  parseEmail(value: string): string {
+    return value;
   }
 }
 
@@ -29,31 +29,31 @@ abstract class CommandeAvecEmail extends CommandRunner {
   name: 'user:create-admin',
   description: 'Crée un administrateur ; sans --password-stdin, affiche un lien pour choisir le mot de passe',
 })
-export class CommandeCreerAdmin extends CommandeAvecEmail {
-  constructor(private readonly utilisateurs: UtilisateursService) {
+export class CreateAdminCommand extends EmailCommand {
+  constructor(private readonly users: UsersService) {
     super();
   }
 
   @Option({ flags: '-n, --name <name>', description: 'Nom affiché', required: true })
-  lireNom(valeur: string): string {
-    return valeur;
+  parseName(value: string): string {
+    return value;
   }
 
   @Option({ flags: '--password-stdin', description: 'Lit le mot de passe sur l’entrée standard' })
-  lireStdin(): boolean {
+  parsePasswordStdin(): boolean {
     return true;
   }
 
-  async run(_: string[], options: OptionsEmail & { name: string; passwordStdin?: boolean }): Promise<void> {
-    const motDePasse = options.passwordStdin ? await lireEntreeStandard() : undefined;
-    const { utilisateur, lien } = await this.utilisateurs.creerAdmin({
+  async run(_: string[], options: EmailOptions & { name: string; passwordStdin?: boolean }): Promise<void> {
+    const password = options.passwordStdin ? await readStdin() : undefined;
+    const { user, link } = await this.users.createAdmin({
       email: options.email,
-      nom: options.name,
-      ...(motDePasse !== undefined && { motDePasse }),
+      name: options.name,
+      ...(password !== undefined && { password }),
     });
-    console.log(`Administrateur créé : ${utilisateur.email} (${utilisateur.id}).`);
-    if (lien) {
-      console.log(`Lien pour choisir le mot de passe, valable jusqu'au ${dateFr(lien.expireLe)} :\n${lien.url}`);
+    console.log(`Administrateur créé : ${user.email} (${user.id}).`);
+    if (link) {
+      console.log(`Lien pour choisir le mot de passe, valable jusqu'au ${frenchDate(link.expiresAt)} :\n${link.url}`);
     }
   }
 }
@@ -62,53 +62,53 @@ export class CommandeCreerAdmin extends CommandeAvecEmail {
   name: 'user:reset-password',
   description: 'Crée un lien à usage unique (24 h) pour choisir un nouveau mot de passe ; annule le précédent',
 })
-export class CommandeReinitialiser extends CommandeAvecEmail {
-  constructor(private readonly utilisateurs: UtilisateursService) {
+export class ResetPasswordCommand extends EmailCommand {
+  constructor(private readonly users: UsersService) {
     super();
   }
 
-  async run(_: string[], options: OptionsEmail): Promise<void> {
-    const lien = await this.utilisateurs.creerLienReinitialisation(options.email);
-    console.log(`Lien à transmettre, valable jusqu'au ${dateFr(lien.expireLe)} :\n${lien.url}`);
+  async run(_: string[], options: EmailOptions): Promise<void> {
+    const link = await this.users.createResetLink(options.email);
+    console.log(`Lien à transmettre, valable jusqu'au ${frenchDate(link.expiresAt)} :\n${link.url}`);
   }
 }
 
 @Command({ name: 'user:deactivate', description: 'Désactive un compte et ferme ses sessions' })
-export class CommandeDesactiver extends CommandeAvecEmail {
-  constructor(private readonly utilisateurs: UtilisateursService) {
+export class DeactivateCommand extends EmailCommand {
+  constructor(private readonly users: UsersService) {
     super();
   }
 
-  async run(_: string[], options: OptionsEmail): Promise<void> {
-    const fermees = await this.utilisateurs.desactiver(options.email);
-    console.log(`Compte désactivé ; ${fermees} session(s) fermée(s).`);
+  async run(_: string[], options: EmailOptions): Promise<void> {
+    const closedCount = await this.users.deactivate(options.email);
+    console.log(`Compte désactivé ; ${closedCount} session(s) fermée(s).`);
   }
 }
 
 @Command({ name: 'user:reactivate', description: 'Réactive un compte désactivé' })
-export class CommandeReactiver extends CommandeAvecEmail {
-  constructor(private readonly utilisateurs: UtilisateursService) {
+export class ReactivateCommand extends EmailCommand {
+  constructor(private readonly users: UsersService) {
     super();
   }
 
-  async run(_: string[], options: OptionsEmail): Promise<void> {
-    await this.utilisateurs.reactiver(options.email);
+  async run(_: string[], options: EmailOptions): Promise<void> {
+    await this.users.reactivate(options.email);
     console.log('Compte réactivé.');
   }
 }
 
 @Command({ name: 'user:list', description: 'Liste les comptes' })
-export class CommandeLister extends CommandRunner {
-  constructor(private readonly utilisateurs: UtilisateursService) {
+export class ListUsersCommand extends CommandRunner {
+  constructor(private readonly users: UsersService) {
     super();
   }
 
   async run(): Promise<void> {
-    const liste = await this.utilisateurs.lister();
-    if (liste.length === 0) return console.log('Aucun compte.');
-    for (const u of liste) {
-      const etat = u.desactiveLe ? 'désactivé' : u.motDePasseHash ? 'actif' : 'mot de passe à choisir';
-      console.log(`${u.email}\t${u.role}\t${etat}\t${u.nom}\tcréé le ${dateFr(u.creeLe)}`);
+    const list = await this.users.list();
+    if (list.length === 0) return console.log('Aucun compte.');
+    for (const u of list) {
+      const status = u.deactivatedAt ? 'désactivé' : u.passwordHash ? 'actif' : 'mot de passe à choisir';
+      console.log(`${u.email}\t${u.role}\t${status}\t${u.name}\tcréé le ${frenchDate(u.createdAt)}`);
     }
   }
 }

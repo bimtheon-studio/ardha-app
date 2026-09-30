@@ -1,10 +1,10 @@
-// Toute erreur sort au format `ErreurApi` du contrat : un message pour l'utilisateur, en français,
+// Toute erreur sort au format `ApiError` du contrat : un message pour l'utilisateur, en français,
 // et au besoin un message par champ. Les erreurs imprévues sont journalisées, jamais détaillées.
 import { type ArgumentsHost, Catch, type ExceptionFilter, HttpException, Logger } from '@nestjs/common';
-import type { ErreurApi } from '../../contracts/index.ts';
+import type { ApiError } from '../../contracts/index.ts';
 import type { Response } from 'express';
 
-import { ERREURS, ErreurMetier } from '../../shared/errors.ts';
+import { ERRORS, DomainError } from '../../shared/errors.ts';
 
 const MESSAGES_HTTP: Record<number, string> = {
   400: 'Requête invalide.',
@@ -17,30 +17,30 @@ const MESSAGES_HTTP: Record<number, string> = {
 };
 
 @Catch()
-export class FiltreErreurs implements ExceptionFilter {
+export class ErrorFilter implements ExceptionFilter {
   private readonly logger = new Logger('Erreurs');
 
-  catch(erreur: unknown, hote: ArgumentsHost): void {
-    const reponse = hote.switchToHttp().getResponse<Response>();
-    const { statut, corps } = this.traduire(erreur);
-    if (statut >= 500) this.logger.error(erreur instanceof Error ? erreur.stack : String(erreur));
-    reponse.status(statut).json(corps);
+  catch(error: unknown, host: ArgumentsHost): void {
+    const response = host.switchToHttp().getResponse<Response>();
+    const { status, body } = this.translate(error);
+    if (status >= 500) this.logger.error(error instanceof Error ? error.stack : String(error));
+    response.status(status).json(body);
   }
 
-  private traduire(erreur: unknown): { statut: number; corps: ErreurApi } {
-    if (erreur instanceof ErreurMetier) {
+  private translate(error: unknown): { status: number; body: ApiError } {
+    if (error instanceof DomainError) {
       return {
-        statut: ERREURS[erreur.code].statut,
-        corps: { message: erreur.message, ...(erreur.champs && { champs: erreur.champs }) },
+        status: ERRORS[error.code].status,
+        body: { message: error.message, ...(error.fields && { fields: error.fields }) },
       };
     }
-    if (erreur instanceof HttpException) {
-      const statut = erreur.getStatus();
-      const r = erreur.getResponse();
-      if (typeof r === 'object' && r && 'champs' in r && 'message' in r) return { statut, corps: r as ErreurApi };
-      const propre = typeof r === 'object' && r && 'messageFr' in r ? String((r as { messageFr: unknown }).messageFr) : undefined;
-      return { statut, corps: { message: propre ?? MESSAGES_HTTP[statut] ?? 'La requête a échoué.' } };
+    if (error instanceof HttpException) {
+      const status = error.getStatus();
+      const r = error.getResponse();
+      if (typeof r === 'object' && r && 'fields' in r && 'message' in r) return { status, body: r as ApiError };
+      const userMessage = typeof r === 'object' && r && 'userMessage' in r ? String((r as { userMessage: unknown }).userMessage) : undefined;
+      return { status, body: { message: userMessage ?? MESSAGES_HTTP[status] ?? 'La requête a échoué.' } };
     }
-    return { statut: 500, corps: { message: 'Une erreur interne est survenue. Réessayez dans un instant.' } };
+    return { status: 500, body: { message: 'Une erreur interne est survenue. Réessayez dans un instant.' } };
   }
 }

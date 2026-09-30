@@ -14,9 +14,9 @@ describe('documentOpenApi', () => {
       '/api/auth/signup',
       '/api/health',
     ]);
-    const connexion = doc.paths['/api/auth/login']?.post as { responses: Record<string, unknown>; requestBody: unknown };
-    expect(Object.keys(connexion.responses)).toEqual(['200', 'default']);
-    expect(connexion.requestBody).toBeDefined();
+    const login = doc.paths['/api/auth/login']?.post as { responses: Record<string, unknown>; requestBody: unknown };
+    expect(Object.keys(login.responses)).toEqual(['200', 'default']);
+    expect(login.requestBody).toBeDefined();
   });
 
   it('marque les routes qui exigent une session', () => {
@@ -25,7 +25,7 @@ describe('documentOpenApi', () => {
   });
 
   it('une route sans réponse n’a pas de contenu', () => {
-    const deco = doc.paths['/api/auth/logout']?.post as { responses: Record<string, { content?: unknown }> };
-    expect(deco.responses['204']?.content).toBeUndefined();
+    const logoutOp = doc.paths['/api/auth/logout']?.post as { responses: Record<string, { content?: unknown }> };
+    expect(logoutOp.responses['204']?.content).toBeUndefined();
   });
 });

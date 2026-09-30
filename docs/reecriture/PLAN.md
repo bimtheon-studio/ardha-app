@@ -351,7 +351,7 @@ Prises en route pendant L0, le 30/09/2026, par l'agent de réécriture. Elles ne
 | DT-16 | Front : React 19.3, React Router 8, Vite 8, Tailwind 4 ; primitives shadcn/ui reprises, polices auto-hébergées (`@fontsource`) | Tailwind 3 ; Google Fonts | versions courantes ; le front ne charge rien hors d'Ardha sauf les tuiles IGN (D-08) |
 | DT-17 | Logs structurés par pino (`nestjs-pino`), cookies et en-têtes d'authentification masqués | logger de Nest | logs JSON exploitables en production (PLAN §8) |
 | DT-18 | ESLint 10 + typescript-eslint ; frontières d'architecture en `no-restricted-imports` | règles de revue | la CI fait respecter le domaine pur, Drizzle confiné, le front limité au contrat |
-| DT-19 | Commandes, options, variables d'environnement et routes **en anglais** : `pnpm start`, `stop`, `destroy`, `status`, `migrate`, `seed` ; CLI `user:create-admin`… ; `ARDHA_PORT_OFFSET` ; `/api/auth/login`, `/login`… Dossiers et noms de fichiers aussi (`src/domain`, `src/accounts`, `clock.ts`…). Le français reste pour le modèle métier (tables, entités), les identifiants du code, les commentaires et les textes affichés | tout en français | consigne du porteur du produit, 30/09/2026 (celle-ci est arbitrée) |
+| DT-19 | **Le code en anglais** : dossiers, fichiers, identifiants, commandes pnpm (`start`, `stop`, `destroy`, `status`, `migrate`, `seed`) et CLI (`user:create-admin`…), options, variables (`ARDHA_PORT_OFFSET`), routes (`/api/auth/login`, `/login`…), champs JSON (`name`, `password`, `token`, `fields`), codes d'erreur et actions du journal. Restent en français : le modèle en base (tables et colonnes, nommées explicitement dans `src/db/schema.ts`), les commentaires et les textes affichés | tout en français | consigne du porteur du produit, 30/09/2026 (arbitrée) ; CLAUDE.md mis à jour |
 
 ## 12. Questions ouvertes
 
@@ -370,6 +370,8 @@ vers des comptes pas encore recréés) ; aucune migration ne les a réinjectées
 
 ## Journal
 
+- **30/09/2026** — code entièrement en anglais (DT-19), renommé par l'arbre syntaxique ; base inchangée
+  (drizzle-kit : aucun changement de schéma).
 - **30/09/2026** — surfaces en anglais (DT-19) : commandes pnpm et CLI, options, routes de l'API et du
   front ; `pnpm status` affiche des liens cliquables et l'état de chaque service. Recette rejouée.
 - **30/09/2026** — **L0 livré sur `master`** (b86d58d et suivant). Fiche F-00 scannée, arbitrée (Q1 à Q9),

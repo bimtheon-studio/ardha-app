@@ -2,7 +2,7 @@
 import { LogOut, User } from 'lucide-react';
 import { Link, Outlet, useNavigate } from 'react-router';
 
-import { useDeconnexion, useMoi } from '@/auth/session';
+import { useLogout, useMe } from '@/auth/session';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -14,20 +14,20 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 /** Initiales tirées du nom (l'ancienne application les tirait de l'e-mail, faute de nom). */
-export function initiales(nom: string): string {
-  const mots = nom.trim().split(/\s+/).filter(Boolean);
-  const lettres = mots.length > 1 ? [mots[0]![0], mots.at(-1)![0]] : [mots[0]?.[0], mots[0]?.[1]];
-  return lettres.filter(Boolean).join('').toUpperCase() || '?';
+export function initials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const letters = words.length > 1 ? [words[0]![0], words.at(-1)![0]] : [words[0]?.[0], words[0]?.[1]];
+  return letters.filter(Boolean).join('').toUpperCase() || '?';
 }
 
-export function Coquille() {
-  const { data: moi } = useMoi();
-  const deconnexion = useDeconnexion();
-  const naviguer = useNavigate();
+export function Shell() {
+  const { data: me } = useMe();
+  const logout = useLogout();
+  const navigate = useNavigate();
 
-  async function seDeconnecter() {
-    await deconnexion.mutateAsync().catch(() => undefined);
-    await naviguer('/login', { replace: true });
+  async function logOut() {
+    await logout.mutateAsync().catch(() => undefined);
+    await navigate('/login', { replace: true });
   }
 
   return (
@@ -39,18 +39,18 @@ export function Coquille() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="icon" aria-label="Menu du compte">
-              {moi ? initiales(moi.nom) : <User />}
+              {me ? initials(me.name) : <User />}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            {moi && (
+            {me && (
               <DropdownMenuLabel className="font-normal">
-                <p className="font-medium">{moi.nom}</p>
-                <p className="text-xs text-muted-foreground">{moi.email}</p>
+                <p className="font-medium">{me.name}</p>
+                <p className="text-xs text-muted-foreground">{me.email}</p>
               </DropdownMenuLabel>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => void seDeconnecter()}>
+            <DropdownMenuItem onSelect={() => void logOut()}>
               <LogOut className="mr-2 size-4" />
               Se déconnecter
             </DropdownMenuItem>

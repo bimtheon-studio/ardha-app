@@ -5,23 +5,23 @@ import { Injectable } from '@nestjs/common';
 
 // `Algorithm` est un `const enum` ambiant, inutilisable avec `isolatedModules` : Argon2id vaut 2.
 const ARGON2ID = 2 as Algorithm;
-const PARAMETRES = { algorithm: ARGON2ID, memoryCost: 19_456, timeCost: 2, parallelism: 1 };
+const PARAMS = { algorithm: ARGON2ID, memoryCost: 19_456, timeCost: 2, parallelism: 1 };
 
 @Injectable()
-export class MotsDePasse {
+export class Passwords {
   /** Hash d'un mot de passe jetable : vérifié quand le compte n'existe pas, pour que la durée de réponse ne le trahisse pas. */
-  private leurre: Promise<string> | undefined;
+  private decoy: Promise<string> | undefined;
 
-  hacher(motDePasse: string): Promise<string> {
-    return hash(motDePasse, PARAMETRES);
+  hash(password: string): Promise<string> {
+    return hash(password, PARAMS);
   }
 
-  async verifier(hashConnu: string | null | undefined, motDePasse: string): Promise<boolean> {
-    if (!hashConnu) {
-      this.leurre ??= this.hacher('leurre-de-verification-a-duree-constante');
-      await verify(await this.leurre, motDePasse);
+  async verify(knownHash: string | null | undefined, password: string): Promise<boolean> {
+    if (!knownHash) {
+      this.decoy ??= this.hash('leurre-de-verification-a-duree-constante');
+      await verify(await this.decoy, password);
       return false;
     }
-    return verify(hashConnu, motDePasse);
+    return verify(knownHash, password);
   }
 }

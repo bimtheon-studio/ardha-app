@@ -1,10 +1,10 @@
 // Fichiers locaux générés par `pnpm start`, ignorés par git : l'override Compose et `.env.local`.
 import { randomBytes } from 'node:crypto';
 
-import type { Contexte } from './context.ts';
+import type { Context } from './context.ts';
 
-export const DEBUT_BLOC = '# >>> ardha stack (généré par `pnpm start`, ne pas committer) >>>';
-export const FIN_BLOC = '# <<< ardha stack <<<';
+export const BLOCK_START = '# >>> ardha stack (généré par `pnpm start`, ne pas committer) >>>';
+export const BLOCK_END = '# <<< ardha stack <<<';
 
 /** Mots de passe locaux : tirés au hasard au premier démarrage, puis conservés dans `.env.local`. */
 export interface Secrets {
@@ -12,28 +12,29 @@ export interface Secrets {
   minio: string;
 }
 
-export function nouveauxSecrets(): Secrets {
-  return { postgres: aleatoire(), minio: aleatoire() };
+export function newSecrets(): Secrets {
+  return { postgres: randomSecret(), minio: randomSecret() };
 }
 
-function aleatoire(): string {
+function randomSecret(): string {
   return randomBytes(18).toString('base64url');
 }
 
 /** Relit les secrets d'un `.env.local` existant, pour ne pas les changer sous un volume déjà initialisé. */
-export function secretsExistants(env: string): Secrets | null {
-  const vars = lireEnv(env);
-  const postgres = vars.get('ARDHA_POSTGRES_MOT_DE_PASSE');
-  const minio = vars.get('ARDHA_MINIO_MOT_DE_PASSE');
+export function existingSecrets(env: string): Secrets | null {
+  const vars = parseEnv(env);
+  // Anciens noms (avant le passage en anglais) en repli : un volume déjà créé garde son mot de passe.
+  const postgres = vars.get('ARDHA_POSTGRES_PASSWORD') ?? vars.get('ARDHA_POSTGRES_MOT_DE_PASSE');
+  const minio = vars.get('ARDHA_MINIO_PASSWORD') ?? vars.get('ARDHA_MINIO_MOT_DE_PASSE');
   return postgres && minio ? { postgres, minio } : null;
 }
 
-export function override(ctx: Contexte, secrets: Secrets): string {
+export function override(ctx: Context, secrets: Secrets): string {
   const { ports } = ctx;
   return [
-    `# Généré par \`pnpm start\` pour « ${ctx.projet} » (branche ${ctx.branche}, décalage +${ctx.decalage}).`,
+    `# Généré par \`pnpm start\` pour « ${ctx.project} » (branche ${ctx.branch}, décalage +${ctx.offset}).`,
     '# Ne pas committer (ignoré par git). Ports publiés sur 127.0.0.1 uniquement.',
-    `name: ${ctx.projet}`,
+    `name: ${ctx.project}`,
     'services:',
     '  postgres:',
     '    environment:',
@@ -53,14 +54,14 @@ export function override(ctx: Contexte, secrets: Secrets): string {
   ].join('\n');
 }
 
-export function variables(ctx: Contexte, secrets: Secrets): Record<string, string> {
+export function variables(ctx: Context, secrets: Secrets): Record<string, string> {
   const { ports } = ctx;
-  const pg = (base: string) =>
-    `postgres://ardha:${secrets.postgres}@127.0.0.1:${ports.postgres}/${base}`;
+  const pg = (db: string) =>
+    `postgres://ardha:${secrets.postgres}@127.0.0.1:${ports.postgres}/${db}`;
   return {
-    ARDHA_PROJET: ctx.projet,
-    ARDHA_POSTGRES_MOT_DE_PASSE: secrets.postgres,
-    ARDHA_MINIO_MOT_DE_PASSE: secrets.minio,
+    ARDHA_PROJECT: ctx.project,
+    ARDHA_POSTGRES_PASSWORD: secrets.postgres,
+    ARDHA_MINIO_PASSWORD: secrets.minio,
     DATABASE_URL: pg('ardha'),
     DATABASE_URL_TEST: pg('ardha_test'),
     REDIS_URL: `redis://127.0.0.1:${ports.redis}`,
@@ -77,22 +78,22 @@ export function variables(ctx: Contexte, secrets: Secrets): Record<string, strin
 }
 
 /** Insère ou remplace le bloc généré dans un `.env.local`, sans toucher au reste du fichier. */
-export function upsertBloc(existant: string, vars: Record<string, string>): string {
-  const bloc = [DEBUT_BLOC, ...Object.entries(vars).map(([k, v]) => `${k}=${v}`), FIN_BLOC].join('\n');
-  const debut = existant.indexOf(DEBUT_BLOC);
-  const fin = existant.indexOf(FIN_BLOC);
-  if (debut !== -1 && fin > debut) {
-    return existant.slice(0, debut) + bloc + existant.slice(fin + FIN_BLOC.length);
+export function upsertBlock(existing: string, vars: Record<string, string>): string {
+  const block = [BLOCK_START, ...Object.entries(vars).map(([k, v]) => `${k}=${v}`), BLOCK_END].join('\n');
+  const start = existing.indexOf(BLOCK_START);
+  const end = existing.indexOf(BLOCK_END);
+  if (start !== -1 && end > start) {
+    return existing.slice(0, start) + block + existing.slice(end + BLOCK_END.length);
   }
-  const reste = existant.trimEnd();
-  return (reste ? `${reste}\n\n` : '') + bloc + '\n';
+  const rest = existing.trimEnd();
+  return (rest ? `${rest}\n\n` : '') + block + '\n';
 }
 
 /** Lecture minimale d'un fichier `.env` : `CLE=valeur`, commentaires `#`, pas de guillemets. */
-export function lireEnv(contenu: string): Map<string, string> {
+export function parseEnv(content: string): Map<string, string> {
   const vars = new Map<string, string>();
-  for (const ligne of contenu.split('\n')) {
-    const l = ligne.trim();
+  for (const line of content.split('\n')) {
+    const l = line.trim();
     if (!l || l.startsWith('#')) continue;
     const i = l.indexOf('=');
     if (i > 0) vars.set(l.slice(0, i).trim(), l.slice(i + 1).trim());

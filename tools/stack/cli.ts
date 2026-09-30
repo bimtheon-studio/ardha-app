@@ -8,84 +8,84 @@ import { execFileSync, spawn, spawnSync, type ChildProcess } from 'node:child_pr
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { adresses, lien } from './addresses.ts';
-import { contexteCourant, type Contexte } from './context.ts';
-import { nouveauxSecrets, override, secretsExistants, upsertBloc, variables } from './files.ts';
-import { portVraimentLibre } from './free-port.ts';
-import { LIBELLES, type Service } from './ports.ts';
+import { addresses, link } from './addresses.ts';
+import { currentContext, type Context } from './context.ts';
+import { newSecrets, override, existingSecrets, upsertBlock, variables } from './files.ts';
+import { portReallyFree } from './free-port.ts';
+import { LABELS, type Service } from './ports.ts';
 
-const SERVICES_DOCKER: Service[] = ['postgres', 'redis', 'minio', 'minioConsole'];
-const SERVICES_LOCAUX: Service[] = ['api', 'web'];
+const DOCKER_SERVICES: Service[] = ['postgres', 'redis', 'minio', 'minioConsole'];
+const LOCAL_SERVICES: Service[] = ['api', 'web'];
 
-function afficherContexte(ctx: Contexte): void {
-  const titre = ctx.estWorktree
-    ? `Worktree isolé « ${ctx.projet} » (branche ${ctx.branche}, décalage +${ctx.decalage})`
-    : `Clone principal « ${ctx.projet} » (branche ${ctx.branche}, décalage +${ctx.decalage})`;
-  console.log(`\n${titre}`);
+function printContext(ctx: Context): void {
+  const title = ctx.isWorktree
+    ? `Worktree isolé « ${ctx.project} » (branche ${ctx.branch}, décalage +${ctx.offset})`
+    : `Clone principal « ${ctx.project} » (branche ${ctx.branch}, décalage +${ctx.offset})`;
+  console.log(`\n${title}`);
   console.log(`  Cookie de session : ${ctx.cookieSession}\n`);
 }
 
-/** Adresses de la stack, cliquables ; avec `etat`, une pastille dit si chacune répond. */
-async function afficherAdresses(ctx: Contexte, etat: boolean): Promise<void> {
+/** Adresses de la stack, cliquables ; avec `status`, une pastille dit si chacune répond. */
+async function printAddresses(ctx: Context, status: boolean): Promise<void> {
   const terminal = Boolean(process.stdout.isTTY);
-  for (const a of adresses(ctx)) {
-    const pastille = etat ? ((await portVraimentLibre(ctx.ports[a.service])) ? '○ ' : '● ') : '';
-    console.log(`  ${pastille}${a.libelle.padEnd(16)} ${lien(a.url, terminal)}`);
+  for (const a of addresses(ctx)) {
+    const dot = status ? ((await portReallyFree(ctx.ports[a.service])) ? '○ ' : '● ') : '';
+    console.log(`  ${dot}${a.label.padEnd(16)} ${link(a.url, terminal)}`);
   }
-  if (etat) console.log('\n  ● répond  ○ arrêté');
+  if (status) console.log('\n  ● répond  ○ arrêté');
   console.log('');
 }
 
-function ecrireFichiers(ctx: Contexte): void {
-  const fichierEnv = path.join(ctx.racine, '.env.local');
-  const existant = existsSync(fichierEnv) ? readFileSync(fichierEnv, 'utf8') : '';
-  const secrets = secretsExistants(existant) ?? nouveauxSecrets();
-  writeFileSync(path.join(ctx.racine, 'docker-compose.override.yaml'), override(ctx, secrets));
-  writeFileSync(fichierEnv, upsertBloc(existant, variables(ctx, secrets)));
+function writeFiles(ctx: Context): void {
+  const envFile = path.join(ctx.root, '.env.local');
+  const existing = existsSync(envFile) ? readFileSync(envFile, 'utf8') : '';
+  const secrets = existingSecrets(existing) ?? newSecrets();
+  writeFileSync(path.join(ctx.root, 'docker-compose.override.yaml'), override(ctx, secrets));
+  writeFileSync(envFile, upsertBlock(existing, variables(ctx, secrets)));
   console.log('Fichiers générés : docker-compose.override.yaml, .env.local');
 }
 
 /** Ports hôtes déjà publiés par les conteneurs de ce projet Compose (un redémarrage les retrouve pris). */
-function portsDuProjet(ctx: Contexte): Set<number> {
-  const sortie = execFileSync(
+function projectPorts(ctx: Context): Set<number> {
+  const output = execFileSync(
     'docker',
-    ['ps', '--filter', `label=com.docker.compose.project=${ctx.projet}`, '--format', '{{.Ports}}'],
+    ['ps', '--filter', `label=com.docker.compose.project=${ctx.project}`, '--format', '{{.Ports}}'],
     { encoding: 'utf8' },
   );
-  return new Set([...sortie.matchAll(/:(\d+)->/g)].map((m) => Number(m[1])));
+  return new Set([...output.matchAll(/:(\d+)->/g)].map((m) => Number(m[1])));
 }
 
-async function verifierPorts(ctx: Contexte, services: Service[]): Promise<void> {
-  const nosPorts = portsDuProjet(ctx);
-  const pris: string[] = [];
+async function checkPorts(ctx: Context, services: Service[]): Promise<void> {
+  const ownPorts = projectPorts(ctx);
+  const taken: string[] = [];
   for (const service of services) {
     const port = ctx.ports[service];
-    if (nosPorts.has(port)) continue;
-    if (!(await portVraimentLibre(port))) pris.push(`  ${LIBELLES[service]} : ${port}`);
+    if (ownPorts.has(port)) continue;
+    if (!(await portReallyFree(port))) taken.push(`  ${LABELS[service]} : ${port}`);
   }
-  if (pris.length > 0) {
+  if (taken.length > 0) {
     throw new Error(
       [
         'Ports déjà pris par un autre processus :',
-        ...pris,
+        ...taken,
         '',
         'Deux branches peuvent tomber sur le même décalage. Libérez ces ports, ou forcez un autre décalage :',
-        `  ARDHA_PORT_OFFSET=${ctx.decalage >= 404 ? 5 : ctx.decalage + 1} pnpm start`,
+        `  ARDHA_PORT_OFFSET=${ctx.offset >= 404 ? 5 : ctx.offset + 1} pnpm start`,
         '(à redonner à chaque démarrage : il n\'est pas mémorisé).',
       ].join('\n'),
     );
   }
 }
 
-function lancer(commande: string, args: string[], ctx: Contexte): void {
-  const r = spawnSync(commande, args, { cwd: ctx.racine, stdio: 'inherit' });
+function run(command: string, args: string[], ctx: Context): void {
+  const r = spawnSync(command, args, { cwd: ctx.root, stdio: 'inherit' });
   if (r.status !== 0) {
-    throw new Error(`Échec de \`${commande} ${args.join(' ')}\` (code ${r.status ?? r.signal}).`);
+    throw new Error(`Échec de \`${command} ${args.join(' ')}\` (code ${r.status ?? r.signal}).`);
   }
 }
 
-function creerBucket(ctx: Contexte): void {
-  lancer(
+function createBucket(ctx: Context): void {
+  run(
     'docker',
     [
       'compose', 'exec', '-T', 'minio', 'sh', '-c',
@@ -95,29 +95,29 @@ function creerBucket(ctx: Contexte): void {
   );
 }
 
-async function demarrer(ctx: Contexte, infraSeule: boolean): Promise<void> {
-  afficherContexte(ctx);
+async function start(ctx: Context, infraOnly: boolean): Promise<void> {
+  printContext(ctx);
   // Les ports d'abord : un démarrage refusé ne doit pas réécrire la configuration d'une stack qui tourne.
-  await verifierPorts(ctx, infraSeule ? SERVICES_DOCKER : [...SERVICES_DOCKER, ...SERVICES_LOCAUX]);
-  ecrireFichiers(ctx);
+  await checkPorts(ctx, infraOnly ? DOCKER_SERVICES : [...DOCKER_SERVICES, ...LOCAL_SERVICES]);
+  writeFiles(ctx);
 
-  lancer('docker', ['compose', 'up', '-d', '--build', '--wait'], ctx);
-  creerBucket(ctx);
-  if (!existsSync(path.join(ctx.racine, 'node_modules'))) {
-    lancer('pnpm', ['install', '--frozen-lockfile'], ctx);
+  run('docker', ['compose', 'up', '-d', '--build', '--wait'], ctx);
+  createBucket(ctx);
+  if (!existsSync(path.join(ctx.root, 'node_modules'))) {
+    run('pnpm', ['install', '--frozen-lockfile'], ctx);
   }
   // Le back compilé : la CLI (migrations, seed), l'API et le worker tournent sur `dist/`.
-  lancer('pnpm', ['run', 'build:back'], ctx);
-  lancer('pnpm', ['run', 'migrate'], ctx);
-  lancer('pnpm', ['run', 'seed'], ctx);
+  run('pnpm', ['run', 'build:back'], ctx);
+  run('pnpm', ['run', 'migrate'], ctx);
+  run('pnpm', ['run', 'seed'], ctx);
 
-  if (infraSeule) {
+  if (infraOnly) {
     console.log('\nDépendances prêtes, base migrée et semée.');
     return;
   }
   console.log('\nStack prête (Ctrl-C arrête l’API, le worker et le front) :');
-  await afficherAdresses(ctx, false);
-  await auPremierPlan(ctx, {
+  await printAddresses(ctx, false);
+  await runForeground(ctx, {
     swc: ['run', 'dev:compiler'],
     api: ['run', 'dev:api'],
     worker: ['run', 'dev:worker'],
@@ -126,76 +126,76 @@ async function demarrer(ctx: Contexte, infraSeule: boolean): Promise<void> {
 }
 
 /** Lance les processus de dev, préfixe leurs sorties, et les arrête tous dès que l'un s'arrête. */
-function auPremierPlan(ctx: Contexte, processus: Record<string, string[]>): Promise<void> {
+function runForeground(ctx: Context, processes: Record<string, string[]>): Promise<void> {
   return new Promise((resolve) => {
-    const enfants: ChildProcess[] = [];
-    let arret = false;
-    const toutArreter = () => {
-      if (arret) return;
-      arret = true;
-      for (const e of enfants) e.kill('SIGTERM');
+    const children: ChildProcess[] = [];
+    let stopping = false;
+    const stopAll = () => {
+      if (stopping) return;
+      stopping = true;
+      for (const e of children) e.kill('SIGTERM');
     };
-    let restants = Object.keys(processus).length;
-    for (const [nom, args] of Object.entries(processus)) {
-      const enfant = spawn('pnpm', args, { cwd: ctx.racine, stdio: ['ignore', 'pipe', 'pipe'] });
-      enfants.push(enfant);
-      const prefixe = `[${nom}]`.padEnd(9);
-      const relayer = (flux: NodeJS.WritableStream) => (morceau: Buffer) => {
-        for (const ligne of morceau.toString().split('\n')) if (ligne) flux.write(`${prefixe}${ligne}\n`);
+    let remaining = Object.keys(processes).length;
+    for (const [name, args] of Object.entries(processes)) {
+      const child = spawn('pnpm', args, { cwd: ctx.root, stdio: ['ignore', 'pipe', 'pipe'] });
+      children.push(child);
+      const prefix = `[${name}]`.padEnd(9);
+      const relay = (stream: NodeJS.WritableStream) => (chunk: Buffer) => {
+        for (const line of chunk.toString().split('\n')) if (line) stream.write(`${prefix}${line}\n`);
       };
-      enfant.stdout?.on('data', relayer(process.stdout));
-      enfant.stderr?.on('data', relayer(process.stderr));
-      enfant.on('exit', (code) => {
-        if (!arret) console.error(`${prefixe}arrêté (code ${code}) : arrêt des autres processus.`);
-        toutArreter();
-        if (--restants === 0) resolve();
+      child.stdout?.on('data', relay(process.stdout));
+      child.stderr?.on('data', relay(process.stderr));
+      child.on('exit', (code) => {
+        if (!stopping) console.error(`${prefix}arrêté (code ${code}) : arrêt des autres processus.`);
+        stopAll();
+        if (--remaining === 0) resolve();
       });
     }
-    process.on('SIGINT', toutArreter);
-    process.on('SIGTERM', toutArreter);
+    process.on('SIGINT', stopAll);
+    process.on('SIGTERM', stopAll);
   });
 }
 
-function arreter(ctx: Contexte): void {
-  lancer('docker', ['compose', 'down', '--remove-orphans'], ctx);
+function stop(ctx: Context): void {
+  run('docker', ['compose', 'down', '--remove-orphans'], ctx);
 }
 
-function detruire(ctx: Contexte, confirme: boolean): void {
-  if (!ctx.estWorktree && !confirme) {
+function destroy(ctx: Context, confirmed: boolean): void {
+  if (!ctx.isWorktree && !confirmed) {
     throw new Error('Clone principal : la destruction efface la base locale. Relancer avec `pnpm destroy --yes`.');
   }
-  lancer('docker', ['compose', 'down', '-v', '--remove-orphans'], ctx);
-  console.log(`Stack et volumes de « ${ctx.projet} » supprimés.`);
+  run('docker', ['compose', 'down', '-v', '--remove-orphans'], ctx);
+  console.log(`Stack et volumes de « ${ctx.project} » supprimés.`);
 }
 
-async function etat(ctx: Contexte): Promise<void> {
-  afficherContexte(ctx);
-  if (!existsSync(path.join(ctx.racine, 'docker-compose.override.yaml'))) {
+async function status(ctx: Context): Promise<void> {
+  printContext(ctx);
+  if (!existsSync(path.join(ctx.root, 'docker-compose.override.yaml'))) {
     console.log('Stack jamais démarrée ici (`pnpm start`).');
     return;
   }
-  await afficherAdresses(ctx, true);
-  lancer('docker', ['compose', 'ps', '--format', 'table {{.Service}}\t{{.Status}}'], ctx);
+  await printAddresses(ctx, true);
+  run('docker', ['compose', 'ps', '--format', 'table {{.Service}}\t{{.Status}}'], ctx);
 }
 
-async function principal(): Promise<void> {
-  const [commande, ...options] = process.argv.slice(2);
-  const ctx = contexteCourant();
-  switch (commande) {
+async function main(): Promise<void> {
+  const [command, ...options] = process.argv.slice(2);
+  const ctx = currentContext();
+  switch (command) {
     case 'start':
-      return demarrer(ctx, options.includes('--infra'));
+      return start(ctx, options.includes('--infra'));
     case 'stop':
-      return arreter(ctx);
+      return stop(ctx);
     case 'destroy':
-      return detruire(ctx, options.includes('--yes'));
+      return destroy(ctx, options.includes('--yes'));
     case 'status':
-      return etat(ctx);
+      return status(ctx);
     default:
       throw new Error('Usage : node tools/stack/cli.ts start [--infra] | stop | destroy [--yes] | status');
   }
 }
 
-principal().catch((erreur: unknown) => {
-  console.error(`\n${erreur instanceof Error ? erreur.message : String(erreur)}`);
+main().catch((error: unknown) => {
+  console.error(`\n${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
 });

@@ -5,7 +5,7 @@ import path from 'node:path';
 
 import { z } from 'zod';
 
-export const RACINE_DEPOT = path.resolve(import.meta.dirname, '../..');
+export const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 
 const Schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -13,7 +13,7 @@ const Schema = z.object({
   REDIS_URL: z.url(),
   API_PORT: z.coerce.number().int().positive().default(13000),
   /** Interface d'écoute : la boucle locale en développement, `0.0.0.0` dans un conteneur. */
-  API_HOTE: z.string().default('127.0.0.1'),
+  API_HOST: z.string().default('127.0.0.1'),
   /** Origine du front : liens envoyés par la CLI, contrôle de l'en-tête Origin. */
   WEB_ORIGIN: z.url(),
   SESSION_COOKIE_NAME: z.string().regex(/^[A-Za-z0-9_]+$/).default('ardha_session'),
@@ -26,12 +26,12 @@ export type Config = z.infer<typeof Schema> & { production: boolean };
 
 export const CONFIG = Symbol('CONFIG');
 
-export function chargerEnvLocal(racine = RACINE_DEPOT): void {
-  const fichier = path.join(racine, '.env.local');
-  if (process.env.NODE_ENV !== 'production' && existsSync(fichier)) process.loadEnvFile(fichier);
+export function loadLocalEnv(root = REPO_ROOT): void {
+  const file = path.join(root, '.env.local');
+  if (process.env.NODE_ENV !== 'production' && existsSync(file)) process.loadEnvFile(file);
 }
 
-export function lireConfig(env: NodeJS.ProcessEnv = process.env): Config {
+export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const r = Schema.safeParse(env);
   if (!r.success) {
     const details = r.error.issues.map((i) => `  ${i.path.join('.')} : ${i.message}`).join('\n');

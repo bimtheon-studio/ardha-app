@@ -27,7 +27,7 @@ export default defineConfig({
       // Seuils à cliquet (PLAN §8) : `autoUpdate` les remonte quand la couverture progresse,
       // jamais ne les baisse ; la CI échoue en dessous. Au moins 90 % sur le domaine.
       thresholds: {
-        autoUpdate: process.env.CI ? false : (seuil: number) => Math.floor(seuil),
+        autoUpdate: process.env.CI ? false : (threshold: number) => Math.floor(threshold),
         lines: 95,
         functions: 92,
         branches: 86,

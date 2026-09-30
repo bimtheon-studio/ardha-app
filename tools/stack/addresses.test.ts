@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { adresses, lien } from './addresses.ts';
-import { contexteDepuis } from './context.ts';
+import { addresses, link } from './addresses.ts';
+import { contextFrom } from './context.ts';
 
 describe('adresses', () => {
   it('donne des URL complètes aux ports du worktree, sans mot de passe', () => {
-    const ctx = contexteDepuis({ racine: '/a', dossierCommun: '.git', branche: 'master' }, 7);
-    const liste = adresses(ctx);
-    expect(liste.map((a) => a.url)).toEqual([
+    const ctx = contextFrom({ root: '/a', commonDir: '.git', branch: 'master' }, 7);
+    const list = addresses(ctx);
+    expect(list.map((a) => a.url)).toEqual([
       'http://127.0.0.1:14007/',
       'http://127.0.0.1:13007/api/health',
       'http://127.0.0.1:13007/api/openapi.json',
@@ -21,7 +21,7 @@ describe('adresses', () => {
 
 describe('lien', () => {
   it('encadre l’URL d’un hyperlien OSC 8 dans un terminal, la laisse brute sinon', () => {
-    expect(lien('http://x/', false)).toBe('http://x/');
-    expect(lien('http://x/', true)).toBe('\u001b]8;;http://x/\u001b\\http://x/\u001b]8;;\u001b\\');
+    expect(link('http://x/', false)).toBe('http://x/');
+    expect(link('http://x/', true)).toBe('\u001b]8;;http://x/\u001b\\http://x/\u001b]8;;\u001b\\');
   });
 });

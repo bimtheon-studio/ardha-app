@@ -4,14 +4,14 @@ import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { LoggerModule } from 'nestjs-pino';
 
-import { BaseModule } from '../db/db.module.ts';
-import { ComptesModule } from '../accounts/accounts.module.ts';
+import { DbModule } from '../db/db.module.ts';
+import { AccountsModule } from '../accounts/accounts.module.ts';
 import { type Config, CONFIG } from '../config/config.ts';
 import { ConfigModule } from '../config/config.module.ts';
-import { optionsJournalisation } from '../shared/logs.ts';
-import { FILE_MAINTENANCE, MaintenanceProcessor, PlanificationMaintenance } from './maintenance.ts';
+import { loggingOptions } from '../shared/logs.ts';
+import { MAINTENANCE_QUEUE, MaintenanceProcessor, MaintenanceScheduler } from './maintenance.ts';
 
-export function connexionRedis(url: string) {
+export function redisConnection(url: string) {
   const u = new URL(url);
   return {
     host: u.hostname,
@@ -27,21 +27,21 @@ export function connexionRedis(url: string) {
 
 @Module({})
 export class WorkerModule {
-  static pour(config?: Config) {
+  static forConfig(config?: Config) {
     return {
       module: WorkerModule,
       imports: [
-        ConfigModule.pour(config),
-        LoggerModule.forRootAsync({ inject: [CONFIG], useFactory: optionsJournalisation }),
-        BaseModule,
-        ComptesModule,
+        ConfigModule.forConfig(config),
+        LoggerModule.forRootAsync({ inject: [CONFIG], useFactory: loggingOptions }),
+        DbModule,
+        AccountsModule,
         BullModule.forRootAsync({
           inject: [CONFIG],
-          useFactory: (c: Config) => ({ connection: connexionRedis(c.REDIS_URL), prefix: 'ardha:bull' }),
+          useFactory: (c: Config) => ({ connection: redisConnection(c.REDIS_URL), prefix: 'ardha:bull' }),
         }),
-        BullModule.registerQueue({ name: FILE_MAINTENANCE }),
+        BullModule.registerQueue({ name: MAINTENANCE_QUEUE }),
       ],
-      providers: [MaintenanceProcessor, PlanificationMaintenance],
+      providers: [MaintenanceProcessor, MaintenanceScheduler],
     };
   }
 }

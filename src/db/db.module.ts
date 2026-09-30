@@ -2,17 +2,17 @@ import { Global, Inject, Module, type OnApplicationShutdown } from '@nestjs/comm
 import type pg from 'pg';
 
 import { CONFIG, type Config } from '../config/config.ts';
-import { BASE, creerBase, creerPool, POOL } from './db.ts';
+import { DB, createDb, createPool, POOL } from './db.ts';
 
 @Global()
 @Module({
   providers: [
-    { provide: POOL, inject: [CONFIG], useFactory: (config: Config) => creerPool(config.DATABASE_URL) },
-    { provide: BASE, inject: [POOL], useFactory: creerBase },
+    { provide: POOL, inject: [CONFIG], useFactory: (config: Config) => createPool(config.DATABASE_URL) },
+    { provide: DB, inject: [POOL], useFactory: createDb },
   ],
-  exports: [BASE, POOL],
+  exports: [DB, POOL],
 })
-export class BaseModule implements OnApplicationShutdown {
+export class DbModule implements OnApplicationShutdown {
   constructor(@Inject(POOL) private readonly pool: pg.Pool) {}
 
   async onApplicationShutdown(): Promise<void> {

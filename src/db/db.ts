@@ -6,22 +6,22 @@ import pg from 'pg';
 
 import * as schema from './schema.ts';
 
-export type Base = NodePgDatabase<typeof schema>;
+export type Db = NodePgDatabase<typeof schema>;
 
-export const BASE = Symbol('BASE');
+export const DB = Symbol('DB');
 export const POOL = Symbol('POOL');
 
-export const DOSSIER_MIGRATIONS = path.resolve(import.meta.dirname, '../../drizzle');
+export const MIGRATIONS_DIR = path.resolve(import.meta.dirname, '../../drizzle');
 
-export function creerPool(url: string): pg.Pool {
+export function createPool(url: string): pg.Pool {
   return new pg.Pool({ connectionString: url, max: 10, application_name: 'ardha' });
 }
 
-export function creerBase(pool: pg.Pool): Base {
+export function createDb(pool: pg.Pool): Db {
   return drizzle({ client: pool, schema, casing: 'snake_case' });
 }
 
 /** Joue les migrations en attente, dans l'ordre, chacune dans sa transaction. */
-export async function migrer(pool: pg.Pool): Promise<void> {
-  await migrate(creerBase(pool), { migrationsFolder: DOSSIER_MIGRATIONS });
+export async function runMigrations(pool: pg.Pool): Promise<void> {
+  await migrate(createDb(pool), { migrationsFolder: MIGRATIONS_DIR });
 }

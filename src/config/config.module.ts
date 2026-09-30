@@ -1,12 +1,12 @@
 import { type DynamicModule, Global, Module } from '@nestjs/common';
 
-import { CONFIG, type Config, chargerEnvLocal, lireConfig } from './config.ts';
+import { CONFIG, type Config, loadLocalEnv, readConfig } from './config.ts';
 
 @Global()
 @Module({})
 export class ConfigModule {
   /** Sans argument : lit l'environnement (et `.env.local` en développement). Les tests passent leur config. */
-  static pour(config?: Config): DynamicModule {
+  static forConfig(config?: Config): DynamicModule {
     return {
       module: ConfigModule,
       providers: [
@@ -14,8 +14,8 @@ export class ConfigModule {
           provide: CONFIG,
           useFactory: () => {
             if (config) return config;
-            chargerEnvLocal();
-            return lireConfig();
+            loadLocalEnv();
+            return readConfig();
           },
         },
       ],

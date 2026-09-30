@@ -1,6 +1,6 @@
 // Contrat de l'authentification (F-00) : inscription, connexion, déconnexion, « qui suis-je »,
 // réinitialisation du mot de passe par lien.
-import { LONGUEUR_MAX_EMAIL, LONGUEUR_MAX_MOT_DE_PASSE, MESSAGES_MOT_DE_PASSE, problemeMotDePasse } from '../domain/index.ts';
+import { EMAIL_MAX_LENGTH, PASSWORD_MAX_LENGTH, PASSWORD_MESSAGES, passwordProblem } from '../domain/index.ts';
 import { z } from 'zod';
 
 import { route } from './routes.ts';
@@ -8,104 +8,104 @@ import { route } from './routes.ts';
 export const Role = z.enum(['admin', 'utilisateur']);
 export type Role = z.infer<typeof Role>;
 
-export const Utilisateur = z.object({
+export const User = z.object({
   id: z.uuid(),
   email: z.string(),
-  nom: z.string(),
+  name: z.string(),
   role: Role,
 });
-export type Utilisateur = z.infer<typeof Utilisateur>;
+export type User = z.infer<typeof User>;
 
-const champEmail = z
+const emailField = z
   .string({ error: 'L’adresse e-mail est obligatoire.' })
   .trim()
   .min(1, 'L’adresse e-mail est obligatoire.')
-  .max(LONGUEUR_MAX_EMAIL, 'Adresse e-mail trop longue.')
+  .max(EMAIL_MAX_LENGTH, 'Adresse e-mail trop longue.')
   .pipe(z.email('Adresse e-mail invalide.'));
 
 /** Mot de passe soumis à la politique (inscription, réinitialisation). */
-const nouveauMotDePasse = z.string({ error: 'Le mot de passe est obligatoire.' });
+const newPassword = z.string({ error: 'Le mot de passe est obligatoire.' });
 
-function verifierPolitique(motDePasse: string, email: string | undefined, ctx: z.RefinementCtx): void {
-  const probleme = problemeMotDePasse(motDePasse, email);
-  if (probleme) ctx.addIssue({ code: 'custom', path: ['motDePasse'], message: MESSAGES_MOT_DE_PASSE[probleme] });
+function checkPolicy(password: string, email: string | undefined, ctx: z.RefinementCtx): void {
+  const problem = passwordProblem(password, email);
+  if (problem) ctx.addIssue({ code: 'custom', path: ['password'], message: PASSWORD_MESSAGES[problem] });
 }
 
-export const Inscription = z
+export const Signup = z
   .object({
-    email: champEmail,
-    nom: z
+    email: emailField,
+    name: z
       .string({ error: 'Le nom est obligatoire.' })
       .trim()
       .min(1, 'Le nom est obligatoire.')
       .max(120, 'Le nom doit faire au plus 120 caractères.'),
-    motDePasse: nouveauMotDePasse,
+    password: newPassword,
   })
-  .superRefine((v, ctx) => verifierPolitique(v.motDePasse, v.email, ctx));
-export type Inscription = z.infer<typeof Inscription>;
+  .superRefine((v, ctx) => checkPolicy(v.password, v.email, ctx));
+export type Signup = z.infer<typeof Signup>;
 
-export const Connexion = z.object({
-  email: champEmail,
+export const Login = z.object({
+  email: emailField,
   // Pas de politique à la connexion : seulement une borne, pour ne pas hacher un texte démesuré.
-  motDePasse: z
+  password: z
     .string({ error: 'Le mot de passe est obligatoire.' })
     .min(1, 'Le mot de passe est obligatoire.')
-    .max(LONGUEUR_MAX_MOT_DE_PASSE * 4, 'Mot de passe trop long.'),
+    .max(PASSWORD_MAX_LENGTH * 4, 'Mot de passe trop long.'),
 });
-export type Connexion = z.infer<typeof Connexion>;
+export type Login = z.infer<typeof Login>;
 
-export const Reinitialisation = z
+export const PasswordReset = z
   .object({
-    jeton: z.string().min(1, 'Lien incomplet.').max(200, 'Lien invalide.'),
-    motDePasse: nouveauMotDePasse,
+    token: z.string().min(1, 'Lien incomplet.').max(200, 'Lien invalide.'),
+    password: newPassword,
   })
-  .superRefine((v, ctx) => verifierPolitique(v.motDePasse, undefined, ctx));
-export type Reinitialisation = z.infer<typeof Reinitialisation>;
+  .superRefine((v, ctx) => checkPolicy(v.password, undefined, ctx));
+export type PasswordReset = z.infer<typeof PasswordReset>;
 
-export const routesAuth = {
+export const authRoutes = {
   signup: route({
-    methode: 'POST',
-    chemin: '/api/auth/signup',
-    resume: 'Crée un compte et ouvre une session',
-    corps: Inscription,
-    reponse: Utilisateur,
-    statut: 201,
-    authentifiee: false,
+    method: 'POST',
+    path: '/api/auth/signup',
+    summary: 'Crée un compte et ouvre une session',
+    body: Signup,
+    response: User,
+    status: 201,
+    authenticated: false,
   }),
   login: route({
-    methode: 'POST',
-    chemin: '/api/auth/login',
-    resume: 'Ouvre une session',
-    corps: Connexion,
-    reponse: Utilisateur,
-    statut: 200,
-    authentifiee: false,
+    method: 'POST',
+    path: '/api/auth/login',
+    summary: 'Ouvre une session',
+    body: Login,
+    response: User,
+    status: 200,
+    authenticated: false,
   }),
   logout: route({
-    methode: 'POST',
-    chemin: '/api/auth/logout',
-    resume: 'Ferme la session courante',
-    corps: undefined,
-    reponse: undefined,
-    statut: 204,
-    authentifiee: false,
+    method: 'POST',
+    path: '/api/auth/logout',
+    summary: 'Ferme la session courante',
+    body: undefined,
+    response: undefined,
+    status: 204,
+    authenticated: false,
   }),
   me: route({
-    methode: 'GET',
-    chemin: '/api/auth/me',
-    resume: 'Utilisateur de la session courante',
-    corps: undefined,
-    reponse: Utilisateur,
-    statut: 200,
-    authentifiee: true,
+    method: 'GET',
+    path: '/api/auth/me',
+    summary: 'Utilisateur de la session courante',
+    body: undefined,
+    response: User,
+    status: 200,
+    authenticated: true,
   }),
   passwordReset: route({
-    methode: 'POST',
-    chemin: '/api/auth/password-reset',
-    resume: 'Change le mot de passe avec un lien à usage unique, et ferme toutes les sessions',
-    corps: Reinitialisation,
-    reponse: undefined,
-    statut: 204,
-    authentifiee: false,
+    method: 'POST',
+    path: '/api/auth/password-reset',
+    summary: 'Change le mot de passe avec un lien à usage unique, et ferme toutes les sessions',
+    body: PasswordReset,
+    response: undefined,
+    status: 204,
+    authenticated: false,
   }),
 };

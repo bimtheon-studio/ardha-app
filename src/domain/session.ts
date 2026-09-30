@@ -1,46 +1,46 @@
 // Durée de vie d'une session (F-00, Q3) : 30 jours glissants, prolongés à l'usage, et jamais plus de
 // 90 jours après la connexion.
 
-const JOUR_MS = 24 * 3600 * 1000;
+const DAY_MS = 24 * 3600 * 1000;
 
-export const DUREE_GLISSANTE_MS = 30 * JOUR_MS;
-export const DUREE_MAX_MS = 90 * JOUR_MS;
+export const SLIDING_DURATION_MS = 30 * DAY_MS;
+export const MAX_DURATION_MS = 90 * DAY_MS;
 /** On n'écrit la prolongation en base qu'au plus une fois par heure : pas une écriture par requête. */
-export const INTERVALLE_PROLONGATION_MS = 3600 * 1000;
+export const RENEWAL_INTERVAL_MS = 3600 * 1000;
 
-export interface EcheancesSession {
+export interface SessionDeadlines {
   /** Échéance glissante, repoussée à l'usage. */
-  expireLe: Date;
+  expiresAt: Date;
   /** Échéance absolue, fixée à la connexion. */
-  expireAuPlusTardLe: Date;
+  absoluteExpiresAt: Date;
 }
 
-export function echeancesInitiales(maintenant: Date): EcheancesSession {
+export function initialDeadlines(now: Date): SessionDeadlines {
   return {
-    expireLe: new Date(maintenant.getTime() + DUREE_GLISSANTE_MS),
-    expireAuPlusTardLe: new Date(maintenant.getTime() + DUREE_MAX_MS),
+    expiresAt: new Date(now.getTime() + SLIDING_DURATION_MS),
+    absoluteExpiresAt: new Date(now.getTime() + MAX_DURATION_MS),
   };
 }
 
-export function sessionExpiree(s: EcheancesSession, maintenant: Date): boolean {
-  const t = maintenant.getTime();
-  return t >= s.expireLe.getTime() || t >= s.expireAuPlusTardLe.getTime();
+export function sessionExpired(s: SessionDeadlines, now: Date): boolean {
+  const t = now.getTime();
+  return t >= s.expiresAt.getTime() || t >= s.absoluteExpiresAt.getTime();
 }
 
 /**
  * Nouvelle échéance glissante si la session doit être prolongée, `null` sinon (déjà prolongée
  * il y a moins d'une heure). Jamais au-delà de l'échéance absolue.
  */
-export function prolongation(
-  s: EcheancesSession & { derniereActiviteLe: Date },
-  maintenant: Date,
+export function renewal(
+  s: SessionDeadlines & { lastActivityAt: Date },
+  now: Date,
 ): Date | null {
-  if (maintenant.getTime() - s.derniereActiviteLe.getTime() < INTERVALLE_PROLONGATION_MS) return null;
-  const glissante = maintenant.getTime() + DUREE_GLISSANTE_MS;
-  return new Date(Math.min(glissante, s.expireAuPlusTardLe.getTime()));
+  if (now.getTime() - s.lastActivityAt.getTime() < RENEWAL_INTERVAL_MS) return null;
+  const sliding = now.getTime() + SLIDING_DURATION_MS;
+  return new Date(Math.min(sliding, s.absoluteExpiresAt.getTime()));
 }
 
 /** Durée de vie à donner au cookie : jusqu'à la plus proche des deux échéances. */
-export function dureeCookieMs(s: EcheancesSession, maintenant: Date): number {
-  return Math.max(0, Math.min(s.expireLe.getTime(), s.expireAuPlusTardLe.getTime()) - maintenant.getTime());
+export function cookieDurationMs(s: SessionDeadlines, now: Date): number {
+  return Math.max(0, Math.min(s.expiresAt.getTime(), s.absoluteExpiresAt.getTime()) - now.getTime());
 }

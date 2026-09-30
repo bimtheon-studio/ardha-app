@@ -1,35 +1,35 @@
 import { describe, expect, it } from 'vitest';
 
-import { Connexion, Inscription, Reinitialisation } from './auth.ts';
-import { messagesParChamp } from './routes.ts';
+import { Login, Signup, PasswordReset } from './auth.ts';
+import { messagesByField } from './routes.ts';
 
-const erreurs = (r: { success: boolean; error?: unknown }) =>
-  r.success ? {} : messagesParChamp(r.error as Parameters<typeof messagesParChamp>[0]);
+const errors = (r: { success: boolean; error?: unknown }) =>
+  r.success ? {} : messagesByField(r.error as Parameters<typeof messagesByField>[0]);
 
 describe('Inscription', () => {
-  const valide = { email: ' Alice@Exemple.fr ', nom: ' Alice Martin ', motDePasse: 'cheval pomme agrafe' };
+  const valid = { email: ' Alice@Exemple.fr ', name: ' Alice Martin ', password: 'cheval pomme agrafe' };
 
   it('accepte une inscription complète, espaces retirés', () => {
-    const r = Inscription.safeParse(valide);
-    expect(r.success && r.data).toEqual({ email: 'Alice@Exemple.fr', nom: 'Alice Martin', motDePasse: valide.motDePasse });
+    const r = Signup.safeParse(valid);
+    expect(r.success && r.data).toEqual({ email: 'Alice@Exemple.fr', name: 'Alice Martin', password: valid.password });
   });
 
   it('exige le nom (F-00, Q4)', () => {
-    expect(erreurs(Inscription.safeParse({ ...valide, nom: '   ' }))).toEqual({ nom: 'Le nom est obligatoire.' });
+    expect(errors(Signup.safeParse({ ...valid, name: '   ' }))).toEqual({ name: 'Le nom est obligatoire.' });
   });
 
   it('applique la politique de mot de passe, message en français', () => {
-    expect(erreurs(Inscription.safeParse({ ...valide, motDePasse: 'court' }))).toEqual({
-      motDePasse: 'Le mot de passe doit faire au moins 12 caractères.',
+    expect(errors(Signup.safeParse({ ...valid, password: 'court' }))).toEqual({
+      password: 'Le mot de passe doit faire au moins 12 caractères.',
     });
-    expect(erreurs(Inscription.safeParse({ ...valide, motDePasse: 'alice@exemple.fr' }))).toEqual({
-      motDePasse: 'Le mot de passe ne doit pas être votre adresse e-mail.',
+    expect(errors(Signup.safeParse({ ...valid, password: 'alice@exemple.fr' }))).toEqual({
+      password: 'Le mot de passe ne doit pas être votre adresse e-mail.',
     });
   });
 
   it('refuse une adresse invalide ou absente', () => {
-    expect(erreurs(Inscription.safeParse({ ...valide, email: 'alice' }))).toEqual({ email: 'Adresse e-mail invalide.' });
-    expect(erreurs(Inscription.safeParse({ nom: 'A', motDePasse: valide.motDePasse }))).toMatchObject({
+    expect(errors(Signup.safeParse({ ...valid, email: 'alice' }))).toEqual({ email: 'Adresse e-mail invalide.' });
+    expect(errors(Signup.safeParse({ name: 'A', password: valid.password }))).toMatchObject({
       email: 'L’adresse e-mail est obligatoire.',
     });
   });
@@ -37,26 +37,26 @@ describe('Inscription', () => {
 
 describe('Connexion', () => {
   it('n’applique pas la politique : un ancien mot de passe court reste saisissable', () => {
-    expect(Connexion.safeParse({ email: 'a@b.fr', motDePasse: 'court' }).success).toBe(true);
+    expect(Login.safeParse({ email: 'a@b.fr', password: 'court' }).success).toBe(true);
   });
 
   it('exige un mot de passe', () => {
-    expect(erreurs(Connexion.safeParse({ email: 'a@b.fr', motDePasse: '' }))).toEqual({
-      motDePasse: 'Le mot de passe est obligatoire.',
+    expect(errors(Login.safeParse({ email: 'a@b.fr', password: '' }))).toEqual({
+      password: 'Le mot de passe est obligatoire.',
     });
   });
 
   it('borne la longueur, pour ne pas hacher un texte démesuré', () => {
-    expect(Connexion.safeParse({ email: 'a@b.fr', motDePasse: 'x'.repeat(10_000) }).success).toBe(false);
+    expect(Login.safeParse({ email: 'a@b.fr', password: 'x'.repeat(10_000) }).success).toBe(false);
   });
 });
 
 describe('Reinitialisation', () => {
   it('exige un jeton et un mot de passe conforme', () => {
-    expect(Reinitialisation.safeParse({ jeton: 'j', motDePasse: 'cheval pomme agrafe' }).success).toBe(true);
-    expect(erreurs(Reinitialisation.safeParse({ jeton: '', motDePasse: '123456789012' }))).toEqual({
-      jeton: 'Lien incomplet.',
-      motDePasse: 'Ce mot de passe est trop courant : choisissez-en un autre.',
+    expect(PasswordReset.safeParse({ token: 'j', password: 'cheval pomme agrafe' }).success).toBe(true);
+    expect(errors(PasswordReset.safeParse({ token: '', password: '123456789012' }))).toEqual({
+      token: 'Lien incomplet.',
+      password: 'Ce mot de passe est trop courant : choisissez-en un autre.',
     });
   });
 });

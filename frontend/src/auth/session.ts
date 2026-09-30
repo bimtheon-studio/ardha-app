@@ -1,48 +1,48 @@
 // Session courante côté front : « qui suis-je », connexion, inscription, déconnexion (TanStack Query).
-import { type Connexion, type Inscription, routesAuth, type Utilisateur } from '@contracts';
+import { type Login, type Signup, authRoutes, type User } from '@contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { appeler, ErreurAppel } from '@/api/client';
+import { callApi, CallError } from '@/api/client';
 
-export const CLE_MOI = ['auth', 'moi'] as const;
+export const ME_KEY = ['auth', 'moi'] as const;
 
 /** `null` : pas de session. Une autre erreur (serveur injoignable) remonte telle quelle : « illisible » n'est pas « déconnecté ». */
-async function lireMoi(): Promise<Utilisateur | null> {
+async function fetchMe(): Promise<User | null> {
   try {
-    return await appeler(routesAuth.me);
+    return await callApi(authRoutes.me);
   } catch (e) {
-    if (e instanceof ErreurAppel && e.statut === 401) return null;
+    if (e instanceof CallError && e.status === 401) return null;
     throw e;
   }
 }
 
-export function useMoi() {
-  return useQuery({ queryKey: CLE_MOI, queryFn: lireMoi, staleTime: 60_000, retry: 1 });
+export function useMe() {
+  return useQuery({ queryKey: ME_KEY, queryFn: fetchMe, staleTime: 60_000, retry: 1 });
 }
 
-export function useConnexion() {
+export function useLogin() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (corps: Connexion) => appeler(routesAuth.login, corps),
-    onSuccess: (u) => client.setQueryData(CLE_MOI, u),
+    mutationFn: (body: Login) => callApi(authRoutes.login, body),
+    onSuccess: (u) => client.setQueryData(ME_KEY, u),
   });
 }
 
-export function useInscription() {
+export function useSignup() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (corps: Inscription) => appeler(routesAuth.signup, corps),
-    onSuccess: (u) => client.setQueryData(CLE_MOI, u),
+    mutationFn: (body: Signup) => callApi(authRoutes.signup, body),
+    onSuccess: (u) => client.setQueryData(ME_KEY, u),
   });
 }
 
-export function useDeconnexion() {
+export function useLogout() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: () => appeler(routesAuth.logout),
+    mutationFn: () => callApi(authRoutes.logout),
     onSettled: () => {
       client.clear();
-      client.setQueryData(CLE_MOI, null);
+      client.setQueryData(ME_KEY, null);
     },
   });
 }

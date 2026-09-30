@@ -3,7 +3,7 @@ import type { Params } from 'nestjs-pino';
 
 import type { Config } from '../config/config.ts';
 
-export function optionsJournalisation(config: Config): Params {
+export function loggingOptions(config: Config): Params {
   return {
     pinoHttp: {
       level: config.LOG_LEVEL,

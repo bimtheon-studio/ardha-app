@@ -1,4 +1,4 @@
-// Garde global : toute route exige une session, sauf celles marquées `@Publique()`. Sécurisé par
+// Garde global : toute route exige une session, sauf celles marquées `@Public()`. Sécurisé par
 // défaut : une route oubliée est fermée, pas ouverte.
 import {
   type CanActivate,
@@ -11,27 +11,27 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { Role, Utilisateur } from '../../contracts/index.ts';
+import type { Role, User } from '../../contracts/index.ts';
 import type { Request, Response } from 'express';
 
 import { AuthService } from '../../accounts/auth.service.ts';
 import { CONFIG, type Config } from '../../config/config.ts';
-import { poserCookieSession } from './cookie.ts';
+import { setSessionCookie } from './cookie.ts';
 
-const PUBLIQUE = 'ardha:publique';
+const PUBLIC = 'ardha:public';
 const ROLE = 'ardha:role';
 
 /** Route ouverte sans session. La session, si elle existe, est tout de même lue. */
-export const Publique = () => SetMetadata(PUBLIQUE, true);
-export const RoleRequis = (role: Role) => SetMetadata(ROLE, role);
+export const Public = () => SetMetadata(PUBLIC, true);
+export const RequiredRole = (role: Role) => SetMetadata(ROLE, role);
 
-export interface RequeteAuthentifiee extends Request {
-  utilisateur?: Utilisateur;
+export interface AuthenticatedRequest extends Request {
+  user?: User;
   sessionId?: string;
 }
 
-export const UtilisateurCourant = createParamDecorator(
-  (_: unknown, ctx: ExecutionContext) => ctx.switchToHttp().getRequest<RequeteAuthentifiee>().utilisateur,
+export const CurrentUser = createParamDecorator(
+  (_: unknown, ctx: ExecutionContext) => ctx.switchToHttp().getRequest<AuthenticatedRequest>().user,
 );
 
 @Injectable()
@@ -43,23 +43,23 @@ export class SessionGuard implements CanActivate {
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
-    const cibles = [ctx.getHandler(), ctx.getClass()];
-    const publique = this.reflector.getAllAndOverride<boolean>(PUBLIQUE, cibles) ?? false;
-    const role = this.reflector.getAllAndOverride<Role | undefined>(ROLE, cibles);
-    const requete = ctx.switchToHttp().getRequest<RequeteAuthentifiee>();
-    const jeton = (requete.cookies as Record<string, string> | undefined)?.[this.config.SESSION_COOKIE_NAME];
+    const targets = [ctx.getHandler(), ctx.getClass()];
+    const isPublic = this.reflector.getAllAndOverride<boolean>(PUBLIC, targets) ?? false;
+    const role = this.reflector.getAllAndOverride<Role | undefined>(ROLE, targets);
+    const request = ctx.switchToHttp().getRequest<AuthenticatedRequest>();
+    const token = (request.cookies as Record<string, string> | undefined)?.[this.config.SESSION_COOKIE_NAME];
 
-    const courante = await this.auth.sessionCourante(jeton);
-    if (courante) {
-      requete.utilisateur = courante.utilisateur;
-      requete.sessionId = courante.sessionId;
-      if (courante.nouvelleDureeCookieMs !== undefined && jeton) {
-        poserCookieSession(ctx.switchToHttp().getResponse<Response>(), this.config, jeton, courante.nouvelleDureeCookieMs);
+    const current = await this.auth.currentSession(token);
+    if (current) {
+      request.user = current.user;
+      request.sessionId = current.sessionId;
+      if (current.renewedCookieMs !== undefined && token) {
+        setSessionCookie(ctx.switchToHttp().getResponse<Response>(), this.config, token, current.renewedCookieMs);
       }
     }
-    if (publique) return true;
-    if (!courante) throw new UnauthorizedException();
-    if (role && courante.utilisateur.role !== role) throw new ForbiddenException();
+    if (isPublic) return true;
+    if (!current) throw new UnauthorizedException();
+    if (role && current.user.role !== role) throw new ForbiddenException();
     return true;
   }
 }

@@ -4,42 +4,42 @@ import { render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { vi } from 'vitest';
 
-import { Routes_ } from '@/App';
+import { AppRoutes } from '@/App';
 
-type Reponse = { statut: number; corps?: unknown };
-type Gestionnaire = (corps: unknown) => Reponse;
+type TResponse = { status: number; body?: unknown };
+type Handler = (body: unknown) => TResponse;
 
 /** Fausse API : une réponse par « MÉTHODE chemin », et la liste des appels reçus. */
-export function fausseApi(routes: Record<string, Reponse | Gestionnaire>) {
-  const appels: { cle: string; corps: unknown }[] = [];
+export function fakeApi(routes: Record<string, TResponse | Handler>) {
+  const calls: { key: string; body: unknown }[] = [];
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (chemin: string, init: RequestInit = {}) => {
-      const cle = `${init.method ?? 'GET'} ${chemin}`;
-      const corps = init.body ? JSON.parse(String(init.body)) : undefined;
-      appels.push({ cle, corps });
-      const r = routes[cle];
-      if (!r) throw new TypeError(`fetch non prévu : ${cle}`);
-      const { statut, corps: sortie } = typeof r === 'function' ? r(corps) : r;
-      return new Response(statut === 204 ? null : JSON.stringify(sortie ?? {}), {
-        status: statut,
+    vi.fn(async (path: string, init: RequestInit = {}) => {
+      const key = `${init.method ?? 'GET'} ${path}`;
+      const body = init.body ? JSON.parse(String(init.body)) : undefined;
+      calls.push({ key, body });
+      const r = routes[key];
+      if (!r) throw new TypeError(`fetch non prévu : ${key}`);
+      const { status, body: output } = typeof r === 'function' ? r(body) : r;
+      return new Response(status === 204 ? null : JSON.stringify(output ?? {}), {
+        status: status,
         headers: { 'Content-Type': 'application/json' },
       });
     }),
   );
-  return appels;
+  return calls;
 }
 
-export function afficher(url: string | { pathname: string; state?: unknown }) {
+export function renderAt(url: string | { pathname: string; state?: unknown }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[url]}>
-        <Routes_ />
+        <AppRoutes />
       </MemoryRouter>
     </QueryClientProvider>,
   );
 }
 
-export const alice = { id: '01900000-0000-7000-8000-000000000001', email: 'alice@exemple.fr', nom: 'Alice Martin', role: 'utilisateur' };
-export const sansSession = { statut: 401, corps: { message: 'Vous devez vous connecter.' } };
+export const alice = { id: '01900000-0000-7000-8000-000000000001', email: 'alice@exemple.fr', name: 'Alice Martin', role: 'utilisateur' };
+export const noSession = { status: 401, body: { message: 'Vous devez vous connecter.' } };

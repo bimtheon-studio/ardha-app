@@ -2,21 +2,21 @@ import { z } from 'zod';
 
 import { route } from './routes.ts';
 
-export const Sante = z.object({
-  statut: z.enum(['ok', 'degrade']),
-  base: z.enum(['ok', 'injoignable']),
+export const Health = z.object({
+  status: z.enum(['ok', 'degrade']),
+  db: z.enum(['ok', 'injoignable']),
   redis: z.enum(['ok', 'injoignable']),
 });
-export type Sante = z.infer<typeof Sante>;
+export type Health = z.infer<typeof Health>;
 
-export const routesSysteme = {
+export const systemRoutes = {
   health: route({
-    methode: 'GET',
-    chemin: '/api/health',
-    resume: 'État de l’API et de ses dépendances',
-    corps: undefined,
-    reponse: Sante,
-    statut: 200,
-    authentifiee: false,
+    method: 'GET',
+    path: '/api/health',
+    summary: 'État de l’API et de ses dépendances',
+    body: undefined,
+    response: Health,
+    status: 200,
+    authenticated: false,
   }),
 };

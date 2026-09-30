@@ -2,26 +2,26 @@
 import { Module } from '@nestjs/common';
 
 import { AuthService } from './auth.service.ts';
-import { PurgeComptes } from './purge.service.ts';
-import { ReinitialisationsRepository } from './password-resets.repository.ts';
+import { AccountsPurge } from './purge.service.ts';
+import { PasswordResetsRepository } from './password-resets.repository.ts';
 import { SessionsRepository } from './sessions.repository.ts';
-import { Horloge } from '../shared/clock.ts';
-import { MotsDePasse } from '../shared/passwords.ts';
-import { Journal } from '../audit/audit-log.ts';
-import { UtilisateursRepository } from './users.repository.ts';
-import { UtilisateursService } from './users.service.ts';
+import { Clock } from '../shared/clock.ts';
+import { Passwords } from '../shared/passwords.ts';
+import { AuditLog } from '../audit/audit-log.ts';
+import { UsersRepository } from './users.repository.ts';
+import { UsersService } from './users.service.ts';
 
-const fournisseurs = [
+const providers = [
   AuthService,
-  UtilisateursService,
-  PurgeComptes,
-  UtilisateursRepository,
+  UsersService,
+  AccountsPurge,
+  UsersRepository,
   SessionsRepository,
-  ReinitialisationsRepository,
-  MotsDePasse,
-  Journal,
-  Horloge,
+  PasswordResetsRepository,
+  Passwords,
+  AuditLog,
+  Clock,
 ];
 
-@Module({ providers: fournisseurs, exports: fournisseurs })
-export class ComptesModule {}
+@Module({ providers: providers, exports: providers })
+export class AccountsModule {}
