@@ -6,9 +6,9 @@ import path from 'node:path';
 
 import pg from 'pg';
 
-import { analyserMigration, type Violation } from './analyse.ts';
+import { analyserMigration, type Violation } from './analysis.ts';
 import { analyserSchema } from './introspection.ts';
-import { lireEnv } from '../stack/fichiers.ts';
+import { lireEnv } from '../stack/files.ts';
 
 const RACINE = path.resolve(import.meta.dirname, '../..');
 const DOSSIER_MIGRATIONS = path.join(RACINE, 'drizzle');

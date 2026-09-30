@@ -14,7 +14,7 @@ export default defineConfig({
         test: {
           name: 'back',
           include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
-          globalSetup: ['test/preparer-base.ts'],
+          globalSetup: ['test/setup-db.ts'],
           // Une seule base de test par worktree : les fichiers s'exécutent l'un après l'autre.
           fileParallelism: false,
         },
@@ -23,7 +23,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts', 'tools/**/*.ts'],
-      exclude: ['**/*.test.ts', 'src/entrees/*/main.ts', 'tools/*/cli.ts', 'src/*/index.ts'],
+      exclude: ['**/*.test.ts', 'src/{routes,worker,cli}/main.ts', 'tools/*/cli.ts', 'src/*/index.ts'],
       // Seuils à cliquet (PLAN §8) : `autoUpdate` les remonte quand la couverture progresse,
       // jamais ne les baisse ; la CI échoue en dessous. Au moins 90 % sur le domaine.
       thresholds: {
@@ -32,8 +32,8 @@ export default defineConfig({
         functions: 92,
         branches: 86,
         statements: 94,
-        'src/domaine/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
-        'src/contrats/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
+        'src/domain/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
+        'src/contracts/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
       },
     },
   },

@@ -1,5 +1,5 @@
 // Session courante côté front : « qui suis-je », connexion, inscription, déconnexion (TanStack Query).
-import { type Connexion, type Inscription, routesAuth, type Utilisateur } from '@contrats';
+import { type Connexion, type Inscription, routesAuth, type Utilisateur } from '@contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { appeler, ErreurAppel } from '@/api/client';

@@ -52,17 +52,22 @@ hasard) et vérifie que les ports sont libres. En cas de collision :
 | `pnpm test` | tests des outils, du back (intégration sur la base `ardha_test` du worktree) et du front, avec couverture |
 | `pnpm lint` · `pnpm typecheck` | lint (dont les frontières de l'architecture) ; types |
 | `pnpm doctrine [--base]` | contrôle « base bête » des migrations ; `--base` : aussi le schéma migré |
-| `pnpm migration:generate` | nouvelle migration SQL depuis `src/base/schema.ts` |
+| `pnpm migration:generate` | nouvelle migration SQL depuis `src/db/schema.ts` |
 | `pnpm cli <commande>` | CLI métier (`pnpm cli --help`) |
 
 ## Structure
 
 ```
 src/                   le back (NestJS)
-  domaine/             règles pures, sans framework
-  contrats/            schémas zod des routes, partagés avec le front ; OpenAPI dérivé
-  comptes/ journal/ base/ commun/ config/     cœur du back : services, repositories, Drizzle
-  entrees/api|worker|cli/                     points d'entrée : simples entrées-sorties
+  domain/              règles pures, sans framework
+  contracts/           schémas zod des routes, partagés avec le front ; OpenAPI dérivé
+  accounts/            comptes : services et repositories
+  audit/               journal d'audit
+  db/                  schéma Drizzle, connexion, migrations
+  shared/ config/      briques communes, configuration
+  routes/              point d'entrée API : contrôleurs et couche HTTP (gardes, limiteur, erreurs)
+  worker/              point d'entrée worker : files BullMQ
+  cli/                 point d'entrée CLI : commandes
 drizzle/               migrations SQL, en avant seulement
 test/                  tests d'intégration du back
 frontend/              le front (React, Vite, TanStack Query, Tailwind, shadcn/ui)
@@ -70,6 +75,6 @@ tools/                 stack par worktree, contrôle de doctrine, inventaire de 
 ```
 
 Règles tenues par le lint : le domaine n'importe rien hors de son dossier ; le contrat ne dépend que
-du domaine et de zod ; Drizzle reste dans `src/base` et les repositories ; le front n'importe du back
-que `@contrats` et `@domaine`. La base est « bête » : ni trigger, ni fonction SQL, ni policy — la CI
+du domaine et de zod ; Drizzle reste dans `src/db` et les repositories ; le front n'importe du back
+que `@contracts` et `@domain`. La base est « bête » : ni trigger, ni fonction SQL, ni policy — la CI
 refuse une migration qui en contient.

@@ -95,15 +95,15 @@ Aucune règle métier d'urbanisme dans ce lot. Règles de sécurité retenues ou
 
 ## Conception cible
 
-- **Données** (client, `src/base/schema.ts`, migration `drizzle/0001_socle.sql`) :
+- **Données** (client, `src/db/schema.ts`, migration `drizzle/0001_socle.sql`) :
   `utilisateur` (e-mail normalisé unique, nom, hash argon2id — nul tant qu'un compte créé par la CLI
   n'a pas choisi son mot de passe —, rôle `admin` ou `utilisateur`, date de désactivation) ;
   `session` (empreinte SHA-256 du jeton, échéance glissante, échéance absolue, IP, agent) ;
   `reinitialisation_mot_de_passe` (empreinte, échéance, date d'utilisation) ; `journal_audit`
   (origine `api`, `cli` ou `worker`, acteur, action, cible, détails sans secret, IP).
-- **Règles pures** (`src/domaine`) : politique de mot de passe, normalisation de l'e-mail, échéances de
+- **Règles pures** (`src/domain`) : politique de mot de passe, normalisation de l'e-mail, échéances de
   session, lien de réinitialisation.
-- **Contrat** (`src/contrats`) : `POST /api/auth/signup`, `POST /api/auth/login`,
+- **Contrat** (`src/contracts`) : `POST /api/auth/signup`, `POST /api/auth/login`,
   `POST /api/auth/logout`, `GET /api/auth/me`, `POST /api/auth/password-reset`,
   `GET /api/health` ; document OpenAPI sur `GET /api/openapi.json`.
 - **API** : toute route exige une session sauf `@Publique()` ; `@RoleRequis('admin')` pour les routes

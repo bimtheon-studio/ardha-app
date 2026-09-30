@@ -3,8 +3,8 @@ import { CommandTestFactory } from 'nest-commander-testing';
 import pg from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CliModule } from '../src/entrees/cli/cli.module.ts';
-import { configDeTest } from './environnement.ts';
+import { CliModule } from '../src/cli/cli.module.ts';
+import { configDeTest } from './env.ts';
 
 const config = configDeTest();
 let pool: pg.Pool;

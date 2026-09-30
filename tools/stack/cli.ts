@@ -8,10 +8,10 @@ import { execFileSync, spawn, spawnSync, type ChildProcess } from 'node:child_pr
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { adresses, lien } from './adresses.ts';
-import { contexteCourant, type Contexte } from './contexte.ts';
-import { nouveauxSecrets, override, secretsExistants, upsertBloc, variables } from './fichiers.ts';
-import { portVraimentLibre } from './libre.ts';
+import { adresses, lien } from './addresses.ts';
+import { contexteCourant, type Contexte } from './context.ts';
+import { nouveauxSecrets, override, secretsExistants, upsertBloc, variables } from './files.ts';
+import { portVraimentLibre } from './free-port.ts';
 import { LIBELLES, type Service } from './ports.ts';
 
 const SERVICES_DOCKER: Service[] = ['postgres', 'redis', 'minio', 'minioConsole'];

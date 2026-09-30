@@ -1,7 +1,7 @@
-import { routesAuth } from '@contrats';
+import { routesAuth } from '@contracts';
 import { describe, expect, it, vi } from 'vitest';
 
-import { alice, fausseApi } from '@/test/outils';
+import { alice, fausseApi } from '@/test/helpers';
 
 import { appeler, ErreurAppel } from './client';
 

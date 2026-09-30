@@ -5,7 +5,7 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { analyserSchema } from './introspection.ts';
-import { urlDeTest } from './url-de-test.ts';
+import { urlDeTest } from './test-url.ts';
 
 const url = urlDeTest();
 const nom = `doctrine_${randomBytes(4).toString('hex')}`;

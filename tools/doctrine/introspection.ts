@@ -1,6 +1,6 @@
 // Contrôle de la doctrine sur le schéma d'une base migrée : ce que le texte des migrations
 // pourrait cacher (SQL dynamique, extension qui crée des objets) se voit dans le catalogue.
-import { EXTENSIONS_AUTORISEES } from './analyse.ts';
+import { EXTENSIONS_AUTORISEES } from './analysis.ts';
 
 export interface Requeteur {
   query<T>(sql: string): Promise<{ rows: T[] }>;

@@ -1,8 +1,8 @@
 // Lint du dépôt. Au-delà du style, il tient les frontières de l'architecture :
-//  - le domaine (`src/domaine`) est pur : aucun import hors de son dossier ;
-//  - le contrat (`src/contrats`) ne dépend que du domaine et de zod ;
-//  - Drizzle ne sort pas de `src/base` et des repositories (D-06) ;
-//  - le front n'importe du back que le contrat et le domaine (`@contrats`, `@domaine`).
+//  - le domaine (`src/domain`) est pur : aucun import hors de son dossier ;
+//  - le contrat (`src/contracts`) ne dépend que du domaine et de zod ;
+//  - Drizzle ne sort pas de `src/db` et des repositories (D-06) ;
+//  - le front n'importe du back que le contrat et le domaine (`@contracts`, `@domain`).
 import js from '@eslint/js';
 import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
@@ -35,31 +35,31 @@ export default tseslint.config(
   { files: ['**/*.js', 'drizzle.config.ts'], ...tseslint.configs.disableTypeChecked },
   {
     files: ['src/**/*.ts'],
-    ignores: ['src/base/**', 'src/**/*.repository.ts', 'src/**/*.test.ts'],
+    ignores: ['src/db/**', 'src/**/*.repository.ts', 'src/**/*.test.ts'],
     rules: {
       'no-restricted-imports': restreindre({
         group: ['drizzle-orm', 'drizzle-orm/*'],
-        message: 'Drizzle reste dans src/base et les repositories (D-06).',
+        message: 'Drizzle reste dans src/db et les repositories (D-06).',
       }),
     },
   },
   {
-    files: ['src/domaine/**/*.ts'],
+    files: ['src/domain/**/*.ts'],
     ignores: ['**/*.test.ts'],
     rules: {
       'no-restricted-imports': restreindre({
         regex: '^(?!\\./)',
-        message: 'Le domaine est pur : ni framework, ni base, ni import hors de src/domaine.',
+        message: 'Le domaine est pur : ni framework, ni base, ni import hors de src/domain.',
       }),
     },
   },
   {
-    files: ['src/contrats/**/*.ts'],
+    files: ['src/contracts/**/*.ts'],
     ignores: ['**/*.test.ts'],
     rules: {
       'no-restricted-imports': restreindre({
-        regex: '^(?!\\./|\\.\\./domaine/|zod$)',
-        message: 'Le contrat ne dépend que de src/domaine et de zod : le front l’importe.',
+        regex: '^(?!\\./|\\.\\./domain/|zod$)',
+        message: 'Le contrat ne dépend que de src/domain et de zod : le front l’importe.',
       }),
     },
   },
@@ -71,7 +71,7 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       'no-restricted-imports': restreindre({
         regex: '^\\.\\./',
-        message: 'Du back, le front n’importe que @contrats et @domaine ; dans le front, utiliser @/.',
+        message: 'Du back, le front n’importe que @contracts et @domain ; dans le front, utiliser @/.',
       }),
     },
   },

@@ -3,9 +3,9 @@ import type pg from 'pg';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { POOL } from '../src/base/base.ts';
-import { UtilisateursService } from '../src/comptes/utilisateurs.service.ts';
-import { type ApplicationDeTest, applicationDeTest } from './application.ts';
+import { POOL } from '../src/db/db.ts';
+import { UtilisateursService } from '../src/accounts/users.service.ts';
+import { type ApplicationDeTest, applicationDeTest } from './test-app.ts';
 
 const MOT_DE_PASSE = 'cheval pomme agrafe';
 const JOUR = 24 * 3600 * 1000;

@@ -3,9 +3,9 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
-import { pageDeRetour } from '@/auth/RouteProtegee';
-import { initiales } from '@/composants/Coquille';
-import { afficher, alice, fausseApi, sansSession } from '@/test/outils';
+import { pageDeRetour } from '@/auth/ProtectedRoute';
+import { initiales } from '@/components/Shell';
+import { afficher, alice, fausseApi, sansSession } from '@/test/helpers';
 
 describe('route protégée', () => {
   it('sans session, / mène à la connexion (Q8)', async () => {

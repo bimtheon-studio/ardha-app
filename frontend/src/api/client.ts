@@ -1,6 +1,6 @@
-// Client de l'API, tiré des routes du contrat (`src/contrats`) : chemin, méthode, corps et réponse
+// Client de l'API, tiré des routes du contrat (`src/contracts`) : chemin, méthode, corps et réponse
 // typés, réponse validée à l'arrivée.
-import { type CorpsDe, ErreurApi, type ReponseDe, type Route } from '@contrats';
+import { type CorpsDe, ErreurApi, type ReponseDe, type Route } from '@contracts';
 
 export class ErreurAppel extends Error {
   constructor(

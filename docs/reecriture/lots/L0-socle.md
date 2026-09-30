@@ -22,8 +22,8 @@ connexion par e-mail et mot de passe, **aucun e-mail envoyé en v1**, pas de pro
    porteur du produit dans ce pane et attendre ses réponses** avant de coder ce qui en dépend ; avancer
    en attendant sur l'infrastructure (étapes 3 à 6), qui n'en dépend pas.
 3. **Structure du dépôt** (revue par le porteur du produit le 30/09/2026) : le back NestJS **à la
-   racine** — `src/domaine` (règles pures), `src/contrats` (schémas partagés front ↔ API), le cœur
-   (services, repositories), et `src/entrees/{api,worker,cli}`, simples entrées-sorties — et le front
+   racine** — `src/domain` (règles pures), `src/contracts` (schémas partagés front ↔ API), le cœur
+   (services, repositories), et `src/{routes,worker,cli}`, simples entrées-sorties — et le front
    dans `frontend/` (React, Vite, TanStack Query, Tailwind, primitives shadcn/ui reprises telles
    quelles). Versions épinglées (`mise.toml`, `engines`).
 4. **Stack locale compatible worktree** : `docker compose` avec Postgres 18 (image PostGIS 3.6 à laquelle
