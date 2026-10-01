@@ -90,8 +90,9 @@ jobs:
       - name: Build
         run: pnpm build
 
-      # Navigateur en cache (clé : version de Playwright) ; les bibliothèques système s'installent
-      # à chaque passage (apt, hors cache).
+      # Navigateur en cache (clé : version de Playwright). Pas d'apt : le runner ubuntu-24.04 a déjà
+      # les bibliothèques de Chromium (install-deps n'ajoutait que des polices CJK et dépendait d'un
+      # miroir parfois très lent : 5 min 33 le 01/10/2026).
       - name: Version de Playwright
         id: playwright
         run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
@@ -104,11 +105,8 @@ jobs:
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
 
       - name: Chromium des tests e2e
-        env:
-          HIT: ${{ steps.chromium-cache.outputs.cache-hit }}
-        run: |
-          if [[ $HIT == true ]]; then pnpm exec playwright install-deps chromium
-          else pnpm exec playwright install --with-deps chromium; fi
+        if: steps.chromium-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install chromium
 
       # Stack jetable (base ardha_e2e, sources enregistrées, tuiles servies par le test) : sans Internet.
       - name: Tests e2e
