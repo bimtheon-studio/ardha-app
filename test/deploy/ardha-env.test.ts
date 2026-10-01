@@ -184,6 +184,17 @@ describe('ardha-env', () => {
     }
   });
 
+  it('admin-link : crée l’admin de recette, puis renouvelle son lien ; PR seulement, permis à la CI', () => {
+    const first = ci('admin-link pr-1');
+    expect(first.out).toMatch(/Administrateur créé : recette@ardha\.test/);
+    expect(first.out).toMatch(/^http:\/\/ardha-pr-1\.test\.local\/reset-password#\S+$/m);
+    const again = ok('admin-link', 'pr-1');
+    expect(again).toMatch(/^http:\/\/ardha-pr-1\.test\.local\/reset-password#\S+$/m);
+    expect(again).not.toMatch(/Administrateur créé/);
+    expect(ardhaEnv('admin-link', 'production').err).toMatch(/environnements de PR seulement/);
+    expect(ci('admin-link production').err).toMatch(/commande refusée à la CI/);
+  });
+
   it('mode ci : liste, journaux et balayage permis ; « ardha/ardha-env » en tête (pnpm server) accepté', () => {
     expect(ci('ardha/ardha-env list').out).toMatch(/^pr-1\t/m);
     expect(ci('logs pr-1 --tail 5').code).toBe(0);

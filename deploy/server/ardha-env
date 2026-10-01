@@ -12,6 +12,7 @@
 #   ardha-env logs <nom> [--tail <n>] [--follow]     journaux du conteneur
 #   ardha-env exec <nom> <commande…>                 commande dans le conteneur (once exec)
 #   ardha-env psql <nom> [arguments de psql…]        psql sur la base de l'environnement
+#   ardha-env admin-link pr-<n>                      admin de recette : création ou nouveau lien (24 h)
 #   ardha-env sweep --keep <pr-1,pr-7,…>             supprime les PR absentes de la liste (fermées)
 #   ardha-env ci                                     commande forcée de la clé SSH de la CI
 #
@@ -310,6 +311,22 @@ cmd_psql() {
   docker exec -i "${tty[@]}" "$POSTGRES" psql -U postgres -d "$(database_of "$name")" "$@"
 }
 
+# Admin de recette d'un environnement de PR, pour la CI qui poste son lien dans la PR : créé s'il
+# n'existe pas, sinon nouveau lien (à usage unique, 24 h). Décision du porteur du produit
+# (01/10/2026) : lien posté malgré le dépôt public.
+cmd_admin_link() {
+  local name=${1:-} email=${ARDHA_PR_ADMIN_EMAIL:-recette@ardha.test}
+  check_name "$name"
+  [[ $name == pr-* ]] || die "admin-link : environnements de PR seulement"
+  local host
+  host=$(host_of "$name")
+  if "$ONCE" exec "$host" ardha user:list | grep -q "^$email"$'\t'; then
+    "$ONCE" exec "$host" ardha user:reset-password --email "$email"
+  else
+    "$ONCE" exec "$host" ardha user:create-admin --email "$email" --name Recette
+  fi
+}
+
 cmd_sweep() {
   local keep=''
   while (($#)); do
@@ -348,6 +365,7 @@ cmd_ci() {
   case $command in
     list) (($# == 1)) || refuse ;;
     create | remove) [[ $name =~ ^pr-[0-9]{1,6}$ ]] || refuse ;;
+    admin-link) [[ $name =~ ^pr-[0-9]{1,6}$ && $# == 2 ]] || refuse ;;
     update) [[ $name =~ ^(production|pr-[0-9]{1,6})$ ]] || refuse ;;
     logs) [[ $name =~ ^(production|pr-[0-9]{1,6})$ && ($# == 2 || ($# == 4 && $3 == --tail && $4 =~ ^[0-9]{1,5}$)) ]] || refuse ;;
     sweep) [[ ${2:-} == --keep && $# -le 3 ]] || refuse ;;
@@ -360,7 +378,7 @@ cmd_ci() {
       ;;
     remove) (($# == 2)) || refuse ;;
   esac
-  "cmd_$command" "${@:2}"
+  "cmd_${command//-/_}" "${@:2}"
 }
 
 command=${1:-}
@@ -375,6 +393,7 @@ case $command in
   exec) cmd_exec "$@" ;;
   psql) cmd_psql "$@" ;;
   sweep) cmd_sweep "$@" ;;
+  admin-link) cmd_admin_link "$@" ;;
   ci) cmd_ci ;;
   *) usage ;;
 esac

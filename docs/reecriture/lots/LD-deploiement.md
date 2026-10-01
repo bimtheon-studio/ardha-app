@@ -92,6 +92,14 @@ Ce que le code de once v0.3.3 impose (lu dans `internal/docker` et `internal/com
   ghcr.io publique possible : once la tire sans identifiants. Les PR venues d'un fork ne doivent
   pas déployer (pas de secrets ni d'accès au serveur pour elles). Push sur demande du porteur du
   produit seulement.
+- **Le dépôt passera en privé à terme** ; d'ici là, priorité au fonctionnel (porteur du produit,
+  01/10/2026). Le jour du passage en privé, le paquet ghcr.io le suivra : poser
+  `REGISTRY_USERNAME` et `REGISTRY_PASSWORD` (jeton `read:packages`) dans `~/ardha/secrets.env`,
+  puis `update` de chaque environnement avec `--registry-…` (once garde les identifiants d'un
+  déploiement à l'autre).
+- **Lien de l'admin de recette posté dans la PR malgré le dépôt public** (porteur du produit,
+  01/10/2026, risque accepté) : admin `recette@ardha.test`, lien à usage unique valable 24 h,
+  reposté à chaque base neuve (`ardha-env admin-link`, permis à la CI).
 - Hôte de production : **`ardha.once.florent.cc`** ; PR : `ardha-pr-<n>.once.florent.cc`.
 - Mémoire : Postgres ~512 Mo, Redis 64 Mo, production `--memory 1024`, PR `--memory 512`, **au plus
   4 environnements de PR** à la fois (le 5e est refusé). Plafonds à revoir après mesure de l'image.
