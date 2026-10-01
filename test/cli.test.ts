@@ -4,6 +4,7 @@ import pg from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CliModule } from '../src/cli/cli.module.ts';
+import { REFERENCE_COMMUNES } from '../src/ingestion/reference-seed.ts';
 import { testConfig } from './env.ts';
 
 const config = testConfig();
@@ -32,20 +33,18 @@ async function run(...args: string[]): Promise<void> {
 }
 
 describe('CLI', () => {
-  it('migrate est idempotent ; seed charge les communes de référence une fois', async () => {
-    await pool.query('TRUNCATE communes, parcels, source_states CASCADE');
+  it('migrate est idempotent ; seed charge une commune de référence une fois', async () => {
+    await pool.query(`DELETE FROM source_states WHERE scope = '37023'`);
     await run('migrate');
-    await run('seed');
-    await run('seed');
+    await run('seed', '37023');
+    await run('seed', '37023');
     expect(output).toEqual([
       'Migrations à jour.',
-      'Seed : Maisons-Alfort (94046) chargée, 5873 parcelles, millésime 2026-09-01.',
-      'Seed : Tours (37261) chargée, 30668 parcelles, millésime 2026-09-01.',
       'Seed : Beaumont-Village (37023) chargée, 1145 parcelles, millésime 2026-09-01.',
-      'Seed : Maisons-Alfort (94046) déjà à jour, 5873 parcelles, millésime 2026-09-01.',
-      'Seed : Tours (37261) déjà à jour, 30668 parcelles, millésime 2026-09-01.',
       'Seed : Beaumont-Village (37023) déjà à jour, 1145 parcelles, millésime 2026-09-01.',
     ]);
+    // Sans argument, les quatre communes de référence (rejoué en entier par l'e2e et `pnpm start`).
+    expect(REFERENCE_COMMUNES).toEqual(['94046', '74010', '37261', '37023']);
   });
 
   it('crée un administrateur et affiche le lien pour choisir son mot de passe', async () => {

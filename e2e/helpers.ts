@@ -2,12 +2,12 @@
 // de la carte à l'écran (projection Web Mercator de Leaflet).
 import { expect, type Page } from '@playwright/test';
 
-/** PNG transparent de 1 × 1 : les tuiles IGN ne sortent pas vers Internet pendant les tests. */
+/** PNG transparent de 1 × 1 : les tuiles (IGN, OpenStreetMap) ne sortent pas vers Internet pendant les tests. */
 const BLANK_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 
 export async function offlineTiles(page: Page): Promise<string[]> {
   const tiles: string[] = [];
-  await page.route(/^https:\/\/data\.geopf\.fr\/wmts/, (route) => {
+  await page.route(/^https:\/\/(data\.geopf\.fr\/wmts|tile\.openstreetmap\.org\/)/, (route) => {
     tiles.push(route.request().url());
     return route.fulfill({ status: 200, contentType: 'image/png', body: BLANK_PNG });
   });

@@ -14,8 +14,11 @@ import { Communes } from '../sources/communes.ts';
 import { RecordedHttp } from '../sources/http.ts';
 import { CadastreLoader } from './cadastre-loader.ts';
 
-/** Maisons-Alfort (PLUi à secteurs), Tours (PLU de grande ville), Beaumont-Village (RNU). */
-export const REFERENCE_COMMUNES = ['94046', '37261', '37023'] as const;
+/**
+ * Maisons-Alfort (PLUi à secteurs) et Annecy, communes des adresses de référence ; Tours (PLU de
+ * grande ville) ; Beaumont-Village (RNU, le cas sans règlement). F-01, Q11.
+ */
+export const REFERENCE_COMMUNES = ['94046', '74010', '37261', '37023'] as const;
 
 export interface SeededCommune {
   code: string;

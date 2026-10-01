@@ -111,7 +111,7 @@ beforeEach(() => {
 afterEach(() => localStorage.clear());
 
 describe('carte : parcelles et sélection', () => {
-  it('loin : invite à zoomer ; près : parcelles de la commune, sélection contiguë, totaux, URL', async () => {
+  it('loin : invite à zoomer ; près : parcelles de la commune, sélection, totaux, URL', async () => {
     api();
     await openMap();
     expect(screen.getByText('Recherchez une adresse, ou zoomez pour afficher les parcelles.')).toBeInTheDocument();
@@ -126,9 +126,25 @@ describe('carte : parcelles et sélection', () => {
     expect(screen.getByTestId('total-area').textContent).toMatch(/^1\d\d m²$/);
     expect(screen.getByTestId('url')).toHaveTextContent('parcels=94046000AB0000%2C94046000AB0001');
 
-    // Une parcelle qui ne touche pas la sélection est refusée, avec la raison.
+    // Sélection libre (Q4) : une parcelle isolée s'ajoute, et la sélection est dite en morceaux.
     await userEvent.click(screen.getByRole('button', { name: 'parcelle AB 5' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('La parcelle doit toucher la sélection.');
+    expect(within(list).getAllByRole('listitem')).toHaveLength(3);
+    expect(screen.getByText('La sélection est en 2 morceaux : elle n’est plus d’un seul tenant.')).toBeInTheDocument();
+  });
+
+  it('au-delà de 50 parcelles, refus expliqué', async () => {
+    const ids = Array.from({ length: 50 }, (_, i) => parcel(i).id).join(',');
+    api({
+      'GET /api/parcels': (_: unknown, url: URL) => {
+        const all = Array.from({ length: 51 }, (_, i) => parcel(i));
+        const wanted = url.searchParams.get('ids')?.split(',');
+        return { status: 200, body: { type: 'FeatureCollection', features: wanted ? all.filter((f) => wanted.includes(f.id)) : all, truncated: false } };
+      },
+    });
+    await openMap(`/map?parcels=${ids}`);
+    viewAt(near);
+    await userEvent.click(await screen.findByRole('button', { name: 'parcelle AB 50' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Une sélection compte au plus 50 parcelles.');
     await userEvent.click(screen.getByRole('button', { name: 'Fermer le message' }));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });

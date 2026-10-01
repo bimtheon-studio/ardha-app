@@ -20,7 +20,7 @@ pnpm start          # dépendances Docker, migrations, seed, puis API + worker +
 Le front s'ouvre sur l'adresse affichée (`http://127.0.0.1:14000` dans le clone principal).
 Ctrl-C arrête l'API, le worker et le front ; les conteneurs restent (`pnpm stop` pour les arrêter).
 
-Le seed charge le cadastre des trois communes de référence (Maisons-Alfort, Tours,
+Le seed charge le cadastre des communes de référence (Maisons-Alfort, Annecy, Tours,
 Beaumont-Village) depuis les réponses enregistrées de `fixtures/http`, sans Internet. Une autre
 commune se charge d'elle-même quand on la regarde sur la carte : c'est le worker qui va chercher son
 cadastre (il lui faut Internet ; `ARDHA_SOURCES=recorded` l'en prive).
@@ -72,6 +72,10 @@ La CLI pilote et débogue la chaîne sans le front :
 | `parcel:selection <IDU…>` | rejoue une sélection clic par clic (contiguïté, plafond), avec son résumé |
 | `address:search <texte…> [--inline]` · `address:reverse <lon> <lat>` | géocodage, par le worker ou sur place |
 | `source:record <url…>` | enregistre la réponse réelle d'une source dans `fixtures/http` |
+| `seed [codes…]` | sème les communes de référence, ou celles données |
+
+Pour enregistrer d'un coup tout ce dont une commande a besoin :
+`ARDHA_SOURCES=record pnpm cli commune:load --inline 74010`.
 
 ## Structure
 

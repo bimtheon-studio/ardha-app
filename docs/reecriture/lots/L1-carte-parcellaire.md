@@ -43,8 +43,9 @@
 ## État au 30/09/2026
 
 Critères de fin tenus en local (recette de [F-01](../fiches/F-01-carte-parcellaire.md#recette)).
-Reste : **confirmer les arbitrages provisoires Q1 à Q11** ; exécuter la CI sur GitHub (pas de
-remote) ; captures comparées à l'ancienne application.
+Arbitrages Q1 à Q11 rendus le 01/10/2026 et appliqués (sélection libre, OSM ajouté, Annecy et les
+adresses de référence). Reste : exécuter la CI sur GitHub (pas de remote) ; captures comparées à
+l'ancienne application.
 
 ## Critères de fin
 

@@ -5,6 +5,7 @@ import { expect, test } from '@playwright/test';
 import { offlineTiles, screenPoint, signUp } from './helpers.ts';
 
 // Deux parcelles contiguës de Maisons-Alfort (millésime 2026-09-01) et une troisième, à 12 m d'elles.
+// Adresses de référence (F-01, Q11) : 2 rue Étienne Dolet à Maisons-Alfort, 18 rue de Morette à Annecy.
 const AY96 = { lat: 48.7999887, lon: 2.4298255 };
 const AY97 = { lat: 48.8000665, lon: 2.4300124 };
 const AY98 = { lat: 48.8002762, lon: 2.4297286 };
@@ -15,20 +16,25 @@ test.beforeEach(async ({ page }) => {
   await signUp(page);
 });
 
-test('chercher une adresse : la carte s’y centre, sur le cadastre de la commune', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('link', { name: 'Choisir des parcelles' }).click();
-  await expect(page.getByText('Recherchez une adresse, ou zoomez pour afficher les parcelles.')).toBeVisible();
+for (const ref of [
+  { query: '2 rue Étienne Dolet Maisons-Alfort', label: '2 Rue Etienne Dolet 94700 Maisons-Alfort', commune: 'Maisons-Alfort', at: /at=48\.79\d+%2C2\.43\d+%2C18/ },
+  { query: '18 rue de Morette Annecy', label: '18 Rue de Morette 74000 Annecy', commune: 'Annecy', at: /at=45\.91\d+%2C6\.13\d+%2C18/ },
+]) {
+  test(`chercher « ${ref.query} » : la carte s’y centre, sur le cadastre de la commune`, async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('link', { name: 'Choisir des parcelles' }).click();
+    await expect(page.getByText('Recherchez une adresse, ou zoomez pour afficher les parcelles.')).toBeVisible();
 
-  await page.getByRole('combobox', { name: 'Adresse' }).fill('9 rue Pasteur Maisons-Alfort');
-  await page.getByRole('option', { name: /9 Rue Pasteur 94700 Maisons-Alfort/ }).click();
-  await expect(page.getByText('Maisons-Alfort · cadastre du 1er septembre 2026')).toBeVisible();
-  await expect(page).toHaveURL(/at=48\.80\d+%2C2\.4\d+%2C18/);
-  await expect(page.getByText('Recherchez une adresse, ou zoomez pour afficher les parcelles.')).toBeHidden();
-  await expect(page.locator('.leaflet-tooltip', { hasText: '9 Rue Pasteur 94700 Maisons-Alfort' })).toBeVisible();
-});
+    await page.getByRole('combobox', { name: 'Adresse' }).fill(ref.query);
+    await page.getByRole('option', { name: new RegExp(ref.label) }).click();
+    await expect(page.getByText(`${ref.commune} · cadastre du 1er septembre 2026`)).toBeVisible();
+    await expect(page).toHaveURL(ref.at);
+    await expect(page.getByText('Recherchez une adresse, ou zoomez pour afficher les parcelles.')).toBeHidden();
+    await expect(page.locator('.leaflet-tooltip', { hasText: ref.label })).toBeVisible();
+  });
+}
 
-test('sélectionner des parcelles contiguës au clic, refuser une parcelle isolée, garder la sélection', async ({ page }) => {
+test('sélectionner des parcelles au clic, signaler une sélection en morceaux, la garder au rechargement', async ({ page }) => {
   await page.goto(`/map?at=${VIEW.lat},${VIEW.lon},${VIEW.zoom}`);
   await expect(page.getByText('Maisons-Alfort · cadastre du 1er septembre 2026')).toBeVisible();
   const list = page.getByRole('list', { name: 'Parcelles' });
@@ -46,23 +52,28 @@ test('sélectionner des parcelles contiguës au clic, refuser une parcelle isol�
   await expect(page.getByTestId('total-contenance')).toHaveText('510 m²');
   await expect(page).toHaveURL(/parcels=94046000AY0096%2C94046000AY0097/);
 
+  // Sélection libre (Q4) : une parcelle isolée s'ajoute, et la sélection est dite en morceaux.
   await click(AY98);
-  await expect(page.getByRole('alert')).toHaveText('La parcelle doit toucher la sélection.');
-  await expect(list.getByRole('listitem')).toHaveCount(2);
+  await expect(list.getByRole('listitem')).toHaveCount(3);
+  await expect(page.getByText('La sélection est en 2 morceaux : elle n’est plus d’un seul tenant.')).toBeVisible();
 
   await page.reload();
-  await expect(page.getByRole('list', { name: 'Parcelles' }).getByRole('listitem')).toHaveCount(2);
+  await expect(page.getByRole('list', { name: 'Parcelles' }).getByRole('listitem')).toHaveCount(3);
+  await page.getByRole('button', { name: 'Retirer la parcelle AY 98' }).click();
+  await expect(page.getByText(/en 2 morceaux/)).toBeHidden();
   await page.getByRole('button', { name: 'Retirer la parcelle AY 96' }).click();
   await expect(page.getByRole('list', { name: 'Parcelles' }).getByRole('listitem')).toHaveCount(1);
   await expect(page.getByTestId('total-contenance')).toHaveText('270 m²');
 });
 
-test('fonds de carte IGN : plan par défaut, photographies au choix', async ({ page }) => {
+test('fonds de carte : plan IGN par défaut, photographies et OpenStreetMap au choix', async ({ page }) => {
   const tiles = await offlineTiles(page);
   await page.goto(`/map?at=${VIEW.lat},${VIEW.lon},17`);
   await expect.poll(() => tiles.some((t) => t.includes('PLANIGNV2'))).toBe(true);
   await page.getByRole('radio', { name: 'Photographies aériennes' }).check();
   await expect.poll(() => tiles.some((t) => t.includes('ORTHOIMAGERY.ORTHOPHOTOS'))).toBe(true);
+  await page.getByRole('radio', { name: 'OpenStreetMap' }).check();
+  await expect.poll(() => tiles.some((t) => t.startsWith('https://tile.openstreetmap.org/'))).toBe(true);
 });
 
 test.describe('sur mobile', () => {

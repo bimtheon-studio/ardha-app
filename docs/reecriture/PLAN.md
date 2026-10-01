@@ -242,8 +242,10 @@ estimation, coûts, dossier) :
 8. **Clore** : CI verte, seuil de couverture tenu, fiche mise à jour avec ses *écarts assumés*.
 
 **Communes de référence** : Maisons-Alfort (94046, PLUi Paris Est Marne & Bois à secteurs et blocs
-communaux, fixtures de l'extracteur voisin), Tours (37261, PLU de grande ville, couches vides corrigées
-le 28/09, #71), et une petite commune en carte communale ou au RNU, à choisir : le cas sans règlement.
+communaux, fixtures de l'extracteur voisin), Annecy (74010), Tours (37261, PLU de grande ville,
+couches vides corrigées le 28/09, #71), et Beaumont-Village (37023, au RNU) : le cas sans règlement.
+**Adresses de référence** (adresses des fondateurs) : 2 rue Étienne Dolet à Maisons-Alfort, 18 rue de
+Morette à Annecy. Arbitré le 01/10/2026 (F-01, Q11).
 
 ## 8. Worktrees et outillage
 
@@ -355,14 +357,14 @@ Prises en route pendant L0, le 30/09/2026, par l'agent de réécriture. Elles ne
 
 ### Décisions techniques de L1 (à relire)
 
-Prises en route pendant L1, le 30/09/2026, par l'agent de réécriture, porteur du
-produit absent. Les arbitrages fonctionnels provisoires sont dans [F-01](fiches/F-01-carte-parcellaire.md#questions-arbitrages-provisoires) (Q1 à Q11).
+Prises en route pendant L1, le 30/09/2026, par l'agent de réécriture, porteur du produit absent.
+Les arbitrages fonctionnels, rendus le 01/10/2026, sont dans [F-01](fiches/F-01-carte-parcellaire.md#questions-arbitrées-le-01102026) (Q1 à Q11).
 
 | N° | Décision | Plutôt que | Sur quoi elle repose |
 |---|---|---|---|
 | DT-20 | Recherches à la demande (adresse, commune d'un point) **par le worker en requête-réponse** : l'API dépose un job `lookups` et attend sa réponse 5 s au plus ; cache Redis 24 h ; débit limité à 40/s | l'API qui appelle la BAN | « seul le worker sort » (PLAN §3) tient sans exception ; ~50 ms de plus mesurés, sans effet sur l'autocomplétion (F-01, Q1) |
 | DT-21 | Cadastre : fichier **Etalab par commune et par millésime**, remplacé en une transaction ; IDU officiel à 14 caractères comme clé ; tables `communes`, `parcels`, `source_states` | WFS de la Géoplateforme par emprise | PLAN §4 ; une commune pèse 0,5 à 3 Mo et se charge en 1 à 3 s ; millésime connu, donc version citable par l'étude (L2) |
-| DT-22 | Adaptateurs de sources dans `src/sources`, chargeurs dans `src/ingestion`, **interdits hors du worker et de la CLI par le lint** (`fetch` compris) ; réponses réelles enregistrées dans `fixtures/http` (`pnpm cli source:record`), rejouées par `ARDHA_SOURCES=recorded` | simulations écrites à la main | D-09 : seed, tests et e2e sans Internet, sur le format réellement servi |
+| DT-22 | Adaptateurs de sources dans `src/sources`, chargeurs dans `src/ingestion`, **interdits hors du worker et de la CLI par le lint** (`fetch` compris) ; réponses réelles enregistrées dans `fixtures/http` (`pnpm cli source:record`, ou `ARDHA_SOURCES=record` devant n'importe quelle commande), rejouées par `ARDHA_SOURCES=recorded` | simulations écrites à la main | D-09 : seed, tests et e2e sans Internet, sur le format réellement servi |
 | DT-23 | Règles de sélection et aire géodésique **dans le domaine**, en TypeScript pur (écart < 10⁻⁵ avec PostGIS), partagées par le front et le back | calculs PostGIS seulement | réponse immédiate au clic, sans aller-retour ; mêmes règles à l'enregistrement de l'étude (L2) |
 | DT-24 | Carte : react-leaflet 5, rendu canvas, parcelles demandées **par cases de 0,01°** (cache réutilisé), au zoom ≥ 16 ; sélection et vue dans l'URL | un GeoJSON par déplacement de carte | D-08 (Leaflet en L1) ; milliers de polygones sans ralentir |
 | DT-25 | Tests d'intégration **en parallèle** : une base par worker de Vitest, clonée d'une base modèle migrée | une base unique, fichiers en série | 8,4 s → 3,5 s pour le back de L0 ; isolement des files BullMQ par préfixe de test |
@@ -377,13 +379,18 @@ produit absent. Les arbitrages fonctionnels provisoires sont dans [F-01](fiches/
 | LLM | Garder Azure OpenAI sur un compte propre, ou changer ? |
 | Extracteur voisin | Caler le format de sortie de `plui-extract` sur `reglement_segment` (conditionne L3) |
 | Fonds de carte | Quel taux d'erreurs de tuiles déclenche le proxy ? À fixer après quelques semaines de mesure |
-| Recette | Quelle petite commune en carte communale ou au RNU ? *Provisoire : Beaumont-Village (37023), RNU (F-01, Q11)* |
+| ~~Recette~~ | ~~Quelle petite commune en carte communale ou au RNU ?~~ Tranché le 01/10/2026 : Beaumont-Village (37023, RNU) ; Annecy ajoutée (F-01, Q11) |
 
 *Pour mémoire* : 5 études de l'ancienne base Lovable avaient été *différées* au transport du 13/09 (FK
 vers des comptes pas encore recréés) ; aucune migration ne les a réinjectées depuis, et l'ancienne base a
 été supprimée le 27/09. Sans conséquence pour la réécriture, qui repart de zéro.
 
 ## Journal
+
+- **01/10/2026** — arbitrages de F-01 rendus par le porteur du produit (Q1 à Q11) : Q1 à Q3, Q5 à Q7,
+  Q9, Q10 confirmés ; **sélection libre** avec avertissement (Q4) ; **OpenStreetMap** ajouté aux
+  fonds IGN (Q8) ; **Annecy** ajoutée aux communes de référence, avec deux adresses de référence
+  (Q11). Appliqués et recettés (e2e sur les deux adresses).
 
 - **30/09/2026** — **L1 livré sur `master`** (6f6b26a, 75d807b et suivants), porteur du produit absent :
   arbitrages Q1 à Q11 de F-01 **provisoires, à confirmer**. Cadastre Etalab par commune, recherche

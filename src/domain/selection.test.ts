@@ -20,28 +20,28 @@ describe('contiguïté', () => {
     expect(touches(parcel(0), far)).toBe(false);
   });
 
-  it('la 1ʳᵉ parcelle est libre ; les suivantes doivent toucher la sélection', () => {
-    expect(addRefusal([], parcel(5))).toBeNull();
-    expect(addRefusal([parcel(0)], parcel(1))).toBeNull();
-    expect(addRefusal([parcel(0)], parcel(3))).toBe('not-contiguous');
-    expect(addRefusal([parcel(0), parcel(2)], parcel(3))).toBeNull();
+  it('sélection libre (Q4) : une parcelle isolée s’ajoute, la sélection compte alors deux morceaux', () => {
+    expect(addRefusal([parcel(0)])).toBeNull();
+    const r = toggle([parcel(0)], parcel(3));
+    expect(r.action).toBe('added');
+    expect(pieces(r.selection)).toBe(2);
   });
 
   it('plafond de 50 parcelles', () => {
     const full = Array.from({ length: SELECTION_MAX }, (_, i) => parcel(i));
-    expect(addRefusal(full, parcel(SELECTION_MAX))).toBe('limit-reached');
+    expect(addRefusal(full)).toBe('limit-reached');
+    expect(toggle(full, parcel(SELECTION_MAX))).toMatchObject({ action: 'refused', refusal: 'limit-reached' });
     expect(REFUSAL_MESSAGES['limit-reached']).toContain('50');
   });
 });
 
 describe('toggle', () => {
-  it('ajoute, refuse, retire (même au milieu, ce qui coupe la sélection en morceaux)', () => {
+  it('ajoute, retire (même au milieu, ce qui coupe la sélection en morceaux)', () => {
     const a = toggle([], parcel(0));
     expect(a).toMatchObject({ action: 'added' });
     const b = toggle(a.selection, parcel(1));
     const c = toggle(b.selection, parcel(2));
     expect(c.selection.map((p) => p.id)).toEqual(['p0-0', 'p0-1', 'p0-2']);
-    expect(toggle(c.selection, parcel(9))).toMatchObject({ action: 'refused', refusal: 'not-contiguous' });
     const d = toggle(c.selection, parcel(1));
     expect(d).toMatchObject({ action: 'removed' });
     expect(pieces(d.selection)).toBe(2);

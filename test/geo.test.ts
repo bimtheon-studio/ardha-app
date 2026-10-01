@@ -37,11 +37,11 @@ describe('accès', () => {
     expect(r.status).toBe(401);
   });
 
-  it('sert les fonds de carte IGN', async () => {
+  it('sert les fonds de carte : IGN, et OpenStreetMap (Q8)', async () => {
     const r = await get('/api/map/layers');
     expect(r.status).toBe(200);
     expect(r.body).toEqual(MAP_LAYERS);
-    expect(r.body.basemaps.map((b: { id: string }) => b.id)).toEqual(['plan', 'ortho']);
+    expect(r.body.basemaps.map((b: { id: string }) => b.id)).toEqual(['plan', 'ortho', 'osm']);
   });
 });
 

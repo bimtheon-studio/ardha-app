@@ -24,9 +24,10 @@ const Schema = z.object({
   QUEUE_PREFIX: z.string().regex(/^[A-Za-z0-9:_-]+$/).default('ardha:bull'),
   /**
    * Sources publiques : `live` (Internet), `recorded` (réponses de `fixtures/http`, sans Internet :
-   * tests, e2e, démonstration hors ligne).
+   * tests, e2e, démonstration hors ligne), `record` (Internet, et chaque réponse est enregistrée
+   * dans `fixtures/http`).
    */
-  ARDHA_SOURCES: z.enum(['live', 'recorded']).default('live'),
+  ARDHA_SOURCES: z.enum(['live', 'recorded', 'record']).default('live'),
   FIXTURES_DIR: z.string().default(path.join(REPO_ROOT, 'fixtures/http')),
   /** Attente maximale d'une recherche confiée au worker, en millisecondes (F-01, Q1). */
   LOOKUP_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),

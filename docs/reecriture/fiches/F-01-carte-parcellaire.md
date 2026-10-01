@@ -1,6 +1,6 @@
 # F-01 · Carte et parcellaire : adresse, cadastre, sélection de parcelles
 
-> Lot : L1 · Statut : `recettée` (30/09/2026) — **arbitrages Q1 à Q11 provisoires, à confirmer par le porteur du produit**
+> Lot : L1 · Statut : `recettée` (30/09/2026) ; arbitrages Q1 à Q11 rendus par le porteur du produit le 01/10/2026
 > Ancien code : `bimtheon-studio/ardha` @ `2a7f9a0` (export de `origin/main` le 30/09/2026)
 
 ## Ce que voit l'utilisateur
@@ -24,7 +24,8 @@ Pas de capture : l'ancienne application tourne sur la constellation ; écrans d�
 ## Comportements
 
 Arbitrage : `D-xx` ou `PLAN §n` quand une décision le tranche ; `Qn` renvoie aux questions de fin de
-fiche, **arbitrées provisoirement par l'agent** (porteur du produit absent la nuit du 30/09).
+fiche : codées la nuit du 30/09 sur l'option recommandée, puis arbitrées par le porteur du produit
+le 01/10/2026 (Q4, Q8 et Q11 changés).
 
 | # | Comportement | Ancien code | Arbitrage | Note |
 |---|---|---|---|---|
@@ -38,10 +39,10 @@ fiche, **arbitrées provisoirement par l'agent** (porteur du produit absent la n
 | 8 | Recharge ±500 m autour de la sélection, fusion, 4 000 parcelles en mémoire | `src/pages/Cadastre.tsx:85-136` | abandonner | l'emprise visible suffit, la base répond vite |
 | 9 | `fitBounds` intempestif sur toutes les parcelles chargées | `src/components/CadastreMap.tsx:444-448` | corriger | la vue ne bouge que sur une adresse ou « Recentrer » |
 | 10 | Clic sur une parcelle : ajoute ou retire ; clic à vide : rien ; survol : `AB12` + commune | `src/components/CadastreMap.tsx:408-434`, `src/hooks/useParcelleSelection.ts:102-135` | garder | |
-| 11 | Une parcelle ajoutée doit toucher la sélection ; test **sommet à sommet**, tolérance 0,00005° | `src/hooks/useParcelleSelection.ts:111-129`, `src/utils/geometryUtils.ts:358-375` | garder la règle (Q4) ; test **par distance entre bords**, 1 m | l'ancien test rejetait deux parcelles qui partagent un bord sans sommet commun |
-| 12 | Retirer une parcelle du milieu laisse une sélection en morceaux, sans avertissement | `src/hooks/useParcelleSelection.ts:106-108` | corriger : retrait permis, avertissement « en N morceaux » (Q4) | |
+| 11 | Une parcelle ajoutée doit toucher la sélection ; test **sommet à sommet**, tolérance 0,00005° | `src/hooks/useParcelleSelection.ts:111-129`, `src/utils/geometryUtils.ts:358-375` | simplifier : sélection **libre** (Q4) ; contiguïté jugée par distance entre bords, 1 m, pour compter les morceaux | l'ancien test rejetait deux parcelles qui partagent un bord sans sommet commun |
+| 12 | Retirer une parcelle du milieu laisse une sélection en morceaux, sans avertissement | `src/hooks/useParcelleSelection.ts:106-108` | corriger : avertissement « en N morceaux », à l'ajout comme au retrait (Q4) | |
 | 13 | Aucun plafond de sélection | — | simplifier : 50 parcelles au plus (Q5) | |
-| 14 | Sélection sur plusieurs communes, si contiguë | implicite (`src/pages/Risques.tsx:84-95` déduplique les codes) | garder (Q6) | |
+| 14 | Sélection sur plusieurs communes | implicite (`src/pages/Risques.tsx:84-95` déduplique les codes) | garder (Q6) | |
 | 15 | Surface : contenance cadastrale, sinon estimation plane sans les trous ; total = somme | `src/hooks/useCadastreAPI.ts:51-73,100`, `src/hooks/useParcelleSelection.ts:153-155` | garder la contenance ; surface géométrique **avec les trous**, affichée à côté | `calculatePolygonArea` était faux (sans cos φ) |
 | 16 | Affichage `< 10 000` → « N m² », sinon « X.XX ha » | `src/components/ParcelSelectionContent.tsx:24-29` | garder, format français (« 1,25 ha ») | |
 | 17 | Identifiant maison `insee_prefixe_section_numero` ; IDU seulement dans le PDF | `src/hooks/useCadastreAPI.ts:76-103`, `src/utils/geometryUtils.ts:154-162` | remplacer : **IDU officiel à 14 caractères** partout, affiché dans le détail | |
@@ -50,7 +51,7 @@ fiche, **arbitrées provisoirement par l'agent** (porteur du produit absent la n
 | 20 | Sélection en `localStorage` (géométries complètes), expirée après 2 h d'inactivité, synchronisée entre onglets | `src/hooks/useParcelleSelection.ts:18-93` | simplifier : **dans l'URL** (`/map?parcels=…`) jusqu'à l'étude enregistrée (L2) ; expiration abandonnée (Q7) | |
 | 21 | Vue de carte en `localStorage` (`mapViewState`), France au zoom 6 par défaut | `src/components/CadastreMap.tsx:177-233` | garder, dans l'URL (`at=lat,lon,zoom`) | |
 | 22 | Clé `searchLocation` lue partout, jamais écrite : restauration morte | `src/pages/Cadastre.tsx:144-195` | abandonner | |
-| 23 | Fond OSM seul, option « estompé » | `src/config/mapConfig.ts:177-182`, `src/index.css:188-191` | remplacer : Plan IGN et photographies aériennes IGN (D-08, Q8) ; « estompé » gardé | |
+| 23 | Fond OSM seul, option « estompé » | `src/config/mapConfig.ts:177-182`, `src/index.css:188-191` | simplifier : Plan IGN (par défaut), photographies aériennes IGN (D-08) **et OSM** (Q8) ; « estompé » gardé | |
 | 24 | Bâtiments BD TOPO lus au WFS dans le navigateur, repli Overpass, cache IndexedDB | `src/hooks/useIGNAPI.ts:133-298`, `src/lib/wfsCache.ts` | reporter (Q9) | le Plan IGN montre déjà le bâti |
 | 25 | Adresses dérivées de la sélection (géocodage inverse de 12 points, tri par hiérarchie de voie) | `src/hooks/useParcelAddresses.ts` | reporter en L2 (adresse principale de l'étude) | filtre défaillant : boîte au lieu du polygone (#5 du scan) |
 | 26 | Altimétrie : résumé, mires, isolignes | `src/pages/Cadastre.tsx:332-356` | reporter en L4 (PLAN §6 : altimétrie dans Risques) | |
@@ -68,9 +69,9 @@ fiche, **arbitrées provisoirement par l'agent** (porteur du produit absent la n
   gauche) + numéro (4). Libellé affiché : section et numéro sans les zéros (`AB 12`), précédés du
   préfixe s'il n'est pas `000`.
 - **Contiguïté** : deux parcelles se touchent quand la distance entre leurs bords est d'au plus
-  **1 m** (tolérance aux imprécisions du plan cadastral). Une parcelle ajoutée doit toucher au moins
-  une parcelle déjà sélectionnée. Le nombre de morceaux d'une sélection est le nombre de composantes
-  connexes de cette relation.
+  **1 m** (tolérance aux imprécisions du plan cadastral). La sélection est libre (Q4) ; le nombre de
+  morceaux d'une sélection, signalé dès qu'il dépasse 1, est le nombre de composantes connexes de
+  cette relation.
 - **Surfaces** : la *contenance* est la surface cadastrale (m², donnée de la DGFiP) ; la *surface
   calculée* est l'aire géodésique approchée du polygone, trous déduits (projection locale
   équirectangulaire, écart < 0,1 % à l'échelle d'une parcelle). Totaux : sommes.
@@ -102,25 +103,28 @@ incohérent entre cadastre et BD TOPO ; courses entre recherches (#3) ; surface 
 
 - `src/utils/__tests__/geometryUtils.test.ts` (centroïde, surface, contiguïté, formatage) : pur ;
   les cas de contiguïté et de formatage sont repris, adaptés à la nouvelle règle.
-- `src/hooks/__tests__/useParcelleSelection.test.ts` : les règles (1ʳᵉ parcelle libre, rejet non
-  contigu, bascule, total) sont reprises en tests du domaine.
+- `src/hooks/__tests__/useParcelleSelection.test.ts` : bascule et total repris en tests du
+  domaine ; le rejet d'une parcelle non contiguë est abandonné (Q4).
 - Rien sur `useCadastreAPI`, `banGeocode`, `AddressSearch` ni la page : réécrits avec la page.
 
-## Questions (arbitrages provisoires)
+## Questions (arbitrées le 01/10/2026)
 
-| # | Question | Arbitrage provisoire de l'agent | Pour changer |
+Posées au porteur du produit le 01/10/2026 ; la colonne « Codé la nuit du 30/09 » dit ce qui avait
+été fait en attendant.
+
+| # | Question | Codé la nuit du 30/09 | Arbitrage |
 |---|---|---|---|
-| Q1 | La recherche d'adresse passe par le worker (l'API attend sa réponse, 5 s au plus) : acceptable pour une autocomplétion ? | oui : ~50 ms de plus qu'un appel direct, cache 24 h, et « seul le worker sort » tient | faire sortir l'API pour le seul géocodage (exception à PLAN §3) |
-| Q2 | Garder « Utiliser ma position » ? | garder | retirer le bouton |
-| Q3 | Commune pas encore chargée quand on navigue : la charger d'elle-même ? | oui, au zoom ≥ 16 (une commune ≈ 0,5 à 3 Mo, une fois par trimestre) | bouton « Charger le cadastre de … » |
-| Q4 | Contiguïté exigée à l'ajout ; retrait libre avec avertissement ? | oui aux deux | sélection libre (avertissement seul), ou retrait refusé |
-| Q5 | Plafond de sélection ? | 50 parcelles | `SELECTION_MAX` dans `src/domain/selection.ts` |
-| Q6 | Sélection sur plusieurs communes ? | permise si contiguë | la limiter à une commune |
-| Q7 | Où vit la sélection avant L2 ? | dans l'URL, partageable et rechargeable ; plus d'expiration | `localStorage` |
-| Q8 | Quels fonds ? | Plan IGN (par défaut), photographies aériennes ; option « estompé » | la configuration est servie par l'API (`/api/map/layers`) |
-| Q9 | Bâtiments en surimpression ? | reporter : le Plan IGN les montre ; le cadastre Etalab publie des bâtiments par commune si on en veut en vecteur | charger `cadastre-<code>-batiments` avec les parcelles |
-| Q10 | Mobile ? | même page, panneau en bas d'écran | |
-| Q11 | Petite commune de recette (question ouverte du PLAN) ? | **Beaumont-Village (37023)**, au RNU selon l'API Carto du GPU le 30/09/2026 | en choisir une autre |
+| Q1 | La recherche d'adresse passe par le worker (l'API attend sa réponse, 5 s au plus) : acceptable pour une autocomplétion ? | oui : ~50 ms de plus qu'un appel direct, cache 24 h, et « seul le worker sort » tient | **garder** : par le worker |
+| Q2 | Garder « Utiliser ma position » ? | garder | **garder** |
+| Q3 | Commune pas encore chargée quand on navigue : la charger d'elle-même ? | oui, au zoom ≥ 16 (une commune ≈ 0,5 à 3 Mo, une fois par trimestre) | **garder** : chargement automatique |
+| Q4 | Contiguïté exigée à l'ajout ; retrait libre avec avertissement ? | oui aux deux | **simplifier : sélection libre**, simple avertissement « en N morceaux » |
+| Q5 | Plafond de sélection ? | 50 parcelles | **garder** : 50 |
+| Q6 | Sélection sur plusieurs communes ? | permise | **garder** : permise |
+| Q7 | Où vit la sélection avant L2 ? | dans l'URL, partageable et rechargeable ; plus d'expiration | **garder** : dans l'URL |
+| Q8 | Quels fonds ? | Plan IGN (par défaut), photographies aériennes ; option « estompé » | **ajouter OpenStreetMap** aux fonds IGN |
+| Q9 | Bâtiments en surimpression ? | reporter : le Plan IGN les montre ; le cadastre Etalab publie des bâtiments par commune si on en veut en vecteur | **reporter** (à reprendre pour la faisabilité, L7) |
+| Q10 | Mobile ? | même page, panneau en bas d'écran | **garder** |
+| Q11 | Petite commune de recette (question ouverte du PLAN) ? | **Beaumont-Village (37023)**, au RNU selon l'API Carto du GPU le 30/09/2026 | **ajouter Annecy** et deux adresses de référence (adresses des fondateurs) : 18 rue de Morette à Annecy, 2 rue Étienne Dolet à Maisons-Alfort ; Tours et Beaumont-Village gardées |
 
 ## Conception cible
 
@@ -146,12 +150,13 @@ Le 30/09/2026, sur `master` (75d807b et suivants), stack du clone principal.
 
 | Cas | Résultat |
 |---|---|
-| Seed sans Internet (`pnpm seed`, réponses enregistrées) | Maisons-Alfort 5 873 parcelles, Tours 30 668, Beaumont-Village 1 145, millésime 2026-09-01 ; 2,5 s ; relancé : « déjà à jour » |
-| Maisons-Alfort, « 9 rue Pasteur » → clic sur AY 96 puis AY 97 | 2 parcelles, contenance 510 m², surface calculée 507 m² ; une parcelle à 12 m (AY 98) est refusée : « La parcelle doit toucher la sélection. » ; la sélection revient au rechargement |
+| Seed sans Internet (`pnpm seed`, réponses enregistrées) | Maisons-Alfort 5 873 parcelles, Annecy 32 167 (ajoutée le 01/10, Q11), Tours 30 668, Beaumont-Village 1 145, millésime 2026-09-01 ; relancé : « déjà à jour » |
+| Adresses de référence (01/10) : « 2 rue Étienne Dolet Maisons-Alfort », « 18 rue de Morette Annecy » | la carte se centre sur l'adresse, cadastre de la commune affiché (e2e) |
+| Maisons-Alfort, « 9 rue Pasteur » → clic sur AY 96 puis AY 97 | 2 parcelles, contenance 510 m², surface calculée 507 m² ; une parcelle à 12 m (AY 98) s'ajoute avec « La sélection est en 2 morceaux » (Q4 arbitrée) ; la sélection revient au rechargement |
 | Commune jamais chargée, par le worker en direct : Paris 11e (`commune:load 75111`) | prête en ~2 s, 4 629 parcelles ; `address:search` passe par le worker |
 | Corse : « 10 cours Napoléon Ajaccio » (2A004, refusé par l'ancien code, #19) | cadastre chargé de lui-même, prêt en 1,3 s, parcelles affichées |
 | Aire calculée comparée à PostGIS (`ST_Area(geography)`) | écart < 10⁻⁵ en métropole et en Martinique (tests du domaine) |
-| e2e (Chromium, stack jetable, sans Internet) | 6 scénarios, 12 s tout compris : compte, recherche d'adresse, sélection au clic, refus, rechargement, fonds, mobile |
+| e2e (Chromium, stack jetable, sans Internet) | 7 scénarios, 17 s tout compris : compte, deux adresses de référence, sélection au clic, morceaux, rechargement, fonds (IGN, OSM), mobile |
 
 Captures : `scratchpad` de la session (non versionnées) ; à reprendre en `captures/F-01-*.png` avec
 l'ancienne application côte à côte quand elle sera accessible hors constellation.
@@ -164,11 +169,13 @@ case vide) ; la mesure des erreurs de tuiles (D-08) attend Sentry (reporté, que
 - Le cadastre vient du fichier Etalab de la commune (millésime trimestriel), chargé par le worker,
   et non plus du WFS de la Géoplateforme interrogé par le navigateur (PLAN §3-4) : il peut avoir
   jusqu'à un trimestre de retard sur le plan cadastral de la DGFiP ; le millésime est affiché.
-- La contiguïté se juge à 1 m entre bords (#11) : deux parcelles qui se touchent par un bord sans
-  sommet commun sont acceptées ; deux parcelles séparées d'un chemin de 1 m aussi.
-- Retirer une parcelle peut laisser la sélection en morceaux : c'est dit, pas empêché (#12, Q4).
+- La sélection est libre (Q4) : une parcelle qui ne touche pas la sélection s'ajoute, et la
+  sélection est dite « en N morceaux » ; l'ancienne application la refusait.
+- Les morceaux se comptent à 1 m entre bords (#11) : deux parcelles qui se touchent par un bord
+  sans sommet commun forment un seul morceau ; deux parcelles séparées d'un chemin de 1 m aussi.
 - Plafond de 50 parcelles (#13, Q5).
 - La sélection vit dans l'URL, plus dans `localStorage` (Q7) ; plus d'expiration à 2 h.
 - L'IDU officiel remplace l'identifiant maison (#17).
-- Le fond OSM laisse la place aux fonds IGN (#23) ; les bâtiments BD TOPO ne sont plus superposés
-  (#24, Q9).
+- Le Plan IGN devient le fond par défaut, avec les photographies aériennes ; OSM reste au choix
+  (#23, Q8). Ses tuiles ont une politique d'usage à surveiller si le trafic grossit. Les bâtiments
+  BD TOPO ne sont plus superposés (#24, Q9).
