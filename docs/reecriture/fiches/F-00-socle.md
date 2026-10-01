@@ -105,7 +105,7 @@ Aucune règle métier d'urbanisme dans ce lot. Règles de sécurité retenues ou
   session, lien de réinitialisation.
 - **Contrat** (`src/contracts`) : `POST /api/auth/signup`, `POST /api/auth/login`,
   `POST /api/auth/logout`, `GET /api/auth/me`, `POST /api/auth/password-reset`,
-  `GET /api/health` ; document OpenAPI sur `GET /api/openapi.json`.
+  `GET /api/health` (remplacée par `GET /up` au lot LD, chemin imposé par once) ; document OpenAPI sur `GET /api/openapi.json`.
 - **API** : toute route exige une session sauf `@Publique()` ; `@RoleRequis('admin')` pour les routes
   d'administration ; limiteur sur la connexion (IP et e-mail), l'inscription et la réinitialisation
   (IP) ; contrôle d'origine sur toute requête qui modifie.

@@ -31,7 +31,7 @@ describe('urlOf', () => {
     expect(urlOf(r, { code: '2A004', id: 'a/b' }, { q: '8 rue', limit: 5, empty: undefined })).toBe(
       '/api/communes/2A004/parcels/a%2Fb?q=8+rue&limit=5',
     );
-    expect(urlOf({ ...r, path: '/api/health' })).toBe('/api/health');
+    expect(urlOf({ ...r, path: '/up' })).toBe('/up');
   });
 
   it('refuse un paramètre de chemin manquant', () => {

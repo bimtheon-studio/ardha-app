@@ -21,7 +21,27 @@ export function createDb(pool: pg.Pool): Db {
   return drizzle({ client: pool, schema, casing: 'snake_case' });
 }
 
-/** Joue les migrations en attente, dans l'ordre, chacune dans sa transaction. */
+/**
+ * Clé du verrou consultatif des migrations. Un verrou consultatif vaut pour une base : chaque
+ * environnement (une base chacun, D-13) a donc le sien.
+ */
+export const MIGRATION_LOCK = 7_302_118_001;
+
+/**
+ * Joue les migrations en attente, dans l'ordre, chacune dans sa transaction. Chaque conteneur les
+ * lance à son démarrage, et once démarre le nouveau avant d'arrêter l'ancien : un verrou consultatif
+ * (`pg_advisory_lock`, fonction native : la base reste « bête ») fait passer une session à la fois.
+ */
 export async function runMigrations(pool: pg.Pool): Promise<void> {
-  await migrate(createDb(pool), { migrationsFolder: MIGRATIONS_DIR });
+  const lock = await pool.connect();
+  try {
+    await lock.query('SELECT pg_advisory_lock($1)', [MIGRATION_LOCK]);
+    try {
+      await migrate(createDb(pool), { migrationsFolder: MIGRATIONS_DIR });
+    } finally {
+      await lock.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK]);
+    }
+  } finally {
+    lock.release();
+  }
 }

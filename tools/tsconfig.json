@@ -13,6 +13,7 @@
   "include": [
     "stack",
     "doctrine",
-    "test-perf"
+    "test-perf",
+    "server"
   ]
 }

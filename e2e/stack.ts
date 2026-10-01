@@ -58,7 +58,7 @@ if (!process.env.E2E_SKIP_FRONT_BUILD) run('pnpm', ['--filter', './frontend', 'r
 /** Le front relaie `/api` : il n'est lancé qu'une fois l'API prête (Playwright attend le front). */
 async function apiReady(): Promise<void> {
   for (let i = 0; i < 200; i++) {
-    const ok = await fetch(`http://127.0.0.1:${api}/api/health`).then((r) => r.ok, () => false);
+    const ok = await fetch(`http://127.0.0.1:${api}/up`).then((r) => r.ok, () => false);
     if (ok) return;
     await new Promise((r) => setTimeout(r, 100));
   }

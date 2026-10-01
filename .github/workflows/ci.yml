@@ -1,25 +1,42 @@
 # CI d'Ardha (PLAN §8) : types, lint, contrôle « base bête », tests unitaires et d'intégration sur
-# la stack Docker (migrations rejouées depuis une base vide), build, tests e2e dans Chromium.
+# la stack Docker (migrations rejouées depuis une base vide), build, tests e2e dans Chromium, image
+# de production construite (testée contre la stack si la PR touche au déploiement) puis publiée sur
+# ghcr.io (lot LD).
 # Chaque étape se rejoue en local avec la même commande `pnpm`.
 name: CI
 
 on:
   pull_request:
   push:
-    branches: [master, staging]
+    branches: [master]
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  # Publication de l'image sur ghcr.io avec le GITHUB_TOKEN (aucun jeton personnel).
+  packages: write
+
+env:
+  IMAGE_REPOSITORY: ghcr.io/bimtheon-studio/ardha
+  # Le commit testé et publié : la tête de la PR (pas le commit de fusion que GitHub construit par
+  # défaut), pour que l'étiquette sha-<7> désigne exactement ce commit.
+  COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+
 jobs:
-  verifier:
+  test:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       CI: 'true'
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.COMMIT }}
+          # Historique complet : comparaison avec la base de la PR (fichiers du déploiement).
+          fetch-depth: 0
 
       # Node et pnpm aux versions de mise.toml.
       - uses: jdx/mise-action@v3
@@ -36,6 +53,31 @@ jobs:
       - name: Doctrine « base bête » — migrations
         run: pnpm doctrine
 
+      # Ni les PR venues d'un fork (dépôt public : pas de droits d'écriture pour elles), ni rien
+      # d'autre qu'une PR ou master.
+      - name: Connexion à ghcr.io
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # pgvector se compile en ~35 s : l'image Postgres se construit une fois par contenu de
+      # docker/postgres (étiquette = empreinte git du dossier), se publie, puis se télécharge.
+      - name: Image Postgres (construite une fois, publiée sur ghcr.io)
+        env:
+          CAN_PUSH: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+        run: |
+          image="ghcr.io/bimtheon-studio/ardha-postgres:$(git rev-parse --short=12 HEAD:docker/postgres)"
+          echo "ARDHA_POSTGRES_IMAGE=$image" >> "$GITHUB_ENV"
+          if ! docker pull --quiet "$image"; then
+            docker build --quiet --tag "$image" docker/postgres
+            if [[ $CAN_PUSH == true ]]; then docker push --quiet "$image"; fi
+          fi
+          # Le Compose du serveur (tests d'ardha-env) attend l'étiquette locale : sans elle, il recompile.
+          docker tag "$image" ardha/postgres:18-3.6-pgvector-0.8.5
+
       - name: Stack (Postgres, Redis, MinIO), migrations depuis zéro, seed
         run: pnpm start --infra
 
@@ -48,8 +90,23 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Navigateur en cache (clé : version de Playwright). Pas d'apt : le runner ubuntu-24.04 a déjà
+      # les bibliothèques de Chromium (install-deps n'ajoutait que des polices CJK et dépendait d'un
+      # miroir parfois très lent : 5 min 33 le 01/10/2026).
+      - name: Version de Playwright
+        id: playwright
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache de Chromium
+        id: chromium-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
       - name: Chromium des tests e2e
-        run: pnpm exec playwright install --with-deps chromium
+        if: steps.chromium-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install chromium
 
       # Stack jetable (base ardha_e2e, sources enregistrées, tuiles servies par le test) : sans Internet.
       - name: Tests e2e
@@ -58,6 +115,60 @@ jobs:
           # Le front vient d'être construit ; le Chromium de Playwright plutôt que celui du système.
           E2E_SKIP_FRONT_BUILD: '1'
           ARDHA_CHROMIUM: ''
+
+      # Phase d'itération rapide (porteur du produit, 01/10/2026) : les tests du déploiement ne
+      # tournent que si la PR touche au déploiement ; jamais sur master. deploy-pr déploie de toute
+      # façon l'image en vrai.
+      - name: La PR touche-t-elle au déploiement ?
+        id: changes
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [[ -n $BASE ]] && ! git diff --quiet "$BASE...$COMMIT" -- Dockerfile .dockerignore docker deploy \
+               tools/server test/deploy src/launcher .github/workflows drizzle vitest.deploy.config.ts; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Image de l'application, avec le cache de couches d'Actions : apt (pg_dump) et pnpm install ne
+      # se refont que si leurs entrées changent. Builder à part (`use: false`) : les autres builds et
+      # Compose gardent le builder par défaut.
+      - name: Builder Docker avec cache
+        id: buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          use: false
+
+      - name: Image de production
+        uses: docker/build-push-action@v6
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          context: .
+          load: true
+          tags: ardha:ci
+          cache-from: type=gha,scope=ardha
+          cache-to: type=gha,mode=max,scope=ardha
+
+      # Image once (/up, front servi par l'API, connexion, seed, sauvegarde et restauration, arrêt
+      # propre) et script serveur ardha-env, avec un faux once qui lance cette image.
+      - name: Déploiement (image, ardha-env)
+        if: steps.changes.outputs.deploy == 'true'
+        run: pnpm test:deploy
+        env:
+          ARDHA_IMAGE: ardha:ci
+          # Construite à l'étape précédente : pas de second build.
+          ARDHA_IMAGE_BUILT: 'true'
+
+      # Étiquettes : sha-<7> (immuable, celle que l'on déploie), et pr-<n> ou master (mobiles).
+      - name: Publication de l'image
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          MOVING_TAG: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'master' }}
+        run: |
+          for tag in "sha-${COMMIT::7}" "$MOVING_TAG"; do
+            docker tag ardha:ci "$IMAGE_REPOSITORY:$tag"
+            docker push --quiet "$IMAGE_REPOSITORY:$tag"
+          done
+          echo "Image publiée : $IMAGE_REPOSITORY:sha-${COMMIT::7} ($MOVING_TAG)" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Rapport e2e
         if: failure()
@@ -70,3 +181,96 @@ jobs:
       - name: Journaux de la stack
         if: failure()
         run: docker compose logs --no-color --tail=200
+
+  # Environnement de la PR (ardha-pr-<n>.once.florent.cc), créé ou mis à jour avec l'image testée.
+  # Base recréée si ce push touche drizzle/. Jamais pour une PR venue d'un fork. Interrupteur :
+  # variable du dépôt DEPLOY_ONCE=true, posée une fois la clé SSH de la CI installée.
+  deploy-pr:
+    needs: test
+    if: vars.DEPLOY_ONCE == 'true' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    concurrency:
+      group: deploy-pr-${{ github.event.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pull-requests: write
+    environment:
+      name: pr-${{ github.event.number }}
+      url: https://ardha-pr-${{ github.event.number }}.once.florent.cc
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.COMMIT }}
+          fetch-depth: 0
+
+      - name: Accès SSH au serveur (clé à commande forcée, ardha-env ci)
+        env:
+          ONCE_SSH_KEY: ${{ secrets.ONCE_SSH_KEY }}
+          ONCE_KNOWN_HOSTS: ${{ secrets.ONCE_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$ONCE_SSH_KEY" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$ONCE_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Déploiement
+        id: deploiement
+        env:
+          NAME: pr-${{ github.event.number }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          image="$IMAGE_REPOSITORY:sha-${COMMIT::7}"
+          server() { ssh -o BatchMode=yes ubuntu@ssh.once.florent.cc "$*"; }
+          if server list | grep -q "^$NAME"$'\t'; then
+            reset=''
+            # Migrations modifiées par ce push (ou historique réécrit : on ne sait pas) : base neuve.
+            if ! git diff --quiet "$BEFORE" "$COMMIT" -- drizzle/ 2>/dev/null; then reset='--reset-db'; fi
+            server update "$NAME" --image "$image" $reset
+            # Un `&&` en dernière commande ferait échouer l'étape quand la base est gardée.
+            if [[ -n $reset ]]; then echo "fresh=true" >> "$GITHUB_OUTPUT"; fi
+          else
+            server create "$NAME" --image "$image"
+            echo "fresh=true" >> "$GITHUB_OUTPUT"
+          fi
+          # Comptes de l'équipe : la liste (e-mails, mots de passe) est lue sur le serveur ; la CI n'en
+          # voit que des nombres.
+          server accounts "$NAME"
+
+      # Base neuve : l'environnement annoncé dans la PR. Les comptes de l'équipe y sont, avec leurs
+      # mots de passe habituels ; ni e-mail ni mot de passe dans la PR (dépôt public).
+      - name: Lien de l'environnement dans la PR
+        if: steps.deploiement.outputs.fresh == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.number }}
+        run: |
+          body="Environnement de la PR : https://ardha-pr-$PR.once.florent.cc (image \`sha-${COMMIT::7}\`). Comptes de l'équipe prêts, mots de passe habituels."
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --edit-last --create-if-none --body "$body"
+
+  # master → production (ardha.once.florent.cc), avec l'image testée.
+  deploy-production:
+    needs: test
+    if: vars.DEPLOY_ONCE == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    environment:
+      name: production
+      url: https://ardha.once.florent.cc
+    steps:
+      - name: Accès SSH au serveur (clé à commande forcée, ardha-env ci)
+        env:
+          ONCE_SSH_KEY: ${{ secrets.ONCE_SSH_KEY }}
+          ONCE_KNOWN_HOSTS: ${{ secrets.ONCE_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$ONCE_SSH_KEY" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$ONCE_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Déploiement
+        run: |
+          ssh -o BatchMode=yes ubuntu@ssh.once.florent.cc "update production --image $IMAGE_REPOSITORY:sha-${COMMIT::7}"
+          ssh -o BatchMode=yes ubuntu@ssh.once.florent.cc "accounts production"

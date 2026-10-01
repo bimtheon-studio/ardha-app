@@ -1,0 +1,12 @@
+#!/bin/sh
+# Hook de once, avant chaque sauvegarde (`once backup`, `--auto-backup`) : dump cohérent (pg_dump lit
+# dans une seule transaction) de la base de l'environnement, déposé dans /storage, que once archive.
+# Le hook ayant réussi, once ne met pas le conteneur en pause. Les extensions (PostGIS, pgvector)
+# restent hors du dump : elles appartiennent au serveur, qui les crée avec la base (`ardha-env`).
+set -eu
+umask 077
+pg_dump --format=custom --no-owner --no-acl \
+  --exclude-extension=postgis --exclude-extension=vector \
+  --file=/storage/database.dump.tmp "$DATABASE_URL"
+mv /storage/database.dump.tmp /storage/database.dump
+echo "pre-backup : base sauvegardée dans /storage/database.dump"

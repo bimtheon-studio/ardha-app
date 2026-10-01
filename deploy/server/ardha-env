@@ -1,0 +1,508 @@
+#!/usr/bin/env bash
+# Environnements d'Ardha sur le serveur once (lot LD, D-13) : la production et un environnement par PR.
+# Chaque environnement = une application once (`ardha…`), une base `ardha_<nom>` et son rôle, un
+# préfixe Redis `ardha-<nom>`. Copié sur le serveur par la commande de déploiement du dépôt ; ne
+# touche qu'à ce qui porte le nom d'Ardha (le serveur est partagé).
+#
+#   ardha-env setup                                  services partagés (Postgres, Redis), secrets
+#   ardha-env create <nom> --image <image>           crée l'environnement et le déploie
+#   ardha-env update <nom> --image <image> [--reset-db]
+#   ardha-env remove <nom> [--confirm production]    supprime tout : application, base, clés Redis
+#   ardha-env list                                   environnements, hôte, image, état
+#   ardha-env logs <nom> [--tail <n>] [--follow]     journaux du conteneur
+#   ardha-env exec <nom> <commande…>                 commande dans le conteneur (once exec)
+#   ardha-env psql <nom> [arguments de psql…]        psql sur la base de l'environnement
+#   ardha-env team-set --email <e> --name <nom>      compte d'équipe (mot de passe lu sur l'entrée standard)
+#   ardha-env team-list | team-remove --email <e>    comptes d'équipe (sans les mots de passe)
+#   ardha-env accounts <nom>                         comptes d'équipe présents, avec leur mot de passe
+#   ardha-env registry --username <u>                identifiants de ghcr.io (jeton lu sur l'entrée standard)
+#   ardha-env sweep --keep <pr-1,pr-7,…>             supprime les PR absentes de la liste (fermées)
+#   ardha-env ci                                     commande forcée de la clé SSH de la CI
+#
+# <nom> : `production` ou `pr-<numéro>`.
+set -euo pipefail
+
+ARDHA_HOME=${ARDHA_HOME:-$HOME/ardha}
+ARDHA_DOMAIN=${ARDHA_DOMAIN:-once.florent.cc}
+ARDHA_SERVICES=${ARDHA_SERVICES:-ardha}
+ARDHA_COMPOSE_PROJECT=${ARDHA_COMPOSE_PROJECT:-ardha-services}
+ARDHA_NETWORK=${ARDHA_NETWORK:-once}
+ARDHA_MAX_PR=${ARDHA_MAX_PR:-4}
+ARDHA_MEMORY_PRODUCTION=${ARDHA_MEMORY_PRODUCTION:-1024}
+ARDHA_MEMORY_PR=${ARDHA_MEMORY_PR:-512}
+ONCE=${ONCE:-once}
+
+POSTGRES="$ARDHA_SERVICES-postgres"
+REDIS="$ARDHA_SERVICES-redis"
+SECRETS="$ARDHA_HOME/secrets.env"
+ENVS="$ARDHA_HOME/envs"
+
+die() {
+  echo "ardha-env : $*" >&2
+  exit 1
+}
+
+usage() {
+  sed -n '/^#   ardha-env/s/^#   //p' "$0" >&2
+  exit 2
+}
+
+random_secret() {
+  head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' | head -c 48
+}
+
+# Noms dérivés d'un environnement.
+check_name() {
+  [[ ${1:-} =~ ^(production|pr-[0-9]{1,6})$ ]] || die "nom invalide « ${1:-} » : production ou pr-<numéro>"
+}
+host_of() { if [[ $1 == production ]]; then echo "ardha.$ARDHA_DOMAIN"; else echo "ardha-$1.$ARDHA_DOMAIN"; fi; }
+database_of() { echo "ardha_${1//-/_}"; }
+prefix_of() { echo "ardha-$1"; }
+env_file() { echo "$ENVS/$1.env"; }
+meta_file() { echo "$ENVS/$1.meta"; }
+
+meta() { # meta <nom> <clé>
+  sed -n "s/^$2=//p" "$(meta_file "$1")" 2>/dev/null || true
+}
+
+sql() { # sql <base> : exécute l'entrée standard en superutilisateur
+  docker exec -i "$POSTGRES" psql -v ON_ERROR_STOP=1 -qAt -U postgres -d "$1"
+}
+
+services_ready() {
+  [[ $(docker inspect -f '{{.State.Health.Status}}' "$POSTGRES" 2>/dev/null) == healthy ]] \
+    || die "$POSTGRES n'est pas prêt : lancer « ardha-env setup »"
+  [[ $(docker inspect -f '{{.State.Health.Status}}' "$REDIS" 2>/dev/null) == healthy ]] \
+    || die "$REDIS n'est pas prêt : lancer « ardha-env setup »"
+}
+
+once_hosts() {
+  # `once list` colore et lie les hôtes (OSC 8, terminées par BEL chez once v0.3.3, ou par ESC \) :
+  # on n'en garde que le texte.
+  "$ONCE" list | sed -E 's/\x1b\]8;;[^\x07\x1b]*(\x07|\x1b\\)//g; s/\x1b\[[0-9;]*m//g'
+}
+
+app_exists() { once_hosts | grep -q "^$1 "; }
+
+# Conteneur once d'un hôte : once range ses réglages (hôte compris) dans l'étiquette `once`.
+container_of() {
+  local host=$1 name label
+  while IFS=$'\t' read -r name label; do
+    if [[ $label == *"\"host\":\"$host\""* ]]; then
+      echo "$name"
+      return
+    fi
+  done < <(docker ps --filter "name=^once-app-ardha" --format '{{.Names}}	{{.Label "once"}}')
+  die "aucun conteneur en service pour $host"
+}
+
+# Arguments `--env` de once, depuis le fichier de l'environnement (update les remplace tous).
+env_args() {
+  local line
+  while IFS= read -r line; do
+    [[ -n $line && $line != \#* ]] && printf '%s\0' --env "$line"
+  done < "$(env_file "$1")"
+}
+
+# Identifiants de ghcr.io (paquet privé), s'il y en a dans secrets.env (`ardha-env registry`) : once
+# reçoit le nom en argument, le jeton par l'entrée standard.
+registry_args() {
+  if [[ -f $SECRETS ]] && grep -q '^REGISTRY_USERNAME=' "$SECRETS"; then
+    printf '%s\n' --registry-username "$(sed -n 's/^REGISTRY_USERNAME=//p' "$SECRETS")" --registry-password-stdin
+  fi
+}
+registry_password() { sed -n 's/^REGISTRY_PASSWORD=//p' "$SECRETS" 2>/dev/null || true; }
+
+create_database() {
+  local db=$1 password=$2
+  sql postgres <<SQL
+CREATE ROLE $db LOGIN PASSWORD '$password';
+CREATE DATABASE $db OWNER $db;
+SQL
+  # Les extensions appartiennent au serveur (superutilisateur) ; les migrations les trouvent déjà là.
+  sql "$db" <<SQL
+CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS vector;
+GRANT ALL ON SCHEMA public TO $db;
+SQL
+}
+
+drop_database() {
+  local db=$1
+  sql postgres <<SQL
+DROP DATABASE IF EXISTS $db WITH (FORCE);
+DROP ROLE IF EXISTS $db;
+SQL
+}
+
+drop_redis_keys() {
+  docker exec "$REDIS" redis-cli --scan --pattern "$1:*" \
+    | xargs -r -n 500 docker exec -i "$REDIS" redis-cli del >/dev/null
+}
+
+# Commandes
+
+cmd_setup() {
+  [[ -f $ARDHA_HOME/compose.yaml ]] || die "$ARDHA_HOME/compose.yaml absent : le déploiement du dépôt le copie"
+  docker network inspect "$ARDHA_NETWORK" >/dev/null 2>&1 \
+    || die "réseau Docker « $ARDHA_NETWORK » absent : once est-il installé ?"
+  mkdir -p "$ENVS" "$ARDHA_HOME/backups"
+  chmod 700 "$ARDHA_HOME" "$ENVS"
+  if [[ ! -f $SECRETS ]]; then
+    (umask 077 && echo "POSTGRES_PASSWORD=$(random_secret)" > "$SECRETS")
+    echo "Secrets créés : $SECRETS"
+  fi
+  chmod 600 "$SECRETS"
+  ARDHA_SERVICES=$ARDHA_SERVICES ARDHA_NETWORK=$ARDHA_NETWORK ARDHA_COMPOSE_PROJECT=$ARDHA_COMPOSE_PROJECT \
+    docker compose --project-directory "$ARDHA_HOME" -f "$ARDHA_HOME/compose.yaml" --env-file "$SECRETS" \
+    up --detach --wait --quiet-pull
+  echo "Services prêts : $POSTGRES, $REDIS (réseau $ARDHA_NETWORK)."
+}
+
+cmd_create() {
+  local name=${1:-} image=''
+  check_name "$name"
+  shift
+  while (($#)); do
+    case $1 in
+      --image) image=${2:-}; shift 2 ;;
+      *) usage ;;
+    esac
+  done
+  [[ -n $image ]] || die "--image manquant"
+  local host db prefix memory
+  host=$(host_of "$name")
+  db=$(database_of "$name")
+  prefix=$(prefix_of "$name")
+  [[ ! -f $(env_file "$name") ]] || die "$name existe déjà : « ardha-env update $name --image … »"
+  services_ready
+  app_exists "$host" && die "$host est déjà une application once"
+  if [[ $name == pr-* ]]; then
+    local count
+    count=$(find "$ENVS" -name 'pr-*.env' | wc -l)
+    ((count < ARDHA_MAX_PR)) || die "déjà $count environnements de PR (au plus $ARDHA_MAX_PR) : en supprimer un"
+    memory=$ARDHA_MEMORY_PR
+  else
+    memory=$ARDHA_MEMORY_PRODUCTION
+  fi
+
+  local password
+  password=$(random_secret)
+  create_database "$db" "$password"
+  (
+    umask 077
+    {
+      echo "DATABASE_URL=postgres://$db:$password@$POSTGRES:5432/$db"
+      echo "REDIS_URL=redis://$REDIS:6379"
+      echo "REDIS_PREFIX=$prefix"
+      # Une PR démarre sur les communes de référence ; la production se remplit à la demande.
+      [[ $name == pr-* ]] && echo "ARDHA_SEED_ON_BOOT=true"
+      echo "LOG_LEVEL=info"
+    } > "$(env_file "$name")"
+    printf 'HOST=%s\nIMAGE=%s\nCREATED=%s\n' "$host" "$image" "$(date -Iseconds)" > "$(meta_file "$name")"
+  )
+
+  local args=(deploy "$image" --host "$host" --memory "$memory" --auto-update=false)
+  [[ $name == production ]] && args+=(--backup-path "$ARDHA_HOME/backups/production" --auto-backup)
+  local envs=()
+  mapfile -d '' envs < <(env_args "$name")
+  args+=("${envs[@]}")
+  local registry=()
+  mapfile -t registry < <(registry_args)
+  args+=("${registry[@]}")
+  [[ $name == production ]] && mkdir -p "$ARDHA_HOME/backups/production"
+
+  echo "Déploiement de $image sur https://$host …"
+  if ! registry_password | "$ONCE" "${args[@]}"; then
+    # once a déjà retiré l'application ; on retire le reste, pour ne rien laisser.
+    drop_database "$db"
+    rm -f "$(env_file "$name")" "$(meta_file "$name")"
+    die "échec du déploiement de $name : rien n'a été gardé"
+  fi
+  echo "Environnement $name prêt : https://$host"
+}
+
+cmd_update() {
+  local name=${1:-} image='' reset=false
+  check_name "$name"
+  shift
+  while (($#)); do
+    case $1 in
+      --image) image=${2:-}; shift 2 ;;
+      --reset-db) reset=true; shift ;;
+      *) usage ;;
+    esac
+  done
+  [[ -n $image ]] || die "--image manquant"
+  [[ -f $(env_file "$name") ]] || die "$name n'existe pas : « ardha-env create $name --image … »"
+  services_ready
+  local host db
+  host=$(host_of "$name")
+  db=$(database_of "$name")
+  if $reset; then
+    [[ $name != production ]] || die "--reset-db refusé sur la production"
+    local password
+    password=$(sed -n "s|^DATABASE_URL=postgres://$db:\([^@]*\)@.*|\1|p" "$(env_file "$name")")
+    drop_database "$db"
+    create_database "$db" "$password"
+    drop_redis_keys "$(prefix_of "$name")"
+    echo "Base $db recréée."
+  fi
+  local envs=()
+  mapfile -d '' envs < <(env_args "$name")
+  echo "Mise à jour de $name vers $image …"
+  local registry=()
+  mapfile -t registry < <(registry_args)
+  registry_password | "$ONCE" update "$host" --image "$image" "${envs[@]}" "${registry[@]}"
+  sed -i "s|^IMAGE=.*|IMAGE=$image|" "$(meta_file "$name")"
+  echo "Environnement $name à jour : https://$host"
+}
+
+cmd_remove() {
+  local name=${1:-} confirm=''
+  check_name "$name"
+  shift
+  while (($#)); do
+    case $1 in
+      --confirm) confirm=${2:-}; shift 2 ;;
+      *) usage ;;
+    esac
+  done
+  [[ $name != production || $confirm == production ]] \
+    || die "supprimer la production demande « --confirm production »"
+  local host
+  host=$(host_of "$name")
+  if app_exists "$host"; then
+    "$ONCE" remove "$host" --remove-data
+  fi
+  services_ready
+  drop_database "$(database_of "$name")"
+  drop_redis_keys "$(prefix_of "$name")"
+  rm -f "$(env_file "$name")" "$(meta_file "$name")"
+  echo "Environnement $name supprimé."
+}
+
+cmd_list() {
+  local hosts file name host status
+  hosts=$(once_hosts)
+  printf '%s\t%s\t%s\t%s\n' NOM HÔTE ÉTAT IMAGE
+  for file in "$ENVS"/*.env; do
+    [[ -e $file ]] || continue
+    name=$(basename "$file" .env)
+    host=$(host_of "$name")
+    status=$(sed -n "s/^$host (\(.*\))$/\1/p" <<< "$hosts")
+    printf '%s\t%s\t%s\t%s\n' "$name" "https://$host" "${status:-absent de once}" "$(meta "$name" IMAGE)"
+  done
+}
+
+cmd_logs() {
+  local name=${1:-} args=()
+  check_name "$name"
+  shift
+  while (($#)); do
+    case $1 in
+      --tail) args+=(--tail "${2:-}"); shift 2 ;;
+      --follow) args+=(--follow); shift ;;
+      *) usage ;;
+    esac
+  done
+  docker logs "${args[@]}" "$(container_of "$(host_of "$name")")"
+}
+
+cmd_exec() {
+  local name=${1:-}
+  check_name "$name"
+  shift
+  (($#)) || usage
+  "$ONCE" exec "$(host_of "$name")" "$@"
+}
+
+cmd_psql() {
+  local name=${1:-}
+  check_name "$name"
+  shift
+  local tty=()
+  [[ -t 0 ]] && tty=(-t)
+  docker exec -i "${tty[@]}" "$POSTGRES" psql -U postgres -d "$(database_of "$name")" "$@"
+}
+
+# Identifiants de ghcr.io pour once (paquet privé) : le jeton (`read:packages`) arrive par l'entrée
+# standard, jamais par la ligne de commande ; il rejoint secrets.env. `create` les passe à
+# `once deploy`, et once les garde d'un déploiement à l'autre.
+cmd_registry() {
+  local username=''
+  while (($#)); do
+    case $1 in
+      --username) username=${2:-}; shift 2 ;;
+      *) usage ;;
+    esac
+  done
+  [[ $username =~ ^[A-Za-z0-9-]+$ ]] || die "--username : identifiant GitHub attendu"
+  local token
+  IFS= read -r token || true
+  [[ -n $token ]] || die "jeton vide : le passer sur l'entrée standard"
+  [[ $token =~ ^[A-Za-z0-9_]+$ ]] || die "jeton inattendu (caractères hors [A-Za-z0-9_])"
+  [[ -f $SECRETS ]] || die "$SECRETS absent : lancer « ardha-env setup »"
+  (
+    umask 077
+    grep -v '^REGISTRY_' "$SECRETS" > "$SECRETS.tmp" || true
+    printf 'REGISTRY_USERNAME=%s\nREGISTRY_PASSWORD=%s\n' "$username" "$token" >> "$SECRETS.tmp"
+    mv "$SECRETS.tmp" "$SECRETS"
+  )
+  echo "Identifiants du registre enregistrés pour $username (pris en compte au prochain create)."
+}
+
+# Comptes de l'équipe (porteur du produit, 01/10/2026) : les mêmes comptes, avec les mêmes mots de
+# passe, dans chaque environnement, pour toujours pouvoir s'y reconnecter. La liste vit sur le
+# serveur seulement (`team`, 600 : e-mail, nom, mot de passe, séparés par des tabulations) : jamais
+# dans le dépôt, public, ni dans les journaux de la CI.
+TEAM="$ARDHA_HOME/team"
+
+check_email() {
+  [[ ${1:-} =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] || die "e-mail invalide « ${1:-} »"
+}
+
+cmd_team_set() {
+  local email='' name=''
+  while (($#)); do
+    case $1 in
+      --email) email=${2:-}; shift 2 ;;
+      --name) name=${2:-}; shift 2 ;;
+      *) usage ;;
+    esac
+  done
+  check_email "$email"
+  [[ -n $name && $name != *$'\t'* ]] || die "--name manquant"
+  local password
+  IFS= read -r password || true
+  ((${#password} >= 12)) || die "mot de passe d'au moins 12 caractères attendu sur l'entrée standard"
+  [[ $password != *$'\t'* ]] || die "mot de passe sans tabulation attendu"
+  [[ -d $ARDHA_HOME ]] || die "$ARDHA_HOME absent : lancer « ardha-env setup »"
+  (
+    umask 077
+    touch "$TEAM"
+    # Remplacé à sa place, ou ajouté en fin de liste ; valeurs passées par l'environnement (awk -v
+    # interpréterait les barres obliques inverses d'un mot de passe).
+    E=$email N=$name P=$password awk -F'\t' '
+      $1 == ENVIRON["E"] { print ENVIRON["E"] "\t" ENVIRON["N"] "\t" ENVIRON["P"]; done = 1; next }
+      { print }
+      END { if (!done) print ENVIRON["E"] "\t" ENVIRON["N"] "\t" ENVIRON["P"] }' "$TEAM" > "$TEAM.tmp"
+    mv "$TEAM.tmp" "$TEAM"
+  )
+  echo "Compte d'équipe $email enregistré (pris en compte au prochain déploiement, ou par « accounts »)."
+}
+
+cmd_team_list() {
+  [[ -f $TEAM ]] || return 0
+  awk -F'\t' '{ print $1 "\t" $2 }' "$TEAM"
+}
+
+cmd_team_remove() {
+  [[ ${1:-} == --email ]] || usage
+  local email=${2:-}
+  if [[ ! -f $TEAM ]] || ! awk -F'\t' -v e="$email" '$1 == e { found = 1 } END { exit !found }' "$TEAM"; then
+    die "$email absent de la liste"
+  fi
+  (umask 077 && awk -F'\t' -v e="$email" '$1 != e' "$TEAM" > "$TEAM.tmp" && mv "$TEAM.tmp" "$TEAM")
+  echo "Compte d'équipe $email retiré de la liste (les comptes déjà créés restent dans les environnements)."
+}
+
+# Comptes de l'équipe dans un environnement : créés s'ils manquent, mot de passe donné à qui n'en a
+# pas ; un compte actif (sessions comprises) ou désactivé n'est pas touché. Ne dit que des nombres.
+cmd_accounts() {
+  local name=${1:-}
+  check_name "$name"
+  local host created=0 given=0 unchanged=0 users email person password status
+  host=$(host_of "$name")
+  [[ -s $TEAM ]] || { echo "Comptes de l’équipe : aucun (« ardha-env team-set »)."; return; }
+  users=$("$ONCE" exec "$host" ardha user:list)
+  while IFS=$'\t' read -r email person password; do
+    [[ -n $email ]] || continue
+    status=$(awk -F'\t' -v e="$email" '$1 == e { print $3 }' <<< "$users")
+    if [[ -z $status ]]; then
+      printf '%s\n' "$password" | "$ONCE" exec "$host" ardha user:create-admin --email "$email" --name "$person" --password-stdin >/dev/null
+      created=$((created + 1))
+    elif [[ $status == 'mot de passe à choisir' ]]; then
+      printf '%s\n' "$password" | "$ONCE" exec "$host" ardha user:set-password --email "$email" --password-stdin >/dev/null
+      given=$((given + 1))
+    else
+      unchanged=$((unchanged + 1))
+    fi
+  done < "$TEAM"
+  echo "Comptes de l’équipe sur $name : $created créé(s), $given mot(s) de passe donné(s), $unchanged inchangé(s)."
+}
+
+cmd_sweep() {
+  local keep=''
+  while (($#)); do
+    case $1 in
+      # Sans valeur : aucune PR ouverte, tout part.
+      --keep) keep=${2-}; shift; (($#)) && shift ;;
+      *) usage ;;
+    esac
+  done
+  [[ $keep =~ ^(pr-[0-9]{1,6}(,pr-[0-9]{1,6})*)?$ ]] || die "--keep : liste de pr-<n> séparés par des virgules"
+  local file name removed=0
+  for file in "$ENVS"/pr-*.env; do
+    [[ -e $file ]] || continue
+    name=$(basename "$file" .env)
+    if [[ ,$keep, != *",$name,"* ]]; then
+      cmd_remove "$name"
+      removed=$((removed + 1))
+    fi
+  done
+  echo "Balayage : $removed environnement(s) supprimé(s)."
+}
+
+# Commande forcée de la clé SSH de la CI (`command="…/ardha-env ci",restrict` dans authorized_keys) :
+# la CI ne peut que créer, mettre à jour, supprimer ou balayer des environnements de PR, mettre à
+# jour la production, lister et lire des journaux. Ni setup, ni psql, ni exec, ni suppression de la
+# production ; images de ghcr.io/bimtheon-studio/ardha à étiquette immuable seulement. Le script
+# lui-même ne se met à jour que par `pnpm server sync`, lancé par un humain.
+cmd_ci() {
+  local words=() image_re='^ghcr\.io/bimtheon-studio/ardha:sha-[0-9a-f]{7}$'
+  read -ra words <<< "${SSH_ORIGINAL_COMMAND:-}"
+  # `pnpm server` appelle `ardha/ardha-env <commande>` : même client pour un humain et pour la CI.
+  [[ ${words[0]:-} == ardha/ardha-env ]] && words=("${words[@]:1}")
+  set -- "${words[@]}"
+  local command=${1:-} name=${2:-}
+  refuse() { die "commande refusée à la CI : ${SSH_ORIGINAL_COMMAND:-(vide)}"; }
+  case $command in
+    list) (($# == 1)) || refuse ;;
+    create | remove) [[ $name =~ ^pr-[0-9]{1,6}$ ]] || refuse ;;
+    accounts) [[ $name =~ ^(production|pr-[0-9]{1,6})$ && $# == 2 ]] || refuse ;;
+    update) [[ $name =~ ^(production|pr-[0-9]{1,6})$ ]] || refuse ;;
+    logs) [[ $name =~ ^(production|pr-[0-9]{1,6})$ && ($# == 2 || ($# == 4 && $3 == --tail && $4 =~ ^[0-9]{1,5}$)) ]] || refuse ;;
+    sweep) [[ ${2:-} == --keep && $# -le 3 ]] || refuse ;;
+    *) refuse ;;
+  esac
+  case $command in
+    create | update)
+      [[ ${3:-} == --image && ${4:-} =~ $image_re ]] || refuse
+      (($# == 4)) || [[ $# == 5 && $5 == --reset-db && $name != production ]] || refuse
+      ;;
+    remove) (($# == 2)) || refuse ;;
+  esac
+  "cmd_${command//-/_}" "${@:2}"
+}
+
+command=${1:-}
+(($#)) && shift
+case $command in
+  setup) cmd_setup "$@" ;;
+  create) cmd_create "$@" ;;
+  update) cmd_update "$@" ;;
+  remove) cmd_remove "$@" ;;
+  list) cmd_list "$@" ;;
+  logs) cmd_logs "$@" ;;
+  exec) cmd_exec "$@" ;;
+  psql) cmd_psql "$@" ;;
+  sweep) cmd_sweep "$@" ;;
+  team-set) cmd_team_set "$@" ;;
+  team-list) cmd_team_list "$@" ;;
+  team-remove) cmd_team_remove "$@" ;;
+  accounts) cmd_accounts "$@" ;;
+  registry) cmd_registry "$@" ;;
+  ci) cmd_ci ;;
+  *) usage ;;
+esac

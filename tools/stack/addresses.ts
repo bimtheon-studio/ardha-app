@@ -14,7 +14,7 @@ export function addresses(ctx: Context): Address[] {
   const { ports } = ctx;
   return [
     { label: 'Front', url: `${h(ports.web)}/`, service: 'web' },
-    { label: 'API (santé)', url: `${h(ports.api)}/api/health`, service: 'api' },
+    { label: 'API (santé)', url: `${h(ports.api)}/up`, service: 'api' },
     { label: 'API (OpenAPI)', url: `${h(ports.api)}/api/openapi.json`, service: 'api' },
     { label: 'MinIO (console)', url: `${h(ports.minioConsole)}/`, service: 'minioConsole' },
     { label: 'MinIO (S3)', url: h(ports.minio), service: 'minio' },

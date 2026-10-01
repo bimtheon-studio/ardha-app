@@ -44,9 +44,83 @@ Le serveur héberge d'autres applications du porteur du produit.
 - Ce qui s'installe sur le serveur (fichier Compose, script) est **versionné dans le dépôt** et copié
   par la commande de déploiement : le serveur se reconstruit depuis le dépôt.
 
+## Inspection du serveur (étape 1, 01/10/2026, lecture seule)
+
+| Point | Constat |
+| --- | --- |
+| Machine | VPS Ubuntu 24.04.4, noyau 6.8, x86_64, **4 vCPU** |
+| Mémoire | **7,7 Go**, 3,2 Go utilisés, **4,5 Go disponibles**, **pas de swap** |
+| Disque | 72 Go, **39 Go libres** ; images Docker 26,6 Go (15,6 Go récupérables : pas à nous d'y toucher) |
+| once | **v0.3.3** = `basecamp/once@da130f0`, le commit cité par D-13 ; tâches de fond (`once background`) disponibles |
+| Docker | 29.7.2 ; `ubuntu` est dans le groupe `docker` (pas de `sudo` nécessaire) |
+| Réseau `once` | bridge `172.18.0.0/16`, non interne (sortie Internet possible : le worker en a besoin) |
+| Ports écoutés | 22, 80, 443 (kamal-proxy), 53 (résolveur local), `127.0.0.1:1318` ; **5432, 6379 et 5000 libres** |
+| Applications | 16 applications once, toutes `running`, aucune ne commence par `ardha` ; la plus lourde, fizzy, ~960 Mo |
+| Compose | aucun projet ; aucun Postgres ni Redis sur la machine |
+
+Ce que le code de once v0.3.3 impose (lu dans `internal/docker` et `internal/command`) :
+
+- **`deploy` et `update` font toujours un `docker pull`** (`application.go`, `pullImage`) : une image
+  chargée par `docker load` sans registre ne suffit pas. Il faut un registre joignable par le démon
+  Docker du serveur (identifiants possibles : `--registry-username`, `--registry-password-stdin`).
+- Le nom de l'application vient du dernier segment de l'image (`helpers.go`, `NameFromImageRef`) :
+  avec une image `…/ardha`, les conteneurs s'appellent `once-app-ardha…`. Les commandes `update`,
+  `remove`, `exec` désignent l'application **par son hôte**.
+- **`update --env` remplace tout l'environnement** (`settings_flags.go`, `applyChanges`) : il faut
+  repasser toutes les variables à chaque mise à jour. Les variables sont stockées dans une étiquette
+  du conteneur (`containerConfig`) : visibles par `docker inspect`, donc par `ubuntu` seulement.
+- Déploiement : kamal-proxy attend `/up` sain **en 120 s** (`proxy.go`, `deployTimeout`), puis once
+  vérifie `https://<hôte>/up` en 30 s, et supprime l'application si la vérification échoue
+  (`deploy.go`, `VerifyHTTPOrRemove`). Migrations et seed ne doivent pas retarder `/up` au-delà.
+- Sauvegarde : si `/hooks/pre-backup` existe et réussit, **pas de pause du conteneur** ; once archive
+  `/storage` et les réglages de l'application (`application_backup.go`). Restauration : nouvelle
+  application **sur l'hôte de l'archive**, refusée s'il est pris ; `/hooks/post-restore` tourne dans
+  un conteneur temporaire avec l'environnement de l'application, avant le démarrage.
+- **L'ancien conteneur est supprimé de force** une fois le nouveau en service
+  (`removeContainersExcept`, `ContainerRemove` avec `Force`) : SIGKILL, sans SIGTERM. Un job BullMQ
+  en cours est alors repris par BullMQ comme job bloqué (*stalled*) ; l'arrêt propre du lanceur ne
+  sert qu'à `once stop` et aux redémarrages de Docker.
+- Journaux : `json-file`, 10 Mo, un seul fichier ; once n'a pas de commande `logs` : passer par
+  `docker logs` sur le conteneur `once-app-<nom>-<id>`.
+
+## Arbitrages du porteur du produit (01/10/2026)
+
+- **Registre : ghcr.io dès maintenant** (pas de registre sur le serveur). Dépôt GitHub :
+  **`bimtheon-studio/ardha-app`** ; image proposée `ghcr.io/bimtheon-studio/ardha` (applications
+  once `ardha…`), à confirmer. Création du dépôt et premier push **en attente de son feu vert**.
+- **Dépôt créé** le 01/10/2026 : https://github.com/bimtheon-studio/ardha-app, **public**. Image
+  ghcr.io publique possible : once la tire sans identifiants. Les PR venues d'un fork ne doivent
+  pas déployer (pas de secrets ni d'accès au serveur pour elles). Push sur demande du porteur du
+  produit seulement.
+- **Le dépôt passera en privé à terme** ; d'ici là, priorité au fonctionnel (porteur du produit,
+  01/10/2026).
+- **Paquet ghcr.io privé** : le porteur du produit ne peut pas le rendre public (réglage de
+  l'organisation). once s'authentifie donc : jeton GitHub *classic* `read:packages` (seul type
+  accepté par ghcr.io), déposé par `pnpm server registry --username <compte>` (demandé sans écho,
+  envoyé par l'entrée standard, rangé dans `~/ardha/secrets.env` en `600`) ; `create` et `update`
+  le passent à once par `--registry-password-stdin`, jamais en argument.
+- **Comptes de l'équipe, mêmes mots de passe partout** (porteur du produit, 01/10/2026 : « on peut
+  toujours se reconnecter à tous les environnements avec les mêmes mots de passe »). Liste sur le
+  serveur seulement, `~/ardha/team` (`600` : e-mail, nom, mot de passe), tenue par
+  `pnpm server team-set|team-list|team-remove` (mot de passe demandé sans écho). Après chaque
+  déploiement (PR et production), la CI lance `ardha-env accounts <env>` : comptes manquants créés
+  (administrateurs) avec leur mot de passe, mot de passe donné à qui n'en a pas ; comptes actifs ou
+  désactivés laissés tels quels. La CI n'en voit que des nombres ; la PR n'annonce que l'URL.
+  Remplace l'admin de recette commun et le lien posté dans la PR (même jour). Nouvelle commande
+  d'administration `ardha user:set-password --password-stdin`.
+- **Tests du déploiement en CI seulement si la PR touche au déploiement** (`Dockerfile`, `docker/`,
+  `deploy/`, `tools/server/`, `test/deploy/`, `src/launcher/`, workflows, `drizzle/`), **jamais sur
+  `master`** (porteur du produit, 01/10/2026 : « phase d'itération ultra rapide, pas besoin de
+  sécuriser le devops »). Sinon, simple construction de l'image publiée ; `deploy-pr` la déploie en
+  vrai de toute façon.
+- Hôte de production : **`ardha.once.florent.cc`** ; PR : `ardha-pr-<n>.once.florent.cc`.
+- Mémoire : Postgres ~512 Mo, Redis 64 Mo, production `--memory 1024`, PR `--memory 512`, **au plus
+  4 environnements de PR** à la fois (le 5e est refusé). Plafonds à revoir après mesure de l'image.
+
 ## Étapes
 
-1. **Inspecter le serveur** (lecture seule) et consigner ce qu'on y trouve dans ce fichier.
+1. **Inspecter le serveur** (lecture seule) et consigner ce qu'on y trouve dans ce fichier : fait,
+   voir ci-dessus.
 2. **Code, testable en local et en CI, tests d'abord** :
    - `Dockerfile` en plusieurs étapes (Node 26.10 et pnpm 12.8 au build, comme `mise.toml`) ; image
      finale avec `pg_dump` 18 et `fixtures/http` (seed des communes de référence) ;
@@ -64,23 +138,90 @@ Le serveur héberge d'autres applications du porteur du produit.
    - hooks `/hooks/pre-backup` et `/hooks/post-restore` ;
    - test « image » : construire l'image, la démarrer contre la stack locale, vérifier `/up`, `/`,
      `/map`, une connexion ; l'ajouter à la CI.
+
+   **Fait (01/10/2026)** : `Dockerfile` (Node 26.10 trixie-slim, tini, `pg_dump` 18.6 du dépôt PGDG,
+   570 Mo) ; lanceur `src/launcher` (migrations sous `pg_advisory_lock`, API, worker relancé avec
+   attente croissante, seed `--if-empty` si `ARDHA_SEED_ON_BOOT`, SIGTERM transmis, SIGKILL après
+   8 s) ; `/up` **remplace `/api/health`** (porteur du produit : une seule route de santé) ;
+   `BASE_URL` → `WEB_ORIGIN`, `DISABLE_SSL` → cookie sans `Secure` ; `REDIS_PREFIX` (files sous
+   `<préfixe>:bull`, limiteur sous `<préfixe>:<cookie>:rate-limit`) ; front servi par l'API
+   (`FRONTEND_DIR`) ; hooks `pre-backup` (dump sans les extensions, qui appartiennent au serveur) et
+   `post-restore` (une transaction, échec si le dump manque) ; CLI dans le conteneur : `ardha …`.
+   Test de l'image (`test/deploy/image.test.ts`, 8 tests), lancé par `pnpm test:deploy` et en CI.
+   Mesure : **pic de 422 Mio** pendant le seed des quatre communes, **154 Mio** au repos ; le
+   plafond de 512 Mo des PR tient, sans grande marge.
 3. **Serveur** : `deploy/server/compose.yaml` (Postgres, Redis ; réseau `once`) et un script serveur
    `ardha-env create|update|remove|list <nom>` (base + rôle, `once deploy`/`update`/`remove`,
    clés Redis). La clé SSH de la CI ne pourra lancer que ce script (commande forcée dans
    `authorized_keys`) : à proposer au porteur du produit, pas à poser sans accord.
+
+   **Fait (01/10/2026, rien d'installé sur le serveur)** :
+   - `deploy/server/compose.yaml`, projet `ardha-services` : `ardha-postgres` (image du dépôt,
+     construite sur le serveur ; 512 Mo, `shared_buffers` 128 Mo, 200 connexions) et `ardha-redis`
+     (64 Mo, `noeviction` pour BullMQ, sans persistance) ; réseau `once` externe, aucun port publié.
+   - `deploy/server/ardha-env` (bash) : `setup`, `create`, `update [--reset-db]`, `remove`, `list`,
+     `logs`, `exec`, `psql`. Disposition sur le serveur : `~/ardha/` (`compose.yaml`, `postgres/`,
+     `ardha-env`, `secrets.env` et `envs/<nom>.env` en `600`, `backups/production`).
+     Par environnement : base et rôle `ardha_<nom>` (non superutilisateur, propriétaire de sa base ;
+     PostGIS et pgvector créés par le superutilisateur), préfixe Redis `ardha-<nom>`, application once
+     `ardha.<domaine>` ou `ardha-pr-<n>.<domaine>`, `--auto-update=false`, 1024 Mo (production,
+     avec `--auto-backup` dans `~/ardha/backups/production`) ou 512 Mo (PR, seed au démarrage).
+     Garde-fous : nom `production` ou `pr-<n>`, au plus 4 PR, pas de `--reset-db` ni de suppression
+     de la production sans `--confirm production`, un déploiement en échec ne laisse ni base ni
+     fichier. Identifiants de registre facultatifs (`REGISTRY_USERNAME`, `REGISTRY_PASSWORD` dans
+     `secrets.env`) si l'image ghcr.io reste privée.
+   - Test `test/deploy/ardha-env.test.ts` (13 tests) : services réels sous un nom de test, réseau
+     jouant le rôle de `once`, faux once (`test/deploy/fake-once`) qui démarre **l'image réelle**
+     (migrations sous le rôle de l'environnement, seed, `/up`). `shellcheck` sans remarque.
+   - Limite connue : once reçoit les variables par `--env` sur sa ligne de commande ; elles sont
+     visibles dans `ps` le temps du déploiement, et dans l'étiquette du conteneur : par `ubuntu`
+     et `root` seulement.
 4. **Commande du dépôt** pour piloter et déboguer : créer, mettre à jour, lire l'état et les logs,
    lancer une commande de la CLI dans le conteneur (`once exec`), supprimer un environnement.
+
+   **Fait (01/10/2026)** : `pnpm server <commande>` (`tools/server`) — `setup`, `sync` (copie
+   `deploy/server` et `docker/postgres` dans `~/ardha` par `tar` dans le tuyau SSH), `image
+   [--push]` (image du commit, `ghcr.io/bimtheon-studio/ardha:sha-<7>`, refusée si l'arbre n'est pas
+   propre), `create`, `update`, `remove`, `list`, `logs`, `exec`, `psql`, transmis à `ardha-env`
+   (arguments échappés pour le shell distant, `-t` quand il faut un terminal). Image par défaut :
+   celle du commit courant. Serveur : `ARDHA_SERVER`. Tests : `tools/server` (15 tests, faux ssh
+   qui exécute la commande dans un `HOME` temporaire).
 5. **Production** : `ardha.once.florent.cc` (nom à confirmer), `--auto-update=false`, image à tag
    immuable (`sha-…`) ; créer l'administrateur par `once exec … user:create-admin`.
+   **Fait (01/10/2026)** : services partagés installés (`pnpm server setup` : `ardha-postgres`
+   52 Mio, `ardha-redis` 32 Mio au repos) ; identifiants ghcr.io déposés (`pnpm server registry`) ;
+   **production** créée en 27 s (`pnpm server create production`, image `sha-5888b33` testée par
+   la CI) : `https://ardha.once.florent.cc`, `/up` au vert, certificat Let's Encrypt, 165 Mio sur
+   1 Go ; administrateur florent.destremau@gmail.com créé (`pnpm server exec production ardha
+   user:create-admin`) ; Beaumont-Village chargée à la demande par le worker, depuis Internet.
+   Le jeton ghcr.io a transité par la conversation de l'agent : **à régénérer**, puis redéposer par
+   `pnpm server registry` dans un terminal.
+
 6. **CI/CD et environnements par PR** (GitHub Actions) : image publiée sur ghcr.io (`sha-…`, `pr-N`,
    `master`) ; push sur `master` → production ; PR ouverte ou mise à jour → `ardha-env create|update
    pr-N`, lien de mot de passe de l'admin en commentaire ; base recréée si la PR touche `drizzle/` ;
    PR fermée → `ardha-env remove pr-N` ; balayage nocturne des environnements orphelins.
+
+   **En cours (01/10/2026)** : la CI publie l'image **qu'elle vient de tester** (`pnpm test:deploy`
+   avec `ARDHA_IMAGE=ardha:ci`) sur `ghcr.io/bimtheon-studio/ardha` avec le `GITHUB_TOKEN` :
+   `sha-<7>` (immuable) et `pr-<n>` ou `master`. La CI teste désormais la tête de la PR et non le
+   commit de fusion, pour que `sha-<7>` désigne exactement ce commit. Rien n'est publié pour une PR
+   venue d'un fork. Paquet public (porteur du produit), à basculer par un admin de l'organisation
+   après le premier push. Premier passage vert le 01/10/2026 (PR #1, image `sha-1e3a53b`).
+
+   `ardha-env ci` : la commande forcée prévue pour la clé SSH de la CI
+   (`command="/home/ubuntu/ardha/ardha-env ci",restrict` dans `authorized_keys`, **à faire
+   accepter**). Liste blanche : `create`/`remove pr-<n>`, `update pr-<n>|production` avec une image
+   `ghcr.io/bimtheon-studio/ardha:sha-<7>` seulement, `--reset-db` hors production, `list`,
+   `logs <nom> [--tail <n>]`, `sweep --keep <pr-…>` (supprime les environnements des PR fermées).
+   Ni `setup`, ni `exec`, ni `psql`, ni suppression de la production ; le script ne se met à jour
+   que par `pnpm server sync`, lancé par un humain. Reste : la clé, les jobs de déploiement des PR
+   et de la production, le balayage nocturne.
 7. **Clore** : README (section « Déployer »), journal du PLAN, décisions techniques de LD.
 
-## Bloquant connu
+## Bloquant connu (levé le 01/10/2026 : dépôt créé)
 
-**Le dépôt n'a pas de remote** (CLAUDE.md) : pas de GitHub Actions ni de ghcr.io tant qu'il n'existe
+**Le dépôt n'avait pas de remote** (CLAUDE.md) : pas de GitHub Actions ni de ghcr.io tant qu'il n'existe
 pas. Les étapes 1 à 5 avancent sans lui (image construite en local, poussée vers un registre ou
 transférée par `docker save | ssh … docker load`, selon ce que once accepte : à vérifier). Demander au
 porteur du produit où créer le dépôt (question « Propriété », PLAN §12) avant l'étape 6.

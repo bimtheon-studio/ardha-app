@@ -46,6 +46,12 @@ export class CommunesRepository {
     return r.rows[0];
   }
 
+  /** Au moins une commune chargée : la base a déjà été semée. */
+  async any(): Promise<boolean> {
+    const r = await this.db.execute(sql`SELECT 1 FROM communes LIMIT 1`);
+    return r.rows.length > 0;
+  }
+
   async list(): Promise<CommuneRecord[]> {
     const r = await this.db.execute<CommuneRecord>(sql`SELECT ${columns} FROM communes ORDER BY code`);
     return r.rows;

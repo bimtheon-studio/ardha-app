@@ -10,6 +10,7 @@ import type { Config } from '../src/config/config.ts';
 import { POOL } from '../src/db/db.ts';
 import { ApiModule } from '../src/routes/api.module.ts';
 import { configureApp } from '../src/routes/app.ts';
+import { rateLimitPrefix } from '../src/routes/http/rate-limit.ts';
 import { Clock } from '../src/shared/clock.ts';
 import { REDIS } from '../src/shared/redis.ts';
 import { WorkerModule } from '../src/worker/worker.module.ts';
@@ -81,7 +82,7 @@ export async function createTestApp(options: { worker?: boolean; config?: NodeJS
     pool,
     reset: async () => {
       await pool.query('TRUNCATE users, sessions, password_resets, audit_logs CASCADE');
-      await dropKeys(redis, `ardha:${config.SESSION_COOKIE_NAME}:rate-limit`);
+      await dropKeys(redis, rateLimitPrefix(config));
     },
     resetReference: async () => {
       await pool.query('TRUNCATE communes, parcels, source_states CASCADE');

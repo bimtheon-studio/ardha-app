@@ -101,7 +101,10 @@ async function start(ctx: Context, infraOnly: boolean): Promise<void> {
   await checkPorts(ctx, infraOnly ? DOCKER_SERVICES : [...DOCKER_SERVICES, ...LOCAL_SERVICES]);
   writeFiles(ctx);
 
-  run('docker', ['compose', 'up', '-d', '--build', '--wait'], ctx);
+  // Image Postgres fournie toute faite (CI : publiée sur ghcr.io) : pas de reconstruction, pgvector
+  // n'est compilé qu'une fois.
+  const build = process.env.ARDHA_POSTGRES_IMAGE ? [] : ['--build'];
+  run('docker', ['compose', 'up', '-d', ...build, '--wait'], ctx);
   createBucket(ctx);
   if (!existsSync(path.join(ctx.root, 'node_modules'))) {
     run('pnpm', ['install', '--frozen-lockfile'], ctx);

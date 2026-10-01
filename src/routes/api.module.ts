@@ -14,7 +14,7 @@ import { GeoController } from './geo.controller.ts';
 import { type Config, CONFIG } from '../config/config.ts';
 import { ConfigModule } from '../config/config.module.ts';
 import { ErrorFilter } from './http/error-filter.ts';
-import { LIMITS, RedisRateLimitStorage } from './http/rate-limit.ts';
+import { LIMITS, rateLimitPrefix, RedisRateLimitStorage } from './http/rate-limit.ts';
 import { loggingOptions } from '../shared/logs.ts';
 import { OriginCheck } from './http/origin.ts';
 import { SessionGuard } from './http/session.guard.ts';
@@ -38,7 +38,7 @@ export class ApiModule implements NestModule {
           inject: [REDIS, CONFIG],
           useFactory: (redis: Redis, c: Config) => ({
             throttlers: LIMITS,
-            storage: new RedisRateLimitStorage(redis, `ardha:${c.SESSION_COOKIE_NAME}:rate-limit`),
+            storage: new RedisRateLimitStorage(redis, rateLimitPrefix(c)),
           }),
         }),
       ],

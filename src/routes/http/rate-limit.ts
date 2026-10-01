@@ -8,6 +8,8 @@ import type { ThrottlerStorageRecord } from '@nestjs/throttler/dist/throttler-st
 import { normalizeEmail } from '../../domain/index.ts';
 import type { Redis } from 'ioredis';
 
+import type { Config } from '../../config/config.ts';
+
 export const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
 export const MAX_ATTEMPTS = 5;
 
@@ -29,13 +31,21 @@ export const LIMITS: ThrottlerOptions[] = [
 ];
 
 /**
+ * Préfixe des compteurs : celui de l'environnement (plusieurs partagent un Redis, D-13), puis le nom
+ * du cookie (unique par worktree et par test).
+ */
+export function rateLimitPrefix(c: Pick<Config, 'REDIS_PREFIX' | 'SESSION_COOKIE_NAME'>): string {
+  return `${c.REDIS_PREFIX}:${c.SESSION_COOKIE_NAME}:rate-limit`;
+}
+
+/**
  * Stockage Redis des compteurs. Fenêtre fixe : le compteur naît à la première tentative et expire
  * `ttl` plus tard ; au-delà de la limite, une clé de blocage dure `blockDuration`.
  */
 export class RedisRateLimitStorage implements ThrottlerStorage {
   constructor(
     private readonly redis: Redis,
-    private readonly prefix = 'ardha:rate-limit',
+    private readonly prefix: string,
   ) {}
 
   async increment(key: string, ttl: number, limit: number, blockMs: number, name: string): Promise<ThrottlerStorageRecord> {

@@ -11,5 +11,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["src", "test", "vitest.config.ts", "drizzle.config.ts", "playwright.config.ts"]
+  "include": ["src", "test", "vitest.config.ts", "vitest.deploy.config.ts", "drizzle.config.ts", "playwright.config.ts"]
 }
