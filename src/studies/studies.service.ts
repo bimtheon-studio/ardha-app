@@ -181,9 +181,12 @@ export class StudiesService {
       },
       parcels,
     );
+    // L'étude telle que créée, lue avant de confier adresse et vignette au worker : la réponse ne
+    // dépend pas de la vitesse du worker.
+    const created = await this.get(actor, id);
     await this.jobs.enqueue({ studyId: id, parcelsKey: key });
     await this.auditLog.record({ origin: actor.origin, action: 'study.created', actorId: actor.userId, targetId: id, ip: actor.ip, details: { parcels: ids.length } });
-    return this.get(actor, id);
+    return created;
   }
 
   /** Renommer fige le nom (Q2) ; l'adresse se choisit parmi celles trouvées (Q3). */
