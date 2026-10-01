@@ -51,7 +51,7 @@ le 01/10/2026 (Q4, Q8 et Q11 changés).
 | 20 | Sélection en `localStorage` (géométries complètes), expirée après 2 h d'inactivité, synchronisée entre onglets | `src/hooks/useParcelleSelection.ts:18-93` | simplifier : **dans l'URL** (`/map?parcels=…`) jusqu'à l'étude enregistrée (L2) ; expiration abandonnée (Q7) | |
 | 21 | Vue de carte en `localStorage` (`mapViewState`), France au zoom 6 par défaut | `src/components/CadastreMap.tsx:177-233` | garder, dans l'URL (`at=lat,lon,zoom`) | |
 | 22 | Clé `searchLocation` lue partout, jamais écrite : restauration morte | `src/pages/Cadastre.tsx:144-195` | abandonner | |
-| 23 | Fond OSM seul, option « estompé » | `src/config/mapConfig.ts:177-182`, `src/index.css:188-191` | simplifier : Plan IGN (par défaut), photographies aériennes IGN (D-08) **et OSM** (Q8) ; « estompé » gardé | |
+| 23 | Fond OSM seul, option « estompé » | `src/config/mapConfig.ts:177-182`, `src/index.css:188-191` | garder **OSM par défaut** ; Plan IGN et photographies aériennes IGN au choix (Q8) ; « estompé » gardé | |
 | 24 | Bâtiments BD TOPO lus au WFS dans le navigateur, repli Overpass, cache IndexedDB | `src/hooks/useIGNAPI.ts:133-298`, `src/lib/wfsCache.ts` | reporter (Q9) | le Plan IGN montre déjà le bâti |
 | 25 | Adresses dérivées de la sélection (géocodage inverse de 12 points, tri par hiérarchie de voie) | `src/hooks/useParcelAddresses.ts` | reporter en L2 (adresse principale de l'étude) | filtre défaillant : boîte au lieu du polygone (#5 du scan) |
 | 26 | Altimétrie : résumé, mires, isolignes | `src/pages/Cadastre.tsx:332-356` | reporter en L4 (PLAN §6 : altimétrie dans Risques) | |
@@ -121,7 +121,7 @@ Posées au porteur du produit le 01/10/2026 ; la colonne « Codé la nuit du 30/
 | Q5 | Plafond de sélection ? | 50 parcelles | **garder** : 50 |
 | Q6 | Sélection sur plusieurs communes ? | permise | **garder** : permise |
 | Q7 | Où vit la sélection avant L2 ? | dans l'URL, partageable et rechargeable ; plus d'expiration | **garder** : dans l'URL |
-| Q8 | Quels fonds ? | Plan IGN (par défaut), photographies aériennes ; option « estompé » | **ajouter OpenStreetMap** aux fonds IGN |
+| Q8 | Quels fonds ? | Plan IGN (par défaut), photographies aériennes ; option « estompé » | **OpenStreetMap par défaut**, fonds IGN au choix (précisé le 01/10/2026) |
 | Q9 | Bâtiments en surimpression ? | reporter : le Plan IGN les montre ; le cadastre Etalab publie des bâtiments par commune si on en veut en vecteur | **reporter** (à reprendre pour la faisabilité, L7) |
 | Q10 | Mobile ? | même page, panneau en bas d'écran | **garder** |
 | Q11 | Petite commune de recette (question ouverte du PLAN) ? | **Beaumont-Village (37023)**, au RNU selon l'API Carto du GPU le 30/09/2026 | **ajouter Annecy** et deux adresses de référence (adresses des fondateurs) : 18 rue de Morette à Annecy, 2 rue Étienne Dolet à Maisons-Alfort ; Tours et Beaumont-Village gardées |
@@ -156,7 +156,7 @@ Le 30/09/2026, sur `master` (75d807b et suivants), stack du clone principal.
 | Commune jamais chargée, par le worker en direct : Paris 11e (`commune:load 75111`) | prête en ~2 s, 4 629 parcelles ; `address:search` passe par le worker |
 | Corse : « 10 cours Napoléon Ajaccio » (2A004, refusé par l'ancien code, #19) | cadastre chargé de lui-même, prêt en 1,3 s, parcelles affichées |
 | Aire calculée comparée à PostGIS (`ST_Area(geography)`) | écart < 10⁻⁵ en métropole et en Martinique (tests du domaine) |
-| e2e (Chromium, stack jetable, sans Internet) | 7 scénarios, 17 s tout compris : compte, deux adresses de référence, sélection au clic, morceaux, rechargement, fonds (IGN, OSM), mobile |
+| e2e (Chromium, stack jetable, sans Internet) | 7 scénarios, 17 s tout compris : compte, deux adresses de référence, sélection au clic, morceaux, rechargement, fonds (OSM par défaut, IGN), mobile |
 
 Captures : `scratchpad` de la session (non versionnées) ; à reprendre en `captures/F-01-*.png` avec
 l'ancienne application côte à côte quand elle sera accessible hors constellation.
@@ -176,6 +176,7 @@ case vide) ; la mesure des erreurs de tuiles (D-08) attend Sentry (reporté, que
 - Plafond de 50 parcelles (#13, Q5).
 - La sélection vit dans l'URL, plus dans `localStorage` (Q7) ; plus d'expiration à 2 h.
 - L'IDU officiel remplace l'identifiant maison (#17).
-- Le Plan IGN devient le fond par défaut, avec les photographies aériennes ; OSM reste au choix
-  (#23, Q8). Ses tuiles ont une politique d'usage à surveiller si le trafic grossit. Les bâtiments
+- OpenStreetMap reste le fond par défaut ; le Plan IGN et les photographies aériennes s'ajoutent
+  au choix (#23, Q8). Les tuiles d'OSM ont une politique d'usage (pas de trafic intensif) : à
+  servir par un fournisseur ou un proxy avant la mise en production à grande échelle. Les bâtiments
   BD TOPO ne sont plus superposés (#24, Q9).

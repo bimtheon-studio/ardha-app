@@ -66,14 +66,15 @@ test('sélectionner des parcelles au clic, signaler une sélection en morceaux, 
   await expect(page.getByTestId('total-contenance')).toHaveText('270 m²');
 });
 
-test('fonds de carte : plan IGN par défaut, photographies et OpenStreetMap au choix', async ({ page }) => {
+test('fonds de carte : OpenStreetMap par défaut, plan IGN et photographies au choix', async ({ page }) => {
   const tiles = await offlineTiles(page);
   await page.goto(`/map?at=${VIEW.lat},${VIEW.lon},17`);
+  await expect.poll(() => tiles.some((t) => t.startsWith('https://tile.openstreetmap.org/'))).toBe(true);
+  expect(tiles.some((t) => t.includes('data.geopf.fr'))).toBe(false);
+  await page.getByRole('radio', { name: 'Plan IGN' }).check();
   await expect.poll(() => tiles.some((t) => t.includes('PLANIGNV2'))).toBe(true);
   await page.getByRole('radio', { name: 'Photographies aériennes' }).check();
   await expect.poll(() => tiles.some((t) => t.includes('ORTHOIMAGERY.ORTHOPHOTOS'))).toBe(true);
-  await page.getByRole('radio', { name: 'OpenStreetMap' }).check();
-  await expect.poll(() => tiles.some((t) => t.startsWith('https://tile.openstreetmap.org/'))).toBe(true);
 });
 
 test.describe('sur mobile', () => {

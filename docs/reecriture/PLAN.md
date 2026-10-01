@@ -318,7 +318,7 @@ sur un fait nouveau, pas sur une préférence.
 | D-05 | Base « bête », jobs par BullMQ et Redis | pg-boss | pg-boss 12.35 installe son schéma et 5 fonctions SQL et fait de la base la file |
 | D-06 | Drizzle pour l'accès aux données | Prisma | SQL spatial dans des requêtes typées, pgvector natif ; Prisma 7.10 sans type géométrique. Risque accepté : Drizzle en 0.45, version épinglée, accès confiné aux repositories |
 | D-07 | L'estimation entre dans la v1 (L6), migrée et terminée | la reporter avec le volet agent | partie clé du produit ; les mutations DVF en base règlent une partie de ce qui manque |
-| D-08 | Fonds de carte chez IGN en accès direct, sous surveillance ; cartes des PDF et vignettes composées par le worker | un proxy de tuiles dès maintenant | aucune panne des tuiles de fond dans l'historique, contrairement aux API de données ; erreurs mesurées dans Sentry, proxy déclenché sur critère ; Leaflet conservé en L1 |
+| D-08 | Fonds de carte chez IGN en accès direct, sous surveillance (*amendée le 01/10/2026 par le porteur du produit : OpenStreetMap par défaut, fonds IGN au choix, F-01 Q8*) ; cartes des PDF et vignettes composées par le worker | un proxy de tuiles dès maintenant | aucune panne des tuiles de fond dans l'historique, contrairement aux API de données ; erreurs mesurées dans Sentry, proxy déclenché sur critère ; Leaflet conservé en L1 |
 | D-09 | Une stack par worktree : ports déterministes par branche, seed par fixtures, tests sans Internet | une stack locale unique | faire coder des agents en parallèle, puis sur des instances éphémères |
 | D-10 | PostgreSQL 18 (18.6), PostGIS 3.6, pgvector 0.8.5 | PostgreSQL 17 | dernière majeure, supportée jusqu'au 14/11/2030 ; images `postgis/postgis:18-3.6` et `pgvector/pgvector:0.8.5-pg18` disponibles |
 | D-11 | Déploiement par branches : `master` → production, `staging` → serveur de staging ; environnements éphémères par branche dans un second temps | staging automatique et production sur tag | les PR visent `master` ; `staging` est une copie de `master` dans laquelle on pré-fusionne les branches en cours, reprise régulièrement depuis `master` |
@@ -388,6 +388,10 @@ vers des comptes pas encore recréés) ; aucune migration ne les a réinjectées
 été supprimée le 27/09. Sans conséquence pour la réécriture, qui repart de zéro.
 
 ## Journal
+
+- **01/10/2026** — fond de carte par défaut : **OpenStreetMap** (porteur du produit), fonds IGN au
+  choix ; D-08 annotée. Tuiles OSM soumises à une politique d'usage : fournisseur ou proxy à prévoir
+  avant un trafic important.
 
 - **01/10/2026** — lint obligatoire en pre-commit (DT-27) ; perf des tests mesurée et consignée
   (DT-28, [`PERF-TESTS.md`](PERF-TESTS.md)) : 269 tests, 27 s tout compris. L'e2e construisait le

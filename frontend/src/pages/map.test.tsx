@@ -46,10 +46,11 @@ function parcel(i: number): ParcelFeature {
 
 const LAYERS = {
   basemaps: [
+    { id: 'osm', label: 'OpenStreetMap', url: 'https://osm/{z}/{x}/{y}', attribution: 'OSM', maxZoom: 19 },
     { id: 'plan', label: 'Plan IGN', url: 'https://tuiles/{z}/{x}/{y}', attribution: 'IGN', maxZoom: 19 },
     { id: 'ortho', label: 'Photographies aériennes', url: 'https://ortho/{z}/{x}/{y}', attribution: 'IGN', maxZoom: 20 },
   ],
-  defaultBasemap: 'plan',
+  defaultBasemap: 'osm',
   parcelsMinZoom: 16,
 };
 
@@ -296,10 +297,10 @@ describe('carte : recherche d’adresse', () => {
 });
 
 describe('carte : fond', () => {
-  it('Plan IGN par défaut ; photographies ; fond estompé retenu d’une visite à l’autre', async () => {
+  it('OpenStreetMap par défaut ; photographies ; fond estompé retenu d’une visite à l’autre', async () => {
     api();
     await openMap();
-    expect(screen.getByTestId('map')).toHaveAttribute('data-basemap', 'plan');
+    expect(screen.getByTestId('map')).toHaveAttribute('data-basemap', 'osm');
     await userEvent.click(screen.getByRole('radio', { name: 'Photographies aériennes' }));
     expect(screen.getByTestId('map')).toHaveAttribute('data-basemap', 'ortho');
     await userEvent.click(screen.getByRole('checkbox', { name: 'Estomper le fond' }));
