@@ -22,6 +22,13 @@
 6. Front : page Risques de l'étude, étape reliée, couches de risques.
 7. Tests unitaires, intégration, e2e ; recette ; clore.
 
+## État au matin du 02/10/2026
+
+Étapes 1 à 7 faites sur `l4-risks` (commits locaux, rien de poussé), critères de fin tenus en local
+(recette de [F-04](../fiches/F-04-risques.md#recette)). **À faire par le porteur du produit** :
+confirmer ou changer les arbitrages provisoires Q1 à Q14 ; décider du push et de la PR (après la
+fusion de L2, dont `l4-risks` part).
+
 ## Critères de fin
 
 - Maisons-Alfort AY96 + AY97 : PPRI « Marne et Seine » et ses zones, hauteurs d'eau TRI, argiles

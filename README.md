@@ -81,6 +81,8 @@ La CLI pilote et débogue la chaîne sans le front :
 | `study:rename` · `study:address` · `study:add-parcel` · `study:remove-parcel` | renommer, choisir l'adresse (identifiant BAN), modifier les parcelles |
 | `study:duplicate` · `study:delete` · `study:restore` · `study:purge [--days]` | copie ; corbeille ; restauration ; purge (le worker la fait chaque nuit, après 30 jours) |
 | `study:refresh <id> [--inline]` · `study:thumbnail <id> --out <png>` | recalcule adresse et vignette ; écrit la vignette dans un fichier |
+| `risk:analyze <étude> [--inline] [--force]` · `risk:show <étude>` | analyse des risques (par le worker, ou sur place) ; lecture |
+| `risk:commune <code>` · `risk:point <lon> <lat>` | interroge Géorisques sur une commune, argiles et hauteurs d'eau TRI en un point |
 
 Pour enregistrer d'un coup tout ce dont une commande a besoin :
 `ARDHA_SOURCES=record pnpm cli commune:load --inline 74010`, ou, pour l'adresse et la vignette d'une

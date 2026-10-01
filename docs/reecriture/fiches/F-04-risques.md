@@ -1,6 +1,6 @@
 # F-04 · Risques : analyse des risques d'une étude
 
-> Lot : L4 · Statut : `conçue` (nuit du 01/10/2026) ; **arbitrages provisoires** Q1 à Q14, pris par
+> Lot : L4 · Statut : `recettée` en local (nuit du 01/10/2026) ; **arbitrages provisoires** Q1 à Q14, pris par
 > l'agent sur l'option recommandée en l'absence du porteur du produit (même règle que la nuit de L1),
 > à confirmer au réveil · Branche : `l4-risks` (partie de `l2-study`, L4 dépend de L2)
 > Ancien code : `bimtheon-studio/ardha` @ `2a7f9a0` · Audit de l'ancienne équipe :
@@ -135,9 +135,27 @@ domaine). `CommunalRisksBanner.test.tsx` (sévérités) : règles portées dans 
 
 ## Recette
 
-À faire : Maisons-Alfort (AY96 + AY97 : PPRI Marne et Seine, TRI, argiles moyen), Annecy (AS71),
-Beaumont-Village (ZA1, rural).
+Nuit du 01/10/2026, sources en direct (CLI `risk:analyze --inline`, écran dans Chromium), puis
+enregistrées pour les tests :
+
+| Étude | Synthèse | Détail |
+|---|---|---|
+| Maisons-Alfort AY96 + AY97 | inondation aléa moyen (TRI), argiles moyen, radon 1, sismicité 1 | PPRI Marne et Seine (zones ZVC, ZR), PPRi Ruissellement urbain, PPRMT « Anciennes Carrières » ; crue moyenne : plus de 2 m d'eau ; altitudes 32,1 à 32,6 m NGF ; cote indicative au moins 34,3 m NGF ; 9 CatNat ; 8 ICPE à moins de 1 km (37 dans la commune) ; 7 bornes à moins de 400 m, la plus proche à 111 m ; 4 s |
+| Annecy AS71 | sismicité 4 (EC8), argiles moyen, radon 2, hors zone inondable | 457 m NGF ; 2 cavités, 12 ICPE à moins de 1 km ; bornes : Overpass en 504 deux fois → « indisponible », comme prévu (Q4) |
+| Beaumont-Village ZA1 (14,6 ha) | argiles **fort**, radon 1, sismicité 2, hors zone inondable | 136 à 140,5 m NGF ; aucune borne connue |
+| Tours BZ447 | PPR inondation sur la commune, radon 1, sismicité 2, hors zone d'argiles | 98 cavités à moins de 1 km ; altitudes 52 à 72 m |
+
+Constats : le TRI code la classe « plus de 2 m » par `ht_max = 10` (traité en classe ouverte, cote
+« au moins ») ; Overpass sature parfois (504) : l'axe le dit ; les tuiles WMS du BRGM sont lentes.
 
 ## Écarts assumés
 
-À écrire en fin de lot.
+- Analyse enregistrée et citée, au lieu d'être refaite à chaque visite ; périmée quand les parcelles
+  changent (Q1).
+- Une source muette est dite indisponible ; l'ancien code concluait « aucun risque » (Q4).
+- Hauteurs d'eau affichées par scénario ; cote indicative au scénario moyen, plus au maximum de
+  tous les scénarios ; classe ouverte « plus de 2 m » lue comme telle (Q5).
+- Plus de grille d'altitudes ni d'isolignes, plus de mode démo, plus de clic d'information sur la
+  carte (Q6, Q11, XSS).
+- Bornes incendie : indicatives, sans « conformité » (Q7).
+- Surcoûts de faisabilité et PDF reportés (L7, L8).
