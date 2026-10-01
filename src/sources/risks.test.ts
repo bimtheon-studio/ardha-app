@@ -9,7 +9,7 @@ import { FakeHttp } from '../../test/fake-http.ts';
 import { REPO_ROOT } from '../config/config.ts';
 import { Elevation, ELEVATION_URL } from './elevation.ts';
 import { FLOOD_WMS, FloodHeights, parseFloodGml } from './flood-heights.ts';
-import { Georisques, GEORISQUES_BASE } from './georisques.ts';
+import { Georisques, GEORISQUES_BASE, GEORISQUES_V2, planState } from './georisques.ts';
 import { RecordedHttp } from './http.ts';
 import { Hydrants, OVERPASS_URL } from './hydrants.ts';
 
@@ -154,5 +154,44 @@ describe('bornes incendie (OSM)', () => {
     expect(new URL(http.calls[0]!).searchParams.get('data')).toContain('(48.79000,2.42000,48.81000,2.44000)');
     await expect(new Hydrants(new FakeHttp({ [OVERPASS_URL]: { text: '<html>runtime error</html>' } })).inBbox([0, 0, 1, 1])).rejects.toThrow('instance surchargée');
     await expect(new Hydrants(new FakeHttp({ [OVERPASS_URL]: { status: 429 } })).inBbox([0, 0, 1, 1])).rejects.toThrow('Overpass : HTTP 429');
+  });
+});
+
+describe('Géorisques v2 (avec jeton, Q12)', () => {
+  it('PPR de Maisons-Alfort avec état et dates, réponses enregistrées ; le jeton part en en-tête, pas dans l’URL', async () => {
+    const plans = await new Georisques(recorded, 'jeton-de-test').plans('94046');
+    expect(plans.map((p) => [p.label, p.state, p.approvedAt ?? p.prescribedAt])).toEqual([
+      ['PPRI Marne et Seine', 'approved', '12/11/2007'],
+      ['PPRi Ruissellement urbain', 'prescribed', '09/07/2001'],
+      ['PPRMT 94 "Anciennes Carrières"', 'prescribed', '01/08/2001'],
+    ]);
+    expect(plans[0]).toMatchObject({ hazards: ['Inondation'], prefectureUrl: expect.stringContaining('val-de-marne.gouv.fr'), zones: [{ code: 'ZVC' }, { code: 'ZR' }] });
+
+    const http = new FakeHttp({ [`${GEORISQUES_V2}/gaspar/`]: { json: { content: [], totalPages: 0 } } });
+    const seen: Record<string, string>[] = [];
+    const get = http.get.bind(http);
+    http.get = (r) => (seen.push(r.headers ?? {}), get(r));
+    expect(await new Georisques(http, 'secret').plans('94046')).toEqual([]);
+    expect(http.calls.map((u) => new URL(u).pathname)).toEqual(['/api/v2/gaspar/pprn', '/api/v2/gaspar/pprt', '/api/v2/gaspar/pprm']);
+    expect(http.calls.every((u) => !u.includes('secret') && u.includes('codesInsee=94046'))).toBe(true);
+    expect(seen[0]).toEqual({ Authorization: 'Bearer secret' });
+    await expect(new Georisques(new FakeHttp({ [GEORISQUES_V2]: { json: { oups: 1 } } }), 's').plans('94046')).rejects.toThrow('Géorisques v2 PPRN : réponse inattendue');
+  });
+
+  it('au-delà de 20 PPR, ni état ni dates ; une fiche illisible n’empêche pas la liste', async () => {
+    const content = Array.from({ length: 22 }, (_, i) => ({ idGaspar: `P${i}`, libPpr: `PPR ${i}` }));
+    const http = new FakeHttp({ [`${GEORISQUES_V2}/gaspar/pprn?`]: { json: { content } }, [`${GEORISQUES_V2}/gaspar/`]: { json: { content: [] } }, [`${GEORISQUES_V2}/gaspar/pprn/`]: { json: { oups: 1 } } });
+    const plans = await new Georisques(http, 's').plans('94046');
+    expect(plans).toHaveLength(22);
+    expect(plans.every((p) => p.state === null && p.prefectureUrl === null)).toBe(true);
+    expect(http.calls.filter((u) => /pprn\/P\d+/.test(u))).toHaveLength(20);
+  });
+
+  it('état d’après les dates des aléas', () => {
+    const h = (over: Record<string, string | null>) => ({ libelle: 'Inondation', dateApprobation: null, datePrescription: null, dateAbrog: null, dateAnnulation: null, dateDeprescription: null, ...over });
+    expect(planState([h({ dateApprobation: '12/11/2007', datePrescription: '04/04/2003' })])).toEqual({ state: 'approved', approvedAt: '12/11/2007', prescribedAt: '04/04/2003' });
+    expect(planState([h({ datePrescription: '04/04/2003' })]).state).toBe('prescribed');
+    expect(planState([h({ dateApprobation: '1990', dateAbrog: '2000' })]).state).toBe('repealed');
+    expect(planState([]).state).toBeNull();
   });
 });

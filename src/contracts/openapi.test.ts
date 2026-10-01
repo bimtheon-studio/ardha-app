@@ -19,6 +19,7 @@ describe('documentOpenApi', () => {
       '/api/communes/{code}/cadastre',
       '/api/map/layers',
       '/api/parcels',
+      '/api/parcels/elevation',
       '/api/studies',
       '/api/studies/{id}',
       '/api/studies/{id}/duplicate',

@@ -1,8 +1,7 @@
 # F-04 · Risques : analyse des risques d'une étude
 
-> Lot : L4 · Statut : `recettée` en local (nuit du 01/10/2026) ; **arbitrages provisoires** Q1 à Q14, pris par
-> l'agent sur l'option recommandée en l'absence du porteur du produit (même règle que la nuit de L1),
-> à confirmer au réveil · Branche : `l4-risks` (partie de `l2-study`, L4 dépend de L2)
+> Lot : L4 · Statut : `recettée` en local (nuit du 01/10/2026) ; arbitrages Q1 à Q14 rendus par le
+> porteur du produit le 02/10/2026 (Q6, Q9, Q10, Q12 changés, repris le 02/10/2026) · Branche : `l4-risks` (partie de `l2-study`, L4 dépend de L2)
 > Ancien code : `bimtheon-studio/ardha` @ `2a7f9a0` · Audit de l'ancienne équipe :
 > `docs/risques-pipeline-audit.md` (juin 2026, endpoints vérifiés en ligne)
 
@@ -97,24 +96,28 @@ contraintes PPRI mortes ; PDF toujours « non disponible » ; export qui lit mal
 domaine). `CommunalRisksBanner.test.tsx` (sévérités) : règles portées dans le domaine.
 `estimationDiagnostics.test.ts` : L6. `buildEnvelope.test.ts` : L7.
 
-## Questions (arbitrages provisoires, nuit du 01/10/2026)
+## Questions (arbitrées le 02/10/2026)
 
-| # | Question | Arbitrage provisoire (option recommandée) | Autres options |
-|---|---|---|---|
-| Q1 | Quand l'analyse se fait-elle ? | **à la demande** (ouverture de la page Risques ou « Recalculer »), par le worker, enregistrée pour l'empreinte des parcelles ; **périmée** quand les parcelles changent | automatique à chaque modification de parcelles |
-| Q2 | Données communales (radon, sismicité, GASPAR, PPR, CatNat, ICPE, SIS, CASIAS) | **appel à la demande** par le worker, copié dans l'analyse avec la date (PLAN §4 : « caches à la demande ») | import en masse dans des tables de référence |
-| Q3 | Argiles et TRI | **par parcelle, en un point intérieur** (pas au centroïde), pire classe | intersection surfacique (pas de WFS pour le TRI) |
-| Q4 | Une source qui échoue | **« indisponible », dit à l'écran**, jamais « hors zone » ; l'analyse est enregistrée avec ses trous | refuser l'analyse entière |
-| Q5 | Cote d'inondation | **hauteurs d'eau par scénario et par parcelle**, telles quelles ; cote indicative = altitude de la parcelle + hauteur max du **scénario moyen** | max de tous les scénarios (ancien) |
-| Q6 | Altimétrie | **points de la parcelle** (intérieur + périmètre ~15 m), stats par parcelle et globales ; grille et isolignes **reportées** | grille ±500 m et isolignes dès L4 |
-| Q7 | Bornes incendie | **OSM, indicatif** : bornes à moins de 400 m de l'emprise, distance de la plus proche, sans « conformité » | règle RDDECI par département ; PEI officiels |
-| Q8 | Couches de risques sur la carte | **tuiles WMS dans le navigateur**, comme les fonds (D-08), sans clic d'information | servies par le worker (proxy) ; pas de couche |
-| Q9 | Surcoûts de faisabilité | **reportés en L7** | dès L4 |
-| Q10 | Cavités, ICPE, SIS, CASIAS | **classés par distance à l'emprise**, cavités à 1 km du centre de l'emprise | par commune seulement (ancien) |
-| Q11 | Mode démo | **abandonné** | garder |
-| Q12 | Géorisques v2 (états et dates des PPR) | **reporté** (jeton à demander) ; v1 donne les zones réglementaires | dès L4 |
-| Q13 | Préférences de couches | **locales au navigateur** | dans l'étude |
-| Q14 | Altimétrie sur la carte de sélection (`/map`) | **reportée** : elle est dans la page Risques de l'étude | dès L4 |
+Codées la nuit du 01/10 sur l'option recommandée (arbitrages provisoires), puis posées au porteur du
+produit le 02/10/2026 avec l'interface de questions : recommandation suivie partout, **sauf Q6, Q9,
+Q10 et Q12**.
+
+| # | Question | Réponse |
+|---|---|---|
+| Q1 | Quand l'analyse se fait-elle ? | **à la demande** (première ouverture de l'étape, « Recalculer »), enregistrée pour l'empreinte des parcelles, **périmée** quand elles changent |
+| Q2 | Données communales | **à la demande** par le worker, copiées dans l'analyse avec la date (PLAN §4) ; import en masse plus tard si Géorisques se montre fragile |
+| Q3 | Argiles et TRI | **par parcelle, en un point intérieur**, pire classe |
+| Q4 | Une source qui échoue | **« indisponible »**, dit à l'écran, l'analyse garde ses trous |
+| Q5 | Cote de crue | hauteurs d'eau **par scénario** ; cote indicative = altitude de la parcelle + hauteur du **scénario moyen**, « au moins » pour la classe ouverte |
+| Q6 | Altimétrie | stats par parcelle dans l'analyse **et résumé d'altitude dès la sélection sur la carte** (choix du porteur du produit) ; grille et isolignes reportées |
+| Q7 | Bornes incendie | **OSM, indicatif**, à moins de 400 m, sans conformité |
+| Q8 | Couches de risques | **tuiles WMS dans le navigateur**, comme les fonds (D-08 étendue), sans clic d'information |
+| Q9 | Surcoûts | **affichés dès L4** (choix du porteur du produit) : inondation sur le résultat **parcellaire**, radon classe 3, sismicité zones 3 et 4+, valeurs sourcées ou signalées comme non sourcées ; ajustables en L7 |
+| Q10 | Alentours | **classés par distance, rayon de 500 m** (choix du porteur du produit) |
+| Q11 | Mode démo | **abandonné** |
+| Q12 | Géorisques v2 | **jeton créé par le porteur du produit** (choix du porteur du produit), gardé côté worker ; états et dates des PPR ajoutés à l'analyse |
+| Q13 | Préférences de couches | **dans le navigateur** |
+| Q14 | Altimétrie sur la carte de sélection | couverte par Q6 : **oui** |
 
 ## Conception cible
 
@@ -144,6 +147,12 @@ enregistrées pour les tests :
 | Annecy AS71 | sismicité 4 (EC8), argiles moyen, radon 2, hors zone inondable | 457 m NGF ; 2 cavités, 12 ICPE à moins de 1 km ; bornes : Overpass en 504 deux fois → « indisponible », comme prévu (Q4) |
 | Beaumont-Village ZA1 (14,6 ha) | argiles **fort**, radon 1, sismicité 2, hors zone inondable | 136 à 140,5 m NGF ; aucune borne connue |
 | Tours BZ447 | PPR inondation sur la commune, radon 1, sismicité 2, hors zone d'argiles | 98 cavités à moins de 1 km ; altitudes 52 à 72 m |
+
+Reprises du 02/10/2026 : alentours à 500 m (Tours : 51 cavités au lieu de 98) ; surcoûts affichés
+(Annecy : +54 €/m² parasismiques, zone 4) ; altitudes de la sélection sur la carte (AY96 + AY97 :
+31,88 à 32,55 m NGF) ; Géorisques v2 avec jeton : PPRI Marne et Seine **approuvé le 12/11/2007**,
+PPRi Ruissellement urbain et PPRMT « Anciennes Carrières » **prescrits** (2001), Annecy : PPR multirisques
+approuvés le 29/01/2009 ; en v2 aussi, `code_insee` et `codeInsee` sont ignorés : il faut `codesInsee`.
 
 Constats : le TRI code la classe « plus de 2 m » par `ht_max = 10` (traité en classe ouverte, cote
 « au moins ») ; Overpass sature parfois (504) : l'axe le dit ; les tuiles WMS du BRGM sont lentes.

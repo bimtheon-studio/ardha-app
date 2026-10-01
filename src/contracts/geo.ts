@@ -135,6 +135,16 @@ export type RiskLayer = z.infer<typeof RiskLayer>;
 export const MapLayers = z.object({ basemaps: z.array(Basemap), defaultBasemap: z.string(), parcelsMinZoom: z.number().int(), riskLayers: z.array(RiskLayer) });
 export type MapLayers = z.infer<typeof MapLayers>;
 
+const ElevationStats = z.object({ min: z.number(), max: z.number(), mean: z.number(), range: z.number(), points: z.number().int() });
+
+/** Altitudes d'une sélection de parcelles (F-04, Q6) : par parcelle et en tout, m NGF. */
+export const SelectionElevation = z.object({
+  overall: ElevationStats.nullable(),
+  parcels: z.array(z.object({ id: z.string(), stats: ElevationStats.nullable() })),
+  source: z.string(),
+});
+export type SelectionElevation = z.infer<typeof SelectionElevation>;
+
 export const geoRoutes = {
   addressSearch: route({
     method: 'GET',
@@ -193,6 +203,21 @@ export const geoRoutes = {
     body: undefined,
     query: ParcelsQuery,
     response: Parcels,
+    status: 200,
+    authenticated: true,
+  }),
+  parcelsElevation: route({
+    method: 'GET',
+    path: '/api/parcels/elevation',
+    summary: 'Altitudes de parcelles (IGN, par le worker) : min, max, moyenne, dénivelé',
+    body: undefined,
+    query: z.object({
+      ids: z
+        .string()
+        .refine((t) => t.split(',').every(isParcelId), 'Identifiant de parcelle invalide.')
+        .refine((t) => t.split(',').length <= SELECTION_MAX, `Au plus ${SELECTION_MAX} parcelles.`),
+    }),
+    response: SelectionElevation,
     status: 200,
     authenticated: true,
   }),

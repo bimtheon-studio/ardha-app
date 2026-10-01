@@ -87,6 +87,7 @@ function api(overrides: Record<string, unknown> = {}) {
     'GET /api/map/layers': { status: 200, body: LAYERS },
     'GET /api/communes/locate': { status: 200, body: { commune: { code: '94046', name: 'Maisons-Alfort' } } },
     'GET /api/studies': { status: 200, body: { studies: [] } },
+    'GET /api/parcels/elevation': { status: 200, body: { overall: { min: 31.9, max: 32.6, mean: 32.2, range: 0.7, points: 23 }, parcels: [], source: 'IGN' } },
     'GET /api/communes/94046': { status: 200, body: commune('ready') },
     'POST /api/communes/94046/cadastre': { status: 202, body: commune('ready') },
     'GET /api/parcels': (_, url) => {

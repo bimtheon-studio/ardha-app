@@ -11,8 +11,9 @@ function result(over: { communes?: Partial<RisksResult['communes'][number]>[]; p
   const parcel = { id: 'p', label: 'AB 1', point: [0, 0] as [number, number], clay: ok(null), flood: ok({ hazard: null, scenarios: [], reference: null }), elevation: ok(null), floodLevel: null };
   const empty = ok({ count: 0, truncated: false, items: [] });
   return {
-    version: 1,
+    version: 2,
     center: [0, 0],
+    radii: { nearbyM: 500, hydrantsM: 400 },
     communes: (over.communes ?? [{}]).map((c) => ({ ...commune, ...c })) as RisksResult['communes'],
     parcels: (over.parcels ?? [{}]).map((p) => ({ ...parcel, ...p })) as RisksResult['parcels'],
     cavities: ok({ truncated: false, items: [] }),
@@ -24,7 +25,7 @@ function result(over: { communes?: Partial<RisksResult['communes'][number]>[]; p
 
 describe('axesInput', () => {
   it('pire valeur des communes et des parcelles', () => {
-    const plan = { id: 'P', kind: 'PPRN' as const, label: 'PPRI', model: 'PPRN-I', modifiedAt: null, flood: true, zones: [], url: 'u' };
+    const plan = { id: 'P', kind: 'PPRN' as const, label: 'PPRI', model: 'PPRN-I', modifiedAt: null, flood: true, zones: [], url: 'u', state: null, approvedAt: null, prescribedAt: null, hazards: [], prefectureUrl: null };
     expect(
       axesInput(
         result({

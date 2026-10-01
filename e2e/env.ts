@@ -27,6 +27,7 @@ export function e2eEnv(): { api: number; web: number; env: NodeJS.ProcessEnv } {
       SESSION_COOKIE_NAME: 'ardha_e2e',
       QUEUE_PREFIX: 'ardha:e2e',
       ARDHA_SOURCES: 'recorded',
+      GEORISQUES_TOKEN: '',
       LOG_LEVEL: 'warn',
       // Le relais du front (vite preview), puis l'IP simulée par chaque test (e2e/helpers.ts).
       TRUST_PROXY: '2',

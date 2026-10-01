@@ -9,6 +9,9 @@ import { z } from 'zod';
 import { type Http, SourceError } from './http.ts';
 
 export const GEORISQUES_BASE = 'https://www.georisques.gouv.fr/api/v1';
+export const GEORISQUES_V2 = 'https://www.georisques.gouv.fr/api/v2';
+/** Fiches détaillées lues au plus par commune (v2 : une requête par PPR). */
+const MAX_PLAN_DETAILS = 20;
 const SOURCE = 'georisques';
 /** Pages lues au plus (100 éléments chacune) : au-delà, la liste est dite tronquée. */
 const MAX_PAGES = 5;
@@ -65,12 +68,39 @@ export interface Listing<T> {
 
 export interface PlanInfo {
   id: string;
-  kind: 'PPRN' | 'PPRT';
+  kind: 'PPRN' | 'PPRT' | 'PPRM';
   label: string;
   model: string | null;
   /** « 27/02/2025 », tel que publié. */
   modifiedAt: string | null;
   zones: { code: string | null; label: string; name: string | null }[];
+  /** v2 seulement (nuls en v1) : état pour la commune, dates « JJ/MM/AAAA », aléas, page de la préfecture. */
+  state: 'approved' | 'prescribed' | 'repealed' | null;
+  approvedAt: string | null;
+  prescribedAt: string | null;
+  hazards: string[];
+  prefectureUrl: string | null;
+}
+
+const Hazard = z.object({
+  libelle: z.string(),
+  dateApprobation: nullableString,
+  datePrescription: nullableString,
+  dateAbrog: nullableString,
+  dateAnnulation: nullableString,
+  dateDeprescription: nullableString,
+});
+const PlanDetails = z.object({
+  communes: z.array(z.object({ codeInsee: z.string(), lienPpr: nullableString, aleas: z.array(Hazard).nullish() })).default([]),
+});
+
+/** État d'un PPR pour une commune, d'après les dates de ses aléas (v2). */
+export function planState(hazards: readonly z.output<typeof Hazard>[]): Pick<PlanInfo, 'state' | 'approvedAt' | 'prescribedAt'> {
+  const first = (pick: (h: z.output<typeof Hazard>) => string | null) => hazards.map(pick).find((d): d is string => d !== null) ?? null;
+  const approvedAt = first((h) => h.dateApprobation);
+  const prescribedAt = first((h) => h.datePrescription);
+  const ended = hazards.length > 0 && hazards.every((h) => h.dateAbrog || h.dateAnnulation || h.dateDeprescription);
+  return { state: ended ? 'repealed' : approvedAt ? 'approved' : prescribedAt ? 'prescribed' : null, approvedAt, prescribedAt };
 }
 
 export interface PollutedSiteInfo {
@@ -89,11 +119,15 @@ function parse<S extends z.ZodType>(schema: S, items: readonly unknown[]): z.out
 }
 
 export class Georisques {
-  constructor(private readonly http: Http) {}
+  /** `token` : jeton de l'API v2 ; sans lui, les PPR se lisent en v1 (sans état ni dates). */
+  constructor(
+    private readonly http: Http,
+    private readonly token?: string,
+  ) {}
 
-  private async json(path: string, params: Record<string, string>): Promise<unknown> {
-    const url = `${GEORISQUES_BASE}/${path}?${new URLSearchParams(params)}`;
-    const r = await this.http.get({ url, timeoutMs: 10_000 });
+  private async json(path: string, params: Record<string, string>, v2 = false): Promise<unknown> {
+    const url = `${v2 ? GEORISQUES_V2 : GEORISQUES_BASE}/${path}?${new URLSearchParams(params)}`;
+    const r = await this.http.get({ url, timeoutMs: 10_000, ...(v2 && { headers: { Authorization: `Bearer ${this.token}` } }) });
     if (r.status !== 200) throw new SourceError(SOURCE, 'unavailable', `Géorisques ${path} : HTTP ${r.status}`);
     try {
       return JSON.parse(r.body.toString('utf8'));
@@ -130,21 +164,52 @@ export class Georisques {
     return rows.flatMap((r) => r.risques_detail.map((d) => ({ code: d.num_risque, label: d.libelle_risque_long })));
   }
 
-  /** PPR naturels et technologiques de la commune, avec leurs zones réglementaires. */
+  /** PPR de la commune, avec leurs zones réglementaires ; en v2, aussi miniers, avec état et dates. */
   async plans(code: string): Promise<PlanInfo[]> {
+    return this.token ? this.plansV2(code) : this.plansV1(code);
+  }
+
+  private async plansV2(code: string): Promise<PlanInfo[]> {
+    const plans: PlanInfo[] = [];
+    for (const kind of ['PPRN', 'PPRT', 'PPRM'] as const) {
+      const path = `gaspar/${kind.toLowerCase()}`;
+      // v2 : `codesInsee` (ni `code_insee` ni `codeInsee`, ignorés : toute la France revient).
+      const page = SpringPage.safeParse(await this.json(path, { codesInsee: code, pageNumber: '0', pageSize: '100' }, true));
+      if (!page.success) throw new SourceError(SOURCE, 'invalid', `Géorisques v2 ${kind} : réponse inattendue`);
+      for (const p of parse(Plan, page.data.content)) {
+        // Le détail porte l'état et les dates par commune ; on s'en passe au-delà du plafond.
+        const details = plans.length < MAX_PLAN_DETAILS ? PlanDetails.safeParse(await this.json(`${path}/${encodeURIComponent(p.idGaspar)}`, {}, true)) : null;
+        const commune = details?.success ? details.data.communes.find((c) => c.codeInsee === code) : undefined;
+        const hazards = commune?.aleas ?? [];
+        plans.push({
+          ...this.planBase(p, kind),
+          ...planState(hazards),
+          hazards: [...new Set(hazards.map((h) => h.libelle))],
+          prefectureUrl: commune?.lienPpr ?? null,
+        });
+      }
+    }
+    return plans;
+  }
+
+  private planBase(p: z.output<typeof Plan>, kind: PlanInfo['kind']) {
+    return {
+      id: p.idGaspar,
+      kind,
+      label: p.libPpr,
+      model: p.modeleProcedure,
+      modifiedAt: p.dateModification,
+      zones: (p.zonageReglementaire?.listTypeReg ?? []).map((z) => ({ code: z.codeZone, label: z.libelle, name: z.nom })),
+    };
+  }
+
+  private async plansV1(code: string): Promise<PlanInfo[]> {
     const plans: PlanInfo[] = [];
     for (const kind of ['PPRN', 'PPRT'] as const) {
       const page = SpringPage.safeParse(await this.json(`gaspar/${kind.toLowerCase()}`, { codeInsee: code, page: '1', page_size: '50' }));
       if (!page.success) throw new SourceError(SOURCE, 'invalid', `Géorisques ${kind} : réponse inattendue`);
       for (const p of parse(Plan, page.data.content)) {
-        plans.push({
-          id: p.idGaspar,
-          kind,
-          label: p.libPpr,
-          model: p.modeleProcedure,
-          modifiedAt: p.dateModification,
-          zones: (p.zonageReglementaire?.listTypeReg ?? []).map((z) => ({ code: z.codeZone, label: z.libelle, name: z.nom })),
-        });
+        plans.push({ ...this.planBase(p, kind), state: null, approvedAt: null, prescribedAt: null, hazards: [], prefectureUrl: null });
       }
     }
     return plans;

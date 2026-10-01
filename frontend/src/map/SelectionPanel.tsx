@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
 
+import { ElevationSummary } from './ElevationSummary';
 import type { SelectedParcel } from './selection';
 
 interface Props {
@@ -74,6 +75,7 @@ export function SelectionPanel({ selection, summary, pending, unknown, refusal, 
               {formatArea(summary.area)}
             </dd>
           </dl>
+          <ElevationSummary ids={selection.map((p) => p.id)} />
           {summary.withoutContenance > 0 && (
             <p className="text-xs text-muted-foreground">{summary.withoutContenance} parcelle(s) sans contenance cadastrale, hors du total.</p>
           )}

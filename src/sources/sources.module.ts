@@ -29,7 +29,7 @@ import { Hydrants } from './hydrants.ts';
     { provide: Communes, inject: [Http], useFactory: (http: Http) => new Communes(http) },
     { provide: Cadastre, inject: [Http], useFactory: (http: Http) => new Cadastre(http) },
     { provide: Tiles, inject: [Http], useFactory: (http: Http) => new Tiles(http) },
-    { provide: Georisques, inject: [Http], useFactory: (http: Http) => new Georisques(http) },
+    { provide: Georisques, inject: [Http, CONFIG], useFactory: (http: Http, c: Config) => new Georisques(http, c.GEORISQUES_TOKEN) },
     { provide: FloodHeights, inject: [Http], useFactory: (http: Http) => new FloodHeights(http) },
     { provide: Elevation, inject: [Http], useFactory: (http: Http) => new Elevation(http) },
     { provide: Hydrants, inject: [Http], useFactory: (http: Http) => new Hydrants(http) },

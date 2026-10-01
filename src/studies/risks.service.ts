@@ -4,7 +4,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { RISKS_VERSION, RisksResult, type StudyRisks } from '../contracts/index.ts';
-import { type AxesInput, type Known, type Level, riskAxes, worstLevel } from '../domain/index.ts';
+import { type AxesInput, type Known, type Level, riskAxes, riskSurcharges, worstLevel } from '../domain/index.ts';
 import { Clock } from '../shared/clock.ts';
 import { AnalysesRepository } from './analyses.repository.ts';
 import { ANALYZE_RISKS_JOB, StudyJobs } from './studies.jobs.ts';
@@ -59,10 +59,11 @@ export class RisksService {
   async get(actor: Actor, id: string): Promise<StudyRisks> {
     const study = await this.studies.require(actor, id);
     const row = await this.analyses.get(id, 'risks');
-    if (!row) return { status: 'none', stale: false, requestedAt: null, computedAt: null, error: null, result: null, axes: null, sources: RISK_SOURCES };
+    if (!row) return { status: 'none', stale: false, requestedAt: null, computedAt: null, error: null, result: null, axes: null, surcharges: null, sources: RISK_SOURCES };
     // Un résultat d'une ancienne version du schéma ne se lit plus : il est à refaire.
     const parsed = RisksResult.safeParse(row.result);
     const result = parsed.success ? parsed.data : null;
+    const input = result && axesInput(result);
     return {
       status: row.status,
       stale: row.parcelsKey !== study.parcelsKey || (row.result !== null && (row.result as { version?: number }).version !== RISKS_VERSION),
@@ -70,7 +71,8 @@ export class RisksService {
       computedAt: row.computedAt?.toISOString() ?? null,
       error: row.error,
       result,
-      axes: result && riskAxes(axesInput(result)),
+      axes: input && riskAxes(input),
+      surcharges: input && riskSurcharges(input),
       sources: RISK_SOURCES,
     };
   }

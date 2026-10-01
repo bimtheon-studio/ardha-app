@@ -86,7 +86,7 @@ describe('analyse des risques', () => {
     expect(ay96!.elevation).toMatchObject({ status: 'ok', data: { min: 32.14, max: 32.55, points: 11 } });
     expect(ay96!.floodLevel).toEqual({ level: 34.31, atLeast: true });
     expect(res.installations).toMatchObject({ status: 'ok', data: { count: 37 } });
-    expect(res.installations.status === 'ok' && res.installations.data.items.every((i) => i.distanceM <= 1000)).toBe(true);
+    expect(res.installations.status === 'ok' && res.installations.data.items.every((i) => i.distanceM <= 500)).toBe(true);
     expect(res.hydrants.status === 'ok' && res.hydrants.data.items[0]!.distanceM).toBe(111);
     expect(res.cavities).toEqual({ status: 'ok', data: { truncated: false, items: [] } });
 
@@ -193,5 +193,23 @@ describe('exécution', () => {
     await expect(runner.run({ studyId: id, parcelsKey: key })).rejects.toThrow('panne');
     expect((await t.app.get(AnalysesRepository).get(id, 'risks'))!.status).toBe('failed');
     spy.mockRestore();
+  });
+});
+
+describe('altitudes d’une sélection (Q6)', () => {
+  it('par le worker, sur le même échantillon que l’analyse : par parcelle et en tout', async () => {
+    const r = await get(`/api/parcels/elevation?ids=${AY96},${AY97}`);
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({
+      overall: { min: 31.88, max: 32.55, mean: 32.2, range: 0.67, points: 23 },
+      parcels: [
+        { id: AY96, stats: { min: 32.14, max: 32.55, points: 11 } },
+        { id: AY97, stats: { min: 31.88, max: 32.3, points: 12 } },
+      ],
+      source: expect.stringContaining('RGE ALTI'),
+    });
+    expect((await get('/api/parcels/elevation?ids=x')).status).toBe(400);
+    expect((await get('/api/parcels/elevation?ids=94046000ZZ9999')).status).toBe(404);
+    expect((await http().get(`/api/parcels/elevation?ids=${AY96}`)).status).toBe(401);
   });
 });

@@ -1,3 +1,5 @@
+import { interiorPoint, perimeterPoints, type Position, type Surface } from './geometry.ts';
+
 // Risques d'une étude (F-04) : aléa inondation des cartes TRI, classes d'argiles, de radon et de
 // sismicité, synthèse des quatre axes. Repris de l'ancien code (`usePPRIFloodZone.ts:120-126`,
 // `CommunalRisksBanner.tsx:47-185` @2a7f9a0), avec un état « indisponible » qui ne se confond plus
@@ -204,5 +206,78 @@ export function elevationStats(zs: readonly number[]): { min: number; max: numbe
 
 /** Rayon de recherche des bornes incendie autour de l'emprise, indicatif (F-04, Q7). */
 export const HYDRANT_RADIUS_M = 400;
-/** Rayon de recherche des cavités, installations et sols pollués autour de l'emprise (F-04, Q10). */
-export const NEARBY_RADIUS_M = 1_000;
+/** Rayon de recherche des cavités, installations et sols pollués autour de l'emprise (F-04, Q10, arbitré le 02/10/2026). */
+export const NEARBY_RADIUS_M = 500;
+
+/** Coût de construction de référence, en € HT par m² de surface de plancher (valeur par défaut de l'ancien outil, ajustable en L7). */
+export const REFERENCE_CONSTRUCTION_COST_M2 = 1_800;
+
+export interface Surcharge {
+  key: 'flood' | 'radon' | 'seismic';
+  label: string;
+  /** € HT par m² de surface de plancher. */
+  perM2: number;
+  /** Ce qui déclenche le surcoût. */
+  basis: string;
+  source: string;
+  /** Faux : valeur reprise sans source vérifiable, à confirmer. */
+  sourced: boolean;
+}
+
+/**
+ * Surcoûts indicatifs de construction liés aux risques (F-04, Q9, arbitré le 02/10/2026), repris de
+ * l'ancienne Faisabilité (`Faisabilite.tsx:448-460`, `docs/audit-follow-ups.md:20-27` @2a7f9a0) et
+ * corrigés : l'inondation se déclenche sur le résultat **parcellaire** (cartes TRI), plus sur la seule
+ * existence d'un PPR dans la commune.
+ */
+export function riskSurcharges(input: Pick<AxesInput, 'floodHazard' | 'radon' | 'seismic'>, constructionCostM2 = REFERENCE_CONSTRUCTION_COST_M2): Surcharge[] {
+  const out: Surcharge[] = [];
+  const { floodHazard: flood, radon, seismic } = input;
+  if (flood !== 'unavailable' && flood !== null) {
+    out.push({
+      key: 'flood',
+      label: 'Adaptation à l’inondation (fondations, plancher surélevé)',
+      perM2: 150,
+      basis: `Parcelle en zone inondable (TRI), aléa ${flood}`,
+      source: 'Forfait repris de l’ancien outil, sans source vérifiable : à confirmer',
+      sourced: false,
+    });
+  }
+  if (radon !== 'unavailable' && radon !== null && radon >= 3) {
+    out.push({
+      key: 'radon',
+      label: 'Protection contre le radon (membrane, ventilation)',
+      perM2: 15,
+      basis: `Potentiel radon de classe ${radon}`,
+      source: 'Prix CYPE 12,71 à 17,11 €/m² ; fourchette ASNR et CSTB 10 à 20 €/m²',
+      sourced: true,
+    });
+  }
+  if (seismic !== 'unavailable' && seismic !== null && seismic >= 3) {
+    const rate = seismic >= 4 ? 0.03 : 0.015;
+    out.push({
+      key: 'seismic',
+      label: 'Dispositions parasismiques',
+      perM2: Math.round(constructionCostM2 * rate),
+      basis: `Zone de sismicité ${seismic} : ${(rate * 100).toLocaleString('fr-FR')} % du coût de construction (${constructionCostM2.toLocaleString('fr-FR')} €/m² de référence)`,
+      source: 'Eurocode 8, guide CPMI-EC8 : valeurs médianes des sources professionnelles (0,5 à 4 %)',
+      sourced: true,
+    });
+  }
+  return out;
+}
+
+/** Points d'altitude par parcelle (le point intérieur, puis le périmètre tous les 15 m), et en tout. */
+export const ELEVATION_PER_PARCEL = 40;
+export const ELEVATION_TOTAL = 300;
+const PERIMETER_STEP_M = 15;
+
+/**
+ * Points où mesurer l'altitude de chaque parcelle : un point intérieur, puis le contour tous les
+ * 15 m, en partageant le plafond total entre les parcelles. Le même échantillon sert à l'analyse des
+ * risques et au résumé de la carte (mêmes requêtes, donc mêmes réponses en cache).
+ */
+export function elevationSamples(parcels: readonly Surface[]): Position[][] {
+  const perParcel = Math.min(ELEVATION_PER_PARCEL, Math.max(2, Math.floor(ELEVATION_TOTAL / Math.max(1, parcels.length))));
+  return parcels.map((g) => [interiorPoint(g), ...perimeterPoints(g, PERIMETER_STEP_M, ELEVATION_PER_PARCEL - 1)].slice(0, perParcel));
+}

@@ -131,6 +131,9 @@ it('risk:analyze --inline, risk:show, risk:commune, risk:point', async () => {
   expect(muted).toContain('?   Retrait-gonflement des argiles : Source indisponible : à vérifier');
   expect(muted).toMatch(/argiles : indisponible \(Réponse enregistrée absente/);
   expect(muted).toMatch(/bornes incendie à 400 m : indisponible/);
+  expect(await run('parcel:elevation', AY96, AY97, '--inline')).toBe(
+    ['Sélection : 31.88 à 32.55 m NGF, moyenne 32.2, dénivelé 0.67 m (23 points)', '  94046000AY0096 : 32.14 à 32.55 m NGF, moyenne 32.31, dénivelé 0.41 m (11 points)', '  94046000AY0097 : 31.88 à 32.3 m NGF, moyenne 32.09, dénivelé 0.42 m (12 points)', 'Source : IGN, RGE ALTI® (m NGF-IGN69, IGN78 en Corse)'].join('\n'),
+  );
   await run('risk:point', 'x', '1');
   expect(errors.join('\n')).toContain('Point invalide : x 1');
   process.exitCode = 0;

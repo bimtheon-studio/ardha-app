@@ -30,6 +30,8 @@ export function testConfig(overrides: NodeJS.ProcessEnv = {}): Config {
     ARDHA_SOURCES: 'recorded',
     TRUST_PROXY: '1',
     LOG_LEVEL: 'silent',
+    // Tests identiques en local et en CI : la v1 de Géorisques, sauf test qui fournit son jeton.
+    GEORISQUES_TOKEN: '',
     ...overrides,
   });
 }

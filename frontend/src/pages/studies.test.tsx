@@ -374,6 +374,7 @@ describe('corbeille', () => {
 const mapApi = {
   ...base,
   'GET /api/communes/locate': { status: 200, body: { commune: { code: '94046', name: 'Maisons-Alfort' } } },
+  'GET /api/parcels/elevation': { status: 200, body: { overall: { min: 31.9, max: 32.6, mean: 32.2, range: 0.7, points: 23 }, parcels: [], source: 'IGN' } },
   'GET /api/communes/94046': { status: 200, body: { code: '94046', name: 'Maisons-Alfort', center: null, cadastre: { status: 'ready', version: '2026-09-01', loadedAt: null, parcelCount: 10, error: null } } },
   'GET /api/parcels': (_: unknown, url: URL) => {
     const all = [0, 1, 2].map(feature);

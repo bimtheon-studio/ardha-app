@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
+import { rect } from './geometry.test.ts';
 import {
   type AxesInput,
   clayLevel,
+  elevationSamples,
   elevationStats,
   type FloodHit,
   floodClassLabel,
@@ -11,6 +13,7 @@ import {
   isFloodPlan,
   referenceFloodHeight,
   riskAxes,
+  riskSurcharges,
   worstLevel,
 } from './risks.ts';
 
@@ -109,5 +112,38 @@ describe('riskAxes', () => {
     expect(byKey({ ...calm, seismic: 2 }).seismic).toMatchObject({ severity: 'low', detail: null });
     expect(byKey({ ...calm, seismic: 7 }).seismic!.state).toBe('Zone inconnue');
     expect(byKey({ ...calm, seismic: 'unavailable' }).seismic!.severity).toBe('unknown');
+  });
+});
+
+describe('riskSurcharges (Q9)', () => {
+  it('inondation sur le résultat parcellaire, radon classe 3, sismicité zones 3 et 4+', () => {
+    expect(riskSurcharges({ floodHazard: 'moyen', radon: 3, seismic: 4 }).map((s) => [s.key, s.perM2, s.sourced])).toEqual([
+      ['flood', 150, false],
+      ['radon', 15, true],
+      ['seismic', 54, true],
+    ]);
+    const [seismic] = riskSurcharges({ floodHazard: null, radon: 2, seismic: 3 });
+    expect(seismic).toMatchObject({ key: 'seismic', perM2: 27 });
+    // Séparateur de milliers : espace fine insécable (fr-FR).
+    expect(seismic!.basis).toMatch(/^Zone de sismicité 3 : 1,5 % du coût de construction \(1\s800 €\/m² de référence\)$/);
+    expect(riskSurcharges({ floodHazard: null, radon: 1, seismic: 3 }, 2_000)[0]!.perM2).toBe(30);
+  });
+
+  it('rien hors zone, ni sur une source muette', () => {
+    expect(riskSurcharges({ floodHazard: null, radon: 1, seismic: 1 })).toEqual([]);
+    expect(riskSurcharges({ floodHazard: 'unavailable', radon: 'unavailable', seismic: 'unavailable' })).toEqual([]);
+    expect(riskSurcharges({ floodHazard: null, radon: null, seismic: null })).toEqual([]);
+  });
+});
+
+describe('elevationSamples', () => {
+  it('le point intérieur d’abord, puis le contour ; plafond partagé entre les parcelles', () => {
+    const big = rect(2.44, 48.8, 2.442, 48.802);
+    const [one] = elevationSamples([big]);
+    expect(one).toHaveLength(40);
+    expect(one![0]).toEqual([2.441, 48.801]);
+    const many = elevationSamples(Array.from({ length: 50 }, () => big));
+    expect(many.every((s) => s.length === 6)).toBe(true);
+    expect(elevationSamples(Array.from({ length: 200 }, () => big))[0]).toHaveLength(2);
   });
 });

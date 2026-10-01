@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { geoRoutes, type Commune, type MapLayers, type Parcels } from '../contracts/index.ts';
 import { parseBbox } from '../domain/index.ts';
 import { CadastreService } from '../geo/cadastre.service.ts';
+import { ElevationService } from '../geo/elevation.service.ts';
 import { Lookups } from '../geo/lookups.ts';
 import { MAP_LAYERS } from '../geo/map-layers.ts';
 import { Validate } from './http/validation.ts';
@@ -23,6 +24,7 @@ export class GeoController {
   constructor(
     private readonly cadastre: CadastreService,
     private readonly lookups: Lookups,
+    private readonly elevation: ElevationService,
   ) {}
 
   @Get(path(r.addressSearch.path))
@@ -50,6 +52,12 @@ export class GeoController {
   @HttpCode(r.communeCadastreLoad.status)
   communeCadastreLoad(@Param(new Validate(r.communeCadastreLoad.params)) p: ParamsOf<'communeCadastreLoad'>): Promise<Commune> {
     return this.cadastre.requestLoad(p.code);
+  }
+
+  // Déclarée avant `parcels`, plus générale.
+  @Get(path(r.parcelsElevation.path))
+  parcelsElevation(@Query(new Validate(r.parcelsElevation.query)) q: QueryOf<'parcelsElevation'>): Promise<ResponseOf<'parcelsElevation'>> {
+    return this.elevation.ofParcels(q.ids.split(','));
   }
 
   @Get(path(r.parcels.path))

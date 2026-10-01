@@ -62,8 +62,9 @@ const study: Study = {
 };
 
 const result: NonNullable<StudyRisks['result']> = {
-  version: 1,
+  version: 2,
   center: [2.43, 48.8],
+  radii: { nearbyM: 500, hydrantsM: 400 },
   communes: [
     {
       code: '94046',
@@ -81,8 +82,15 @@ const result: NonNullable<StudyRisks['result']> = {
           flood: true,
           zones: [{ code: 'ZR', label: 'Interdiction', name: 'zone rouge de grand écoulement' }],
           url: 'https://www.georisques.gouv.fr/risques/plans-prevention-risques/donnees#/dossier/94DDT20090002',
+          state: 'approved',
+          approvedAt: '12/11/2007',
+          prescribedAt: '04/04/2003',
+          hazards: ['Inondation'],
+          prefectureUrl: 'https://www.val-de-marne.gouv.fr/ppr',
         },
-        { id: 'P2', kind: 'PPRT', label: 'PPRT dépôt', model: null, modifiedAt: null, flood: false, zones: [], url: 'u' },
+        { id: 'P2', kind: 'PPRT', label: 'PPRT dépôt', model: null, modifiedAt: null, flood: false, zones: [], url: 'u', state: 'prescribed', approvedAt: null, prescribedAt: '01/01/2020', hazards: [], prefectureUrl: null },
+        { id: 'P3', kind: 'PPRM', label: 'PPRM ancien', model: null, modifiedAt: null, flood: false, zones: [], url: 'u3', state: 'repealed', approvedAt: '01/01/1990', prescribedAt: null, hazards: [], prefectureUrl: null },
+        { id: 'P4', kind: 'PPRN', label: 'PPR v1', model: null, modifiedAt: null, flood: false, zones: [], url: 'u4', state: null, approvedAt: null, prescribedAt: null, hazards: [], prefectureUrl: null },
       ]),
       catnat: ok({ count: 9, truncated: false, latest: [{ id: 'X', label: 'Inondations et/ou Coulées de Boue', start: '15/01/2018', published: null }] }),
     },
@@ -118,8 +126,12 @@ const axes: StudyRisks['axes'] = [
   { key: 'clay', label: 'Retrait-gonflement des argiles', state: 'Source indisponible : à vérifier', severity: 'unknown', detail: null },
 ];
 const sources: StudyRisks['sources'] = [{ key: 'georisques', label: 'Géorisques', url: 'https://www.georisques.gouv.fr', licence: 'Licence ouverte 2.0' }];
-const ready: StudyRisks = { status: 'ready', stale: false, requestedAt: '2026-10-01T10:00:00Z', computedAt: '2026-10-01T10:01:00Z', error: null, result, axes, sources };
-const none: StudyRisks = { status: 'none', stale: false, requestedAt: null, computedAt: null, error: null, result: null, axes: null, sources };
+const surcharges: StudyRisks['surcharges'] = [
+  { key: 'flood', label: 'Adaptation à l’inondation', perM2: 150, basis: 'Parcelle en zone inondable (TRI), aléa moyen', source: 'Forfait non sourcé', sourced: false },
+  { key: 'seismic', label: 'Dispositions parasismiques', perM2: 27, basis: 'Zone 3', source: 'Eurocode 8', sourced: true },
+];
+const ready: StudyRisks = { status: 'ready', stale: false, requestedAt: '2026-10-01T10:00:00Z', computedAt: '2026-10-01T10:01:00Z', error: null, result, axes, surcharges, sources };
+const none: StudyRisks = { status: 'none', stale: false, requestedAt: null, computedAt: null, error: null, result: null, axes: null, surcharges: null, sources };
 const LAYERS = {
   basemaps: [{ id: 'osm', label: 'OSM', url: 'https://osm/{z}/{x}/{y}', attribution: 'OSM', maxZoom: 19 }],
   defaultBasemap: 'absent',
@@ -157,6 +169,10 @@ describe('page des risques', () => {
     expect(within(synthesis).getAllByRole('listitem').map((li) => li.dataset.severity)).toEqual(['medium', 'unknown']);
     expect(synthesis).toHaveTextContent('Aléa moyen');
     expect(screen.getByText('Analyse du 1 octobre 2026')).toBeInTheDocument();
+    const costs = screen.getByRole('region', { name: 'Surcoûts indicatifs' });
+    expect(costs).toHaveTextContent('Adaptation à l’inondation');
+    expect(costs).toHaveTextContent('+150 €/m²');
+    expect(costs).toHaveTextContent('total +177 €/m²');
 
     const parcels = screen.getByRole('region', { name: 'Par parcelle' });
     expect(parcels).toHaveTextContent('moyen (centennal) : plus de 2 m');
@@ -169,6 +185,10 @@ describe('page des risques', () => {
     const communes = screen.getByRole('region', { name: 'Communes' });
     expect(within(communes).getByRole('link', { name: 'PPRI Marne et Seine' })).toHaveAttribute('href', result.communes[0]!.plans.status === 'ok' ? result.communes[0]!.plans.data[0]!.url : '');
     expect(communes).toHaveTextContent('ZR Interdiction : zone rouge de grand écoulement');
+    expect(communes).toHaveTextContent('approuvé le 12/11/2007 (prescrit le 04/04/2003) · Inondation');
+    expect(within(communes).getByRole('link', { name: 'page de la préfecture' })).toHaveAttribute('href', 'https://www.val-de-marne.gouv.fr/ppr');
+    expect(communes).toHaveTextContent('prescrit le 01/01/2020');
+    expect(communes).toHaveTextContent('abrogé');
     expect(communes).toHaveTextContent('9 (dernier : Inondations et/ou Coulées de Boue, 15/01/2018)');
     expect(communes).toHaveTextContent('Aucun PPR sur la commune.');
 
@@ -251,7 +271,7 @@ describe('page des risques', () => {
       pollutedSites: ok({ count: 2, truncated: false, items: [] }),
       hydrants: ok({ items: [] }),
     };
-    api({ [`GET /api/studies/${ID}/risks`]: { status: 200, body: { ...ready, result: calm } } });
+    api({ [`GET /api/studies/${ID}/risks`]: { status: 200, body: { ...ready, result: calm, surcharges: [] } } });
     renderAt(`/studies/${ID}/risks`);
     expect(await screen.findByRole('region', { name: 'Commune' })).toHaveTextContent('1 (dernier : Tempête)');
     expect(screen.getByRole('region', { name: 'Par parcelle' })).toHaveTextContent('cote de crue indicative : 33,31 m NGF');
@@ -259,6 +279,7 @@ describe('page des risques', () => {
     expect(nearby).toHaveTextContent('Aucune.');
     expect(nearby).toHaveTextContent('Aucun (2 dans la commune).');
     expect(nearby).toHaveTextContent('Aucune connue.');
+    expect(screen.getByRole('region', { name: 'Surcoûts indicatifs' })).toHaveTextContent('Aucun surcoût de construction lié aux risques connus.');
     expect(screen.getByRole('checkbox', { name: 'Zonage des PPR inondation' })).not.toBeChecked();
   });
 

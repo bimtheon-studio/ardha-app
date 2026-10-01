@@ -22,6 +22,11 @@ export interface HttpRequest {
   url: string;
   /** Délai maximal d'une tentative, en millisecondes. */
   timeoutMs?: number;
+  /**
+   * En-têtes en plus (jeton d'une API). Ils ne font pas partie de la clé d'un enregistrement et ne
+   * sont jamais écrits dans `fixtures/http`.
+   */
+  headers?: Record<string, string>;
 }
 
 /** Une source injoignable, qui répond mal, ou dont la réponse ne se lit pas. */
@@ -62,14 +67,14 @@ export class LiveHttp extends Http {
     this.fetch = options.fetch ?? globalThis.fetch;
   }
 
-  async get({ url, timeoutMs = 15_000 }: HttpRequest): Promise<HttpResponse> {
+  async get({ url, timeoutMs = 15_000, headers = {} }: HttpRequest): Promise<HttpResponse> {
     const host = new URL(url).host;
     let last = '';
     for (let attempt = 1; attempt <= this.attempts; attempt++) {
       if (attempt > 1) await sleep(this.backoffMs * 2 ** (attempt - 2));
       try {
         const r = await this.fetch(url, {
-          headers: { 'User-Agent': USER_AGENT, Accept: '*/*' },
+          headers: { 'User-Agent': USER_AGENT, Accept: '*/*', ...headers },
           redirect: 'follow',
           signal: AbortSignal.timeout(timeoutMs),
         });

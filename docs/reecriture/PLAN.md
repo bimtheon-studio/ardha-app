@@ -378,7 +378,8 @@ Les arbitrages fonctionnels, rendus le 01/10/2026, sont dans [F-01](fiches/F-01-
 | DT-32 | **Vignette** composée par le worker avec **sharp** 0.35 (tuiles assemblées + contours en SVG, PNG en palette, 480 × 300, ≈ 20 Ko), cadrage Web Mercator dans le domaine (`frameBbox`) | canvas dans Node ; tuile brute comme avant | D-08 ; binaires précompilés, sans dépendance système dans l'image |
 | DT-33 | **Analyses d'étude** dans `study_analyses` (une par étude et par type, pour une empreinte de parcelles ; résultat jsonb validé par un schéma zod versionné, relu à chaque lecture ; synthèse recalculée à la lecture) | une table par analyse ; synthèse figée | PLAN §4 (`etude_analyse`) ; servira à L3, L5, L7 ; une règle corrigée s'applique sans refaire l'analyse |
 | DT-34 | Chaque donnée d'une analyse porte son état **`ok` / `unavailable`** ; une source muette ne fait pas échouer l'analyse | échec global, ou silence | F-04 Q4 : l'ancien code concluait « aucun risque » sur une panne |
-| DT-35 | Couches de risques en **tuiles WMS chargées par le navigateur** (Géorisques, BRGM), comme les fonds de carte, sans GetFeatureInfo | proxy par le worker | D-08 étendu, **arbitrage provisoire** F-04 Q8 ; les données, elles, passent par le worker |
+| DT-35 | Couches de risques en **tuiles WMS chargées par le navigateur** (Géorisques, BRGM), comme les fonds de carte, sans GetFeatureInfo | proxy par le worker | D-08 étendu, F-04 Q8, arbitré le 02/10/2026 ; les données, elles, passent par le worker |
+| DT-36 | **Géorisques v2** par un jeton personnel du porteur du produit (`GEORISQUES_TOKEN`, worker seul, jamais dans git), en-tête `Authorization`, **repli v1** sans jeton ; tests et e2e en v1 | v2 seule | F-04 Q12 : états et dates des PPR, PPR miniers ; aucune dépendance au jeton pour tester |
 
 ## 12. Questions ouvertes
 
@@ -397,6 +398,9 @@ vers des comptes pas encore recréés) ; aucune migration ne les a réinjectées
 été supprimée le 27/09. Sans conséquence pour la réécriture, qui repart de zéro.
 
 ## Journal
+
+- **02/10/2026** — arbitrages F-04 Q1 à Q14 rendus (Q6 altitudes aussi sur la carte, Q9 surcoûts dès
+  L4, Q10 alentours à 500 m, Q12 jeton Géorisques v2) et repris ; DT-36.
 
 - **02/10/2026 (nuit)** — **L4 codé et recetté en local** sur `l4-risks` (partie de `l2-study`) :
   analyse des risques par le worker (Géorisques v1, TRI, altimétrie IGN, OSM), page Risques de

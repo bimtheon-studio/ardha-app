@@ -90,6 +90,22 @@ function Commune({ c }: { c: CommuneRisks }) {
                       · {p.model ?? p.kind}
                       {p.modifiedAt && ` · modifié le ${p.modifiedAt}`}
                     </span>
+                    {(p.state || p.hazards.length > 0) && (
+                      <p className="text-xs">
+                        {p.state === 'approved' && `approuvé le ${p.approvedAt}${p.prescribedAt ? ` (prescrit le ${p.prescribedAt})` : ''}`}
+                        {p.state === 'prescribed' && `prescrit le ${p.prescribedAt}, pas encore approuvé`}
+                        {p.state === 'repealed' && 'abrogé ou annulé'}
+                        {p.hazards.length > 0 && `${p.state ? ' · ' : ''}${p.hazards.join(', ')}`}
+                        {p.prefectureUrl && (
+                          <>
+                            {' · '}
+                            <a href={p.prefectureUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                              page de la préfecture
+                            </a>
+                          </>
+                        )}
+                      </p>
+                    )}
                     {p.zones.length > 0 && (
                       <ul className="mt-1 ml-4 list-disc text-xs text-muted-foreground">
                         {p.zones.map((z, i) => (
@@ -196,13 +212,13 @@ function Nearby({ result }: { result: Result }) {
   return (
     <ul className="divide-y border text-sm">
       <li className="px-3 py-2">
-        <p className="font-medium">Cavités souterraines à moins de 1 km</p>
+        <p className="font-medium">Cavités souterraines à moins de {meters(result.radii.nearbyM)}</p>
         <Value of={result.cavities}>
           {(c) => (c.items.length === 0 ? <p className="text-muted-foreground">Aucune.</p> : <p>{c.items.length}, la plus proche à {meters(c.items[0]!.distanceM)}</p>)}
         </Value>
       </li>
       <li className="px-3 py-2">
-        <p className="font-medium">Installations classées à moins de 1 km</p>
+        <p className="font-medium">Installations classées à moins de {meters(result.radii.nearbyM)}</p>
         <Value of={result.installations}>
           {(i) => (
             <>
@@ -223,7 +239,7 @@ function Nearby({ result }: { result: Result }) {
         </Value>
       </li>
       <li className="px-3 py-2">
-        <p className="font-medium">Sols pollués à moins de 1 km</p>
+        <p className="font-medium">Sols pollués à moins de {meters(result.radii.nearbyM)}</p>
         <Value of={result.pollutedSites}>
           {(s) =>
             s.items.length === 0 ? (
@@ -246,7 +262,7 @@ function Nearby({ result }: { result: Result }) {
         </Value>
       </li>
       <li className="px-3 py-2">
-        <p className="font-medium">Bornes incendie à moins de 400 m (OpenStreetMap, indicatif)</p>
+        <p className="font-medium">Bornes incendie à moins de {meters(result.radii.hydrantsM)} (OpenStreetMap, indicatif)</p>
         <Value of={result.hydrants}>
           {(h) => (h.items.length === 0 ? <p className="text-muted-foreground">Aucune connue.</p> : <p>{h.items.length}, la plus proche à {meters(h.items[0]!.distanceM)}</p>)}
         </Value>
@@ -362,6 +378,32 @@ export function RisksPage() {
                   </li>
                 ))}
               </ul>
+            </Section>
+          )}
+          {r.surcharges && (
+            <Section title="Surcoûts indicatifs">
+              {r.surcharges.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Aucun surcoût de construction lié aux risques connus.</p>
+              ) : (
+                <div className="space-y-2">
+                  <ul className="divide-y border text-sm">
+                    {r.surcharges.map((c) => (
+                      <li key={c.key} className="flex items-start gap-3 px-3 py-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium">{c.label}</p>
+                          <p className="text-xs text-muted-foreground">{c.basis}</p>
+                          <p className={`text-xs ${c.sourced ? 'text-muted-foreground' : 'text-orange-800'}`}>{c.source}</p>
+                        </div>
+                        <span className="tabular-nums whitespace-nowrap">+{c.perM2.toLocaleString('fr-FR')} €/m²</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-xs text-muted-foreground">
+                    En € HT par m² de surface de plancher, à ajouter au coût de construction : total +
+                    {r.surcharges.reduce((t, c) => t + c.perM2, 0).toLocaleString('fr-FR')} €/m². Ajustables dans la faisabilité (à venir).
+                  </p>
+                </div>
+              )}
             </Section>
           )}
           {result && (

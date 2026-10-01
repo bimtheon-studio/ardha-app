@@ -83,6 +83,7 @@ La CLI pilote et débogue la chaîne sans le front :
 | `study:refresh <id> [--inline]` · `study:thumbnail <id> --out <png>` | recalcule adresse et vignette ; écrit la vignette dans un fichier |
 | `risk:analyze <étude> [--inline] [--force]` · `risk:show <étude>` | analyse des risques (par le worker, ou sur place) ; lecture |
 | `risk:commune <code>` · `risk:point <lon> <lat>` | interroge Géorisques sur une commune, argiles et hauteurs d'eau TRI en un point |
+| `parcel:elevation <IDU…> [--inline]` | altitudes IGN d'une sélection (min, max, moyenne, dénivelé), par le worker ou sur place |
 
 Pour enregistrer d'un coup tout ce dont une commande a besoin :
 `ARDHA_SOURCES=record pnpm cli commune:load --inline 74010`, ou, pour l'adresse et la vignette d'une
@@ -91,6 +92,10 @@ Pour enregistrer d'un coup tout ce dont une commande a besoin :
 Fichiers (vignettes d'étude) : magasin S3 en local et en test (MinIO du worktree, `FILES_DRIVER=s3`
 dans `.env.local`), disque en production (`FILES_DRIVER=disk`, `FILES_DIR=/storage/files`, sauvegardé
 avec le volume de once).
+
+Géorisques v2 (états et dates des PPR, PPR miniers) : jeton personnel dans `GEORISQUES_TOKEN`
+(`.env.local`, jamais dans git), lu par le worker seul ; sans jeton, l'analyse lit la v1. Les tests et
+l'e2e forcent la v1, pour être identiques en local et en CI.
 
 ## Structure
 

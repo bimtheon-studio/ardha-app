@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { route } from './routes.ts';
 
 /** Version du schéma du résultat : un changement incompatible l'augmente, et l'analyse se refait. */
-export const RISKS_VERSION = 1;
+export const RISKS_VERSION = 2;
 
 export function known<T extends z.ZodType>(data: T) {
   return z.discriminatedUnion('status', [z.object({ status: z.literal('ok'), data }), z.object({ status: z.literal('unavailable'), error: z.string() })]);
@@ -24,13 +24,21 @@ export const FloodHitSchema = z.object({
 
 export const RiskPlan = z.object({
   id: z.string(),
-  kind: z.enum(['PPRN', 'PPRT']),
+  kind: z.enum(['PPRN', 'PPRT', 'PPRM']),
   label: z.string(),
   model: z.string().nullable(),
   modifiedAt: z.string().nullable(),
   flood: z.boolean(),
   zones: z.array(z.object({ code: z.string().nullable(), label: z.string(), name: z.string().nullable() })),
   url: z.string(),
+  /** Avec le jeton de l'API v2 seulement (sinon nuls) : état pour la commune et dates « JJ/MM/AAAA ». */
+  state: z.enum(['approved', 'prescribed', 'repealed']).nullable(),
+  approvedAt: z.string().nullable(),
+  prescribedAt: z.string().nullable(),
+  /** Aléas couverts (« Inondation », « Mouvement de terrain »…). */
+  hazards: z.array(z.string()),
+  /** Page du PPR sur le site de la préfecture. */
+  prefectureUrl: z.string().nullable(),
 });
 export type RiskPlan = z.infer<typeof RiskPlan>;
 
@@ -80,6 +88,8 @@ export const RisksResult = z.object({
   parcels: z.array(ParcelRisks),
   /** Centre de l'emprise, d'où partent les recherches alentour. */
   center: lonLat,
+  /** Rayons de recherche autour de l'emprise, en mètres : alentours (cavités, installations, sols pollués) et bornes. */
+  radii: z.object({ nearbyM: z.number(), hydrantsM: z.number() }),
   cavities: known(z.object({ truncated: z.boolean(), items: z.array(z.object({ id: z.string(), name: z.string().nullable(), type: z.string().nullable(), point: lonLat, ...near })) })),
   installations: known(
     z.object({
@@ -127,6 +137,12 @@ export const StudyRisks = z.object({
   result: RisksResult.nullable(),
   /** Synthèse des quatre axes, la plus sévère d'abord. */
   axes: z.array(RiskAxis).nullable(),
+  /** Surcoûts indicatifs de construction, en € HT par m² de surface de plancher (Q9). */
+  surcharges: z
+    .array(
+      z.object({ key: z.enum(['flood', 'radon', 'seismic']), label: z.string(), perM2: z.number(), basis: z.string(), source: z.string(), sourced: z.boolean() }),
+    )
+    .nullable(),
   sources: z.array(RiskSource),
 });
 export type StudyRisks = z.infer<typeof StudyRisks>;

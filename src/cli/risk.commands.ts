@@ -5,6 +5,9 @@ import { Command, Option } from 'nest-commander';
 import type { StudyRisks } from '../contracts/index.ts';
 import { clayLevel, floodClassLabel, FLOOD_SCENARIO_LABELS, FLOOD_TYPE_LABELS, floodHazard, floodScenarios } from '../domain/index.ts';
 import { RiskAnalyses } from '../ingestion/risk-analyses.ts';
+import { ElevationService } from '../geo/elevation.service.ts';
+import { ParcelsRepository } from '../geo/parcels.repository.ts';
+import { LookupHandlers } from '../ingestion/lookup-handlers.ts';
 import { FloodHeights } from '../sources/flood-heights.ts';
 import { Georisques } from '../sources/georisques.ts';
 import { RisksService } from '../studies/risks.service.ts';
@@ -24,12 +27,15 @@ export function describeRisks(r: StudyRisks): string {
   const lines = [`Analyse : ${STATUS[r.status]}${r.stale ? ', périmée (parcelles modifiées)' : ''}${r.computedAt ? `, calculée le ${frenchDate(r.computedAt)}` : ''}`];
   if (r.error) lines.push(`  erreur : ${r.error}`);
   for (const a of r.axes ?? []) lines.push(`  ${SEVERITY[a.severity]} ${a.label} : ${a.state}${a.detail ? ` — ${a.detail}` : ''}`);
+  for (const c of r.surcharges ?? []) lines.push(`  surcoût : ${c.label} +${c.perM2} €/m² (${c.basis})${c.sourced ? '' : ' — non sourcé'}`);
   const res = r.result;
   if (!res) return lines.join('\n');
   for (const c of res.communes) {
     lines.push(`  Commune ${c.name ?? '?'} (${c.code})`);
     lines.push(`    risques GASPAR : ${value(c.hazards, (h) => h.map((x) => x.label).join(', ') || 'aucun')}`);
-    lines.push(`    PPR : ${value(c.plans, (ps) => ps.map((p) => `${p.label} [${p.model ?? p.kind}${p.zones.length ? `, ${p.zones.length} zone(s)` : ''}]`).join(' ; ') || 'aucun')}`);
+    const state = (p: { state: string | null; approvedAt: string | null; prescribedAt: string | null }) =>
+      p.state === 'approved' ? `, approuvé le ${p.approvedAt}` : p.state === 'prescribed' ? `, prescrit le ${p.prescribedAt}` : p.state === 'repealed' ? ', abrogé' : '';
+    lines.push(`    PPR : ${value(c.plans, (ps) => ps.map((p) => `${p.label} [${p.model ?? p.kind}${p.zones.length ? `, ${p.zones.length} zone(s)` : ''}${state(p)}]`).join(' ; ') || 'aucun')}`);
     lines.push(`    CatNat : ${value(c.catnat, (n) => `${n.count} arrêté(s)`)}`);
   }
   for (const p of res.parcels) {
@@ -40,10 +46,11 @@ export function describeRisks(r: StudyRisks): string {
     );
     lines.push(`    altitudes : ${value(p.elevation, (e) => (e ? `${e.min}–${e.max} m NGF, moyenne ${e.mean} (${e.points} pts)` : 'aucune'))}${p.floodLevel ? ` ; cote indicative ${p.floodLevel.atLeast ? 'au moins ' : ''}${p.floodLevel.level} m NGF` : ''}`);
   }
-  lines.push(`  cavités à 1 km : ${value(res.cavities, (c) => String(c.items.length))}`);
-  lines.push(`  installations classées à 1 km : ${value(res.installations, (i) => `${i.items.length} (sur ${i.count} dans la commune)`)}`);
-  lines.push(`  sols pollués à 1 km : ${value(res.pollutedSites, (s) => `${s.items.length} (sur ${s.count})`)}`);
-  lines.push(`  bornes incendie à 400 m : ${value(res.hydrants, (h) => (h.items.length ? `${h.items.length}, la plus proche à ${h.items[0]!.distanceM} m` : 'aucune'))}`);
+  const near = `${res.radii.nearbyM} m`;
+  lines.push(`  cavités à ${near} : ${value(res.cavities, (c) => String(c.items.length))}`);
+  lines.push(`  installations classées à ${near} : ${value(res.installations, (i) => `${i.items.length} (sur ${i.count} dans la commune)`)}`);
+  lines.push(`  sols pollués à ${near} : ${value(res.pollutedSites, (s) => `${s.items.length} (sur ${s.count})`)}`);
+  lines.push(`  bornes incendie à ${res.radii.hydrantsM} m : ${value(res.hydrants, (h) => (h.items.length ? `${h.items.length}, la plus proche à ${h.items[0]!.distanceM} m` : 'aucune'))}`);
   return lines.join('\n');
 }
 
@@ -125,4 +132,26 @@ export class RiskPointCommand extends JsonCommand {
   }
 }
 
-export const RISK_COMMANDS = [RiskAnalyzeCommand, RiskShowCommand, RiskCommuneCommand, RiskPointCommand];
+@Command({ name: 'parcel:elevation', arguments: '<parcels...>', description: 'Altitudes de parcelles (IGN) : par le worker, ou sur place avec --inline' })
+export class ParcelElevationCommand extends InlineCommand {
+  constructor(
+    private readonly elevation: ElevationService,
+    private readonly parcels: ParcelsRepository,
+    private readonly handlers: LookupHandlers,
+  ) {
+    super();
+  }
+
+  async run(ids: string[], options: InlineOption): Promise<void> {
+    // --inline : la recherche du worker est faite dans la CLI.
+    const service = options.inline
+      ? new ElevationService(this.parcels, { run: (name: 'elevation:points', input: { points: [number, number][] }) => this.handlers.handle(name, input) } as never)
+      : this.elevation;
+    const r = await service.ofParcels(ids);
+    const line = (s: { min: number; max: number; mean: number; range: number; points: number } | null) =>
+      s ? `${s.min} à ${s.max} m NGF, moyenne ${s.mean}, dénivelé ${s.range} m (${s.points} points)` : 'aucune altitude';
+    print(options.json, r, () => [`Sélection : ${line(r.overall)}`, ...r.parcels.map((p) => `  ${p.id} : ${line(p.stats)}`), `Source : ${r.source}`].join('\n'));
+  }
+}
+
+export const RISK_COMMANDS = [RiskAnalyzeCommand, RiskShowCommand, RiskCommuneCommand, RiskPointCommand, ParcelElevationCommand];

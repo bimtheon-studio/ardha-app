@@ -95,3 +95,15 @@ export function useParcelsByIds(ids: readonly string[]) {
     staleTime: 10 * 60_000,
   });
 }
+
+/** Altitudes de la sélection (F-04, Q6), une fois la sélection stable : mesurées par le worker, en cache. */
+export function useSelectionElevation(ids: readonly string[]) {
+  const key = [...ids].sort().join(',');
+  return useQuery({
+    queryKey: ['map', 'elevation', key],
+    queryFn: () => callApi(geoRoutes.parcelsElevation, { query: { ids: key } }),
+    enabled: ids.length > 0,
+    staleTime: 60 * 60_000,
+    retry: false,
+  });
+}

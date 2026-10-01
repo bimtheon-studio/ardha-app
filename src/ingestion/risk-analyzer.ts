@@ -11,16 +11,15 @@ import {
   clayLevel,
   distanceM,
   distanceToPointM,
+  elevationSamples,
   elevationStats,
   expandBbox,
   floodHazard,
   floodScenarios,
   HYDRANT_RADIUS_M,
-  interiorPoint,
   isFloodPlan,
   NEARBY_RADIUS_M,
   parcelLabel,
-  perimeterPoints,
   type Position,
   referenceFloodHeight,
   type Surface,
@@ -35,10 +34,6 @@ import type { StudyParcelRecord } from '../studies/studies.repository.ts';
 
 type Known<T> = { status: 'ok'; data: T } | { status: 'unavailable'; error: string };
 
-/** Points d'altitude par parcelle (le point intérieur, puis le périmètre tous les 15 m), et en tout. */
-const ELEVATION_PER_PARCEL = 40;
-const ELEVATION_TOTAL = 300;
-const PERIMETER_STEP_M = 15;
 
 const round = (v: number, digits = 6) => Math.round(v * 10 ** digits) / 10 ** digits;
 const lonLat = (p: Position): [number, number] => [round(p[0] ?? 0), round(p[1] ?? 0)];
@@ -119,9 +114,7 @@ export class RiskAnalyzer {
     }
 
     // Altitudes : un seul appel par lots pour toutes les parcelles.
-    const samples = parcels.map((p) => [interiorPoint(p.geometry), ...perimeterPoints(p.geometry, PERIMETER_STEP_M, ELEVATION_PER_PARCEL - 1)]);
-    const perParcel = Math.max(2, Math.floor(ELEVATION_TOTAL / Math.max(1, parcels.length)));
-    const asked = samples.map((s) => s.slice(0, perParcel));
+    const asked = elevationSamples(parcels.map((p) => p.geometry));
     const altitudes = await this.known('altimétrie', () => this.elevation.points(asked.flat()));
 
     const parcelResults = [];
@@ -168,6 +161,7 @@ export class RiskAnalyzer {
       communes,
       parcels: parcelResults,
       center: lonLat(center),
+      radii: { nearbyM: NEARBY_RADIUS_M, hydrantsM: HYDRANT_RADIUS_M },
       cavities:
         cavities.status === 'ok'
           ? {

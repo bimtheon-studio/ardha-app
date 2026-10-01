@@ -55,6 +55,11 @@ const Schema = z.object({
   S3_BUCKET: z.string().optional(),
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
+  /** Jeton de l'API Géorisques v2 (F-04, Q12), pour le worker ; sans lui, l'analyse lit la v1. */
+  GEORISQUES_TOKEN: z
+    .string()
+    .optional()
+    .transform((v) => v || undefined),
 }).refine((c) => c.FILES_DRIVER !== 's3' || (c.S3_ENDPOINT && c.S3_BUCKET && c.S3_ACCESS_KEY_ID && c.S3_SECRET_ACCESS_KEY), {
   message: 'FILES_DRIVER=s3 demande S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID et S3_SECRET_ACCESS_KEY.',
   path: ['FILES_DRIVER'],
