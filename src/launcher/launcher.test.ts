@@ -88,7 +88,7 @@ describe('lanceur du conteneur', () => {
     const worker = fake('worker', `const n = require('node:fs').readFileSync(${JSON.stringify(path.join(dir, 'worker'))}, 'utf8').split('\\n').length - 1; if (n < 3) process.exit(1); ${SERVES}`);
     const l = launcher({ worker });
     const exit = l.start();
-    await until(() => journal('worker').length >= 3);
+    await until(() => journal('worker').length >= 3 && journal('api').includes('start'));
     expect(journal('api')).toEqual(['start']);
     expect(logs.filter((m) => /worker arrêté \(code 1\), relance/.test(m))).toHaveLength(2);
     l.stop('SIGTERM');
@@ -117,7 +117,8 @@ describe('lanceur du conteneur', () => {
   it('lance le seed après le démarrage de l’API ; un seed en échec n’arrête pas le conteneur', async () => {
     const l = launcher({ seed: fake('seed', 'process.exit(2);') });
     const exit = l.start();
-    await until(() => logs.some((m) => /seed en échec \(code 2\)/.test(m)));
+    // L'API aussi : un faux processus met quelques dizaines de millisecondes à démarrer (CI).
+    await until(() => logs.some((m) => /seed en échec \(code 2\)/.test(m)) && journal('api').includes('start'));
     expect(journal('seed')).toEqual(['start']);
     l.stop('SIGTERM');
     expect(await exit).toBe(0);
