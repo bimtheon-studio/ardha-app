@@ -41,8 +41,9 @@ describe('frameBbox', () => {
   });
 
   it('respecte le zoom minimal et ne sort pas du monde', () => {
-    const f = frameBbox([-180, -85, 180, 85], 256, 256, { minZoom: 0 });
+    const f = frameBbox([-180, -85, 180, 85], 256, 600, { minZoom: 0 });
     expect(f.zoom).toBe(0);
-    expect(f.tiles.every((t) => t.y === 0 && t.x === 0)).toBe(true);
+    // Au-dessus et au-dessous du monde, pas de tuile ; en largeur, le monde se répète.
+    expect(f.tiles).toEqual([{ x: 0, y: 0, left: 0, top: 172 }]);
   });
 });

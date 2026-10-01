@@ -11,6 +11,7 @@ import { Clock } from '../src/shared/clock.ts';
 import { AccountsModule } from '../src/accounts/accounts.module.ts';
 import { ConfigModule } from '../src/config/config.module.ts';
 import { UsersService } from '../src/accounts/users.service.ts';
+import { StudiesService } from '../src/studies/studies.service.ts';
 import { MaintenanceProcessor, PURGE_JOB, Reconciliation } from '../src/worker/maintenance.ts';
 import { TestClock } from './test-app.ts';
 import { testConfig } from './env.ts';
@@ -28,7 +29,11 @@ beforeAll(async () => {
   clock = new TestClock();
   module = await Test.createTestingModule({
     imports: [ConfigModule.forConfig(testConfig()), DbModule, AccountsModule],
-    providers: [MaintenanceProcessor, { provide: Reconciliation, useValue: { run: async () => [] } }],
+    providers: [
+      MaintenanceProcessor,
+      { provide: Reconciliation, useValue: { run: async () => ({ communes: [], studies: [] }) } },
+      { provide: StudiesService, useValue: { purge: async () => [] } },
+    ],
   })
     .overrideProvider(Clock)
     .useValue(clock)
@@ -111,7 +116,7 @@ describe('purge du worker', () => {
     clock.advance(31 * DAY);
     await auth.login({ email: 'c@exemple.fr', password: 'cheval pomme agrafe' }, ctx);
     const result = await module.get(MaintenanceProcessor).process({ name: PURGE_JOB } as never);
-    expect(result).toEqual({ sessions: 1, links: 1 });
+    expect(result).toEqual({ sessions: 1, links: 1, studies: 0 });
     expect((await pool.query('SELECT count(*)::int AS n FROM sessions')).rows[0].n).toBe(1);
   });
 

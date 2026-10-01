@@ -8,6 +8,7 @@ import { Cadastre } from './cadastre.ts';
 import { Communes } from './communes.ts';
 import { Geocoding } from './geocoding.ts';
 import { Http, LiveHttp, RecordedHttp, RecordingHttp } from './http.ts';
+import { Tiles } from './tiles.ts';
 
 @Module({
   providers: [
@@ -23,7 +24,8 @@ import { Http, LiveHttp, RecordedHttp, RecordingHttp } from './http.ts';
     { provide: Geocoding, inject: [Http], useFactory: (http: Http) => new Geocoding(http) },
     { provide: Communes, inject: [Http], useFactory: (http: Http) => new Communes(http) },
     { provide: Cadastre, inject: [Http], useFactory: (http: Http) => new Cadastre(http) },
+    { provide: Tiles, inject: [Http], useFactory: (http: Http) => new Tiles(http) },
   ],
-  exports: [Http, Geocoding, Communes, Cadastre],
+  exports: [Http, Geocoding, Communes, Cadastre, Tiles],
 })
 export class SourcesModule {}

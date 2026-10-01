@@ -28,6 +28,8 @@ export interface Route<
   status: number;
   /** Faux pour les routes ouvertes sans session (connexion, inscription…). */
   authenticated: boolean;
+  /** Type de média d'une réponse qui n'est pas du JSON (`image/png`). */
+  produces?: string;
 }
 
 /** Décrit une route ; `query` et `params` sont facultatifs à la déclaration. */

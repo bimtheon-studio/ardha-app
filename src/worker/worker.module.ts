@@ -12,10 +12,13 @@ import { GeoModule } from '../geo/geo.module.ts';
 import { IngestionModule } from '../ingestion/ingestion.module.ts';
 import { loggingOptions } from '../shared/logs.ts';
 import { MAINTENANCE_QUEUE, QueuesModule } from '../shared/queues.ts';
+import { FilesModule } from '../shared/files.ts';
 import { RedisModule } from '../shared/redis.ts';
+import { StudiesModule } from '../studies/studies.module.ts';
 import { CadastreProcessor } from './cadastre.processor.ts';
 import { LookupsProcessor } from './lookups.processor.ts';
 import { MaintenanceProcessor, MaintenanceScheduler, Reconciliation } from './maintenance.ts';
+import { StudiesProcessor } from './studies.processor.ts';
 
 @Module({})
 export class WorkerModule {
@@ -29,11 +32,13 @@ export class WorkerModule {
         RedisModule,
         QueuesModule.forRoot(),
         AccountsModule,
+        FilesModule,
         GeoModule,
+        StudiesModule,
         IngestionModule,
         BullModule.registerQueue({ name: MAINTENANCE_QUEUE }),
       ],
-      providers: [MaintenanceProcessor, MaintenanceScheduler, Reconciliation, CadastreProcessor, LookupsProcessor],
+      providers: [MaintenanceProcessor, MaintenanceScheduler, Reconciliation, CadastreProcessor, LookupsProcessor, StudiesProcessor],
     };
   }
 }

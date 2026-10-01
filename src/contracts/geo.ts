@@ -20,6 +20,10 @@ export const Address = z.object({
   /** Identifiant BAN. */
   id: z.string(),
   label: z.string(),
+  /** Sans code postal ni commune : « 2 Rue Étienne Dolet », « Rue Pasteur », « Les Fourches ». */
+  name: z.string(),
+  /** Voie, sans le numéro ; nulle pour un lieu-dit ou une commune. */
+  street: z.string().nullable(),
   /** « 94, Val-de-Marne, Île-de-France ». */
   context: z.string(),
   kind: z.enum(['housenumber', 'street', 'locality', 'municipality']),

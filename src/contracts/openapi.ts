@@ -35,7 +35,9 @@ export function documentOpenApi(routes: Record<string, Route>, version: string):
       responses: {
         [r.status]: r.response
           ? { description: 'Succès', content: { 'application/json': { schema: schema(r.response, 'output') } } }
-          : { description: 'Succès, sans contenu' },
+          : r.produces
+            ? { description: 'Succès', content: { [r.produces]: { schema: { type: 'string', format: 'binary' } } } }
+            : { description: 'Succès, sans contenu' },
         default: { description: 'Erreur', content: { 'application/json': { schema: schema(ApiError, 'output') } } },
       },
     };

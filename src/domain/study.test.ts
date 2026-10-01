@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { copyName, parcelsKey, proposeStudyName, STUDY_NAME_MAX, studySteps } from './study.ts';
+import { copyName, parcelsKey, principalCommune, proposeStudyName, STUDY_NAME_MAX, studySteps } from './study.ts';
 
 const today = new Date('2026-10-01T10:00:00Z');
 const ay96 = { prefix: '000', section: 'AY', number: '0096' };
@@ -45,10 +45,10 @@ describe('proposeStudyName', () => {
 
 describe('parcelsKey', () => {
   it('ne dépend ni de l’ordre ni des doublons, change avec les parcelles', () => {
-    const a = parcelsKey(['940460000AY0096', '940460000AY0097']);
+    const a = parcelsKey(['94046000AY0096', '94046000AY0097']);
     expect(a).toMatch(/^[0-9a-f]{16}$/);
-    expect(parcelsKey(['940460000AY0097', '940460000AY0096', '940460000AY0097'])).toBe(a);
-    expect(parcelsKey(['940460000AY0096'])).not.toBe(a);
+    expect(parcelsKey(['94046000AY0097', '94046000AY0096', '94046000AY0097'])).toBe(a);
+    expect(parcelsKey(['94046000AY0096'])).not.toBe(a);
   });
 });
 
@@ -59,5 +59,13 @@ describe('studySteps', () => {
     expect(steps[0]).toEqual({ key: 'parcels', label: 'Parcelles', state: 'done', lot: null });
     expect(steps.slice(1).every((s) => s.state === 'upcoming' && s.lot)).toBe(true);
     expect(studySteps({ parcelCount: 0 })[0]!.state).toBe('todo');
+  });
+});
+
+describe('principalCommune', () => {
+  it('la commune qui porte la plus grande surface, la première à égalité', () => {
+    expect(principalCommune([{ communeCode: 'a', area: 10 }, { communeCode: 'b', area: 8 }, { communeCode: 'b', area: 8 }])).toBe('b');
+    expect(principalCommune([{ communeCode: 'a', area: 10 }, { communeCode: 'b', area: 10 }])).toBe('a');
+    expect(principalCommune([])).toBeNull();
   });
 });

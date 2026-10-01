@@ -42,6 +42,22 @@ const Schema = z.object({
   FIXTURES_DIR: z.string().default(path.join(REPO_ROOT, 'fixtures/http')),
   /** Attente maximale d'une recherche confiée au worker, en millisecondes (F-01, Q1). */
   LOOKUP_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
+  /**
+   * Magasin de fichiers (F-02, Q11) : `disk` (production, sous `/storage`) ou `s3` (MinIO en local
+   * et en test).
+   */
+  FILES_DRIVER: z.enum(['disk', 's3']).default('disk'),
+  FILES_DIR: z.string().default(path.join(REPO_ROOT, '.files')),
+  /** Préfixe des clés : les tests ont le leur dans le bucket de développement. */
+  FILES_PREFIX: z.string().regex(/^(?:[a-z0-9_-]+\/)*$/).default(''),
+  S3_ENDPOINT: z.url().optional(),
+  S3_REGION: z.string().default('us-east-1'),
+  S3_BUCKET: z.string().optional(),
+  S3_ACCESS_KEY_ID: z.string().optional(),
+  S3_SECRET_ACCESS_KEY: z.string().optional(),
+}).refine((c) => c.FILES_DRIVER !== 's3' || (c.S3_ENDPOINT && c.S3_BUCKET && c.S3_ACCESS_KEY_ID && c.S3_SECRET_ACCESS_KEY), {
+  message: 'FILES_DRIVER=s3 demande S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID et S3_SECRET_ACCESS_KEY.',
+  path: ['FILES_DRIVER'],
 });
 
 export type Config = Omit<z.infer<typeof Schema>, 'QUEUE_PREFIX'> & {

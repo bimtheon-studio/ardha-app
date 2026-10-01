@@ -66,6 +66,8 @@ function commune(status: Commune['cadastre']['status'], extra: Partial<Commune['
 const ADDRESS = {
   id: '94046_7120_00009',
   label: '9 Rue Pasteur 94700 Maisons-Alfort',
+  name: '9 Rue Pasteur',
+  street: 'Rue Pasteur',
   context: '94, Val-de-Marne, Île-de-France',
   kind: 'housenumber',
   lon: 2.43,

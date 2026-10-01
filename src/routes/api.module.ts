@@ -20,6 +20,9 @@ import { OriginCheck } from './http/origin.ts';
 import { SessionGuard } from './http/session.guard.ts';
 import { REDIS, RedisModule } from '../shared/redis.ts';
 import { SystemController } from './system.controller.ts';
+import { FilesModule } from '../shared/files.ts';
+import { StudiesModule } from '../studies/studies.module.ts';
+import { StudiesController } from './studies.controller.ts';
 
 @Module({})
 export class ApiModule implements NestModule {
@@ -33,7 +36,9 @@ export class ApiModule implements NestModule {
         RedisModule,
         QueuesModule.forRoot(),
         AccountsModule,
+        FilesModule,
         GeoModule,
+        StudiesModule,
         ThrottlerModule.forRootAsync({
           inject: [REDIS, CONFIG],
           useFactory: (redis: Redis, c: Config) => ({
@@ -42,7 +47,7 @@ export class ApiModule implements NestModule {
           }),
         }),
       ],
-      controllers: [AuthController, GeoController, SystemController],
+      controllers: [AuthController, GeoController, StudiesController, SystemController],
       providers: [
         { provide: APP_GUARD, useClass: SessionGuard },
         { provide: APP_FILTER, useClass: ErrorFilter },

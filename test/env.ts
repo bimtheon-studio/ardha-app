@@ -26,6 +26,7 @@ export function testConfig(overrides: NodeJS.ProcessEnv = {}): Config {
     WEB_ORIGIN: 'http://127.0.0.1:14000',
     SESSION_COOKIE_NAME: `test_${id}`,
     QUEUE_PREFIX: `test:${id}`,
+    FILES_PREFIX: `test/${id}/`,
     ARDHA_SOURCES: 'recorded',
     TRUST_PROXY: '1',
     LOG_LEVEL: 'silent',

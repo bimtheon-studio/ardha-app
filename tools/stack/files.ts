@@ -65,6 +65,7 @@ export function variables(ctx: Context, secrets: Secrets): Record<string, string
     DATABASE_URL: pg('ardha'),
     DATABASE_URL_TEST: pg('ardha_test'),
     REDIS_URL: `redis://127.0.0.1:${ports.redis}`,
+    FILES_DRIVER: 's3',
     S3_ENDPOINT: `http://127.0.0.1:${ports.minio}`,
     S3_REGION: 'us-east-1',
     S3_ACCESS_KEY_ID: 'ardha',

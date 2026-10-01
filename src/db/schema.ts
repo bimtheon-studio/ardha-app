@@ -4,7 +4,9 @@
 // `uuidv7()` et `now()`, natifs de PostgreSQL 18.
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   customType,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -15,6 +17,8 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core';
+
+import type { Address } from '../contracts/geo.ts';
 
 const id = () => uuid().primaryKey().default(sql`uuidv7()`);
 const timestampTz = () => timestamp({ withTimezone: true, mode: 'date' });
@@ -157,7 +161,71 @@ export const sourceState = pgTable(
   (t) => [primaryKey({ columns: [t.source, t.scope] }), index().on(t.status)],
 );
 
+/**
+ * Données client : une étude (F-02). Ses parcelles sont copiées dans `study_parcels` ; l'adresse et
+ * la vignette sont calculées par le worker pour une empreinte des parcelles (`parcels_key`) : elles
+ * sont en retard tant que `address_key` ou `thumbnail_key` en diffère.
+ */
+export const study = pgTable(
+  'studies',
+  {
+    id: id(),
+    ownerId: uuid()
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    /** Vrai tant que le nom attend l'adresse ; faux une fois proposé par le worker, ou renommé (Q2). */
+    nameIsProvisional: boolean().notNull().default(true),
+    /** Commune qui porte la plus grande part de la surface. */
+    communeCode: text().notNull(),
+    communeName: text(),
+    /** Adresse retenue (BAN), copiée. */
+    address: jsonb().$type<Address>(),
+    /** Adresses rattachées aux parcelles, la principale en tête (Q3). */
+    addresses: jsonb().$type<Address[]>().notNull().default([]),
+    /** Adresse choisie par l'utilisateur, gardée tant qu'elle est trouvée. */
+    chosenAddressId: text(),
+    parcelsKey: text().notNull(),
+    addressKey: text(),
+    thumbnailKey: text(),
+    /** Dans la corbeille depuis (Q9). */
+    deletedAt: timestampTz(),
+    createdAt: timestampTz().notNull().defaultNow(),
+    updatedAt: timestampTz().notNull().defaultNow(),
+  },
+  (t) => [index().on(t.ownerId, t.updatedAt), index().on(t.deletedAt)],
+);
+
+/**
+ * Parcelles d'une étude, copiées depuis le cadastre avec leur millésime. Pas de clé vers `parcels` :
+ * la référence se remplace à chaque millésime, l'étude garde ce qu'elle a vu (PLAN §4).
+ */
+export const studyParcel = pgTable(
+  'study_parcels',
+  {
+    studyId: uuid()
+      .notNull()
+      .references(() => study.id, { onDelete: 'cascade' }),
+    /** IDU, 14 caractères. */
+    parcelId: text().notNull(),
+    /** Ordre d'ajout. */
+    position: integer().notNull(),
+    communeCode: text().notNull(),
+    prefix: text().notNull(),
+    section: text().notNull(),
+    number: text().notNull(),
+    contenance: integer(),
+    /** Surface calculée (géodésique), en m². */
+    area: doublePrecision().notNull(),
+    geometry: multiPolygon().notNull(),
+    /** Millésime du cadastre copié (`2026-09-01`). */
+    version: text().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.studyId, t.parcelId] })],
+);
+
 export type UserRow = typeof user.$inferSelect;
 export type SessionRow = typeof session.$inferSelect;
 export type PasswordResetRow = typeof passwordReset.$inferSelect;
 export type SourceStateRow = typeof sourceState.$inferSelect;
+export type StudyRow = typeof study.$inferSelect;

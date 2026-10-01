@@ -19,13 +19,26 @@ import { IngestionModule } from '../ingestion/ingestion.module.ts';
 import { QueuesModule } from '../shared/queues.ts';
 import { RedisModule } from '../shared/redis.ts';
 import { GEO_COMMANDS } from './geo.commands.ts';
+import { STUDY_COMMANDS } from './study.commands.ts';
+import { FilesModule } from '../shared/files.ts';
+import { StudiesModule } from '../studies/studies.module.ts';
 
 @Module({})
 export class CliModule {
   static forConfig(config?: Config) {
     return {
       module: CliModule,
-      imports: [ConfigModule.forConfig(config), DbModule, RedisModule, QueuesModule.forRoot(), AccountsModule, GeoModule, IngestionModule],
+      imports: [
+        ConfigModule.forConfig(config),
+        DbModule,
+        RedisModule,
+        QueuesModule.forRoot(),
+        AccountsModule,
+        FilesModule,
+        GeoModule,
+        StudiesModule,
+        IngestionModule,
+      ],
       providers: [
         MigrateCommand,
         SeedCommand,
@@ -37,6 +50,7 @@ export class CliModule {
         ReactivateCommand,
         ListUsersCommand,
         ...GEO_COMMANDS,
+        ...STUDY_COMMANDS,
       ],
     };
   }

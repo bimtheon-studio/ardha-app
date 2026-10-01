@@ -59,10 +59,11 @@ describe('rankAddresses', () => {
         address('voie', { kind: 'street', name: 'Rue Haute', street: 'Rue Haute' }),
         address('av', { name: '30 Avenue Foch', street: 'Avenue Foch' }),
         address('commune', { kind: 'municipality', name: 'X', street: null }),
+        address('sans-numero', { name: 'bis Rue Haute', street: 'Rue Haute', score: 0.1 }),
       ],
       [parcel],
     );
-    expect(ranked.map((a) => a.id)).toEqual(['av', 'rue-4b', 'rue-4', 'rue-12', 'voie', 'lieu']);
+    expect(ranked.map((a) => a.id)).toEqual(['av', 'rue-4b', 'rue-4', 'rue-12', 'voie', 'sans-numero', 'lieu']);
   });
 });
 

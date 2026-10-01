@@ -42,6 +42,15 @@ export function proposeStudyName(input: {
   return `${base.slice(0, STUDY_NAME_MAX - suffix.length)}${suffix}`;
 }
 
+/** Commune qui porte la plus grande surface (à égalité, la première rencontrée). */
+export function principalCommune(parcels: readonly { communeCode: string; area: number }[]): string | null {
+  const totals = new Map<string, number>();
+  for (const p of parcels) totals.set(p.communeCode, (totals.get(p.communeCode) ?? 0) + p.area);
+  let best: string | null = null;
+  for (const [code, area] of totals) if (best === null || area > totals.get(best)!) best = code;
+  return best;
+}
+
 /** Nom d'une copie (F-02, Q10). */
 export function copyName(name: string): string {
   const suffix = ' (copie)';
