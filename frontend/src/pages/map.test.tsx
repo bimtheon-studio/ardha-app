@@ -85,6 +85,7 @@ function api(overrides: Record<string, unknown> = {}) {
     'GET /api/auth/me': { status: 200, body: alice },
     'GET /api/map/layers': { status: 200, body: LAYERS },
     'GET /api/communes/locate': { status: 200, body: { commune: { code: '94046', name: 'Maisons-Alfort' } } },
+    'GET /api/studies': { status: 200, body: { studies: [] } },
     'GET /api/communes/94046': { status: 200, body: commune('ready') },
     'POST /api/communes/94046/cadastre': { status: 202, body: commune('ready') },
     'GET /api/parcels': (_, url) => {
@@ -324,7 +325,8 @@ describe('carte : fond', () => {
   it('l’accueil mène à la carte', async () => {
     api();
     renderAt('/');
-    await userEvent.click(await screen.findByRole('link', { name: 'Choisir des parcelles' }));
+    await screen.findByText('Aucune étude pour l’instant');
+    await userEvent.click(screen.getAllByRole('link', { name: 'Nouvelle étude' })[0]!);
     expect(await screen.findByTestId('map')).toBeInTheDocument();
   });
 });

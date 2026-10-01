@@ -22,7 +22,7 @@ for (const ref of [
 ]) {
   test(`chercher « ${ref.query} » : la carte s’y centre, sur le cadastre de la commune`, async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('link', { name: 'Choisir des parcelles' }).click();
+    await page.getByRole('link', { name: 'Nouvelle étude' }).first().click();
     await expect(page.getByText('Recherchez une adresse, ou zoomez pour afficher les parcelles.')).toBeVisible();
 
     await page.getByRole('combobox', { name: 'Adresse' }).fill(ref.query);

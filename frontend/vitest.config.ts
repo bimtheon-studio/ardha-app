@@ -16,7 +16,7 @@ export default mergeConfig(
         // Leaflet (`src/map/leaflet`) ne se dessine pas dans happy-dom : il est couvert par l'e2e.
         exclude: ['src/**/*.test.{ts,tsx}', 'src/test/**', 'src/main.tsx', 'src/components/ui/**', 'src/map/leaflet/**'],
         // Seuils à cliquet : `autoUpdate` les remonte en local, la CI échoue en dessous.
-        thresholds: { autoUpdate: process.env.CI ? false : (threshold: number) => Math.floor(threshold), lines: 99, functions: 97, branches: 94, statements: 98 },
+        thresholds: { autoUpdate: process.env.CI ? false : (threshold: number) => Math.floor(threshold), lines: 99, functions: 98, branches: 95, statements: 98 },
       },
     },
   }),

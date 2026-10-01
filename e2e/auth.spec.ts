@@ -14,7 +14,7 @@ test('s’inscrire, se déconnecter, se reconnecter', async ({ page }) => {
   await page.getByLabel('Adresse e-mail').fill(email);
   await page.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
   await page.getByRole('button', { name: /Créer/ }).click();
-  await expect(page.getByRole('heading', { name: 'Bonjour Camille Durand' })).toBeVisible();
+  await expect(page.getByText('Bonjour Camille Durand')).toBeVisible();
 
   await page.getByRole('button', { name: 'Menu du compte' }).click();
   await page.getByRole('menuitem', { name: 'Se déconnecter' }).click();
@@ -26,7 +26,7 @@ test('s’inscrire, se déconnecter, se reconnecter', async ({ page }) => {
   await expect(page.getByRole('alert')).toHaveText('Adresse e-mail ou mot de passe incorrect.');
   await page.getByLabel('Mot de passe').fill(PASSWORD);
   await page.getByRole('button', { name: 'Se connecter' }).click();
-  await expect(page.getByRole('heading', { name: 'Bonjour Camille Durand' })).toBeVisible();
+  await expect(page.getByText('Bonjour Camille Durand')).toBeVisible();
 });
 
 test('une page protégée demandée sans session y ramène après la connexion', async ({ page }) => {

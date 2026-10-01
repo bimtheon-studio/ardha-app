@@ -7,6 +7,8 @@ import { returnPath } from '@/auth/ProtectedRoute';
 import { initials } from '@/components/Shell';
 import { renderAt, alice, fakeApi, noSession } from '@/test/helpers';
 
+const NO_STUDIES = { status: 200, body: { studies: [] } };
+
 describe('route protégée', () => {
   it('sans session, / mène à la connexion (Q8)', async () => {
     fakeApi({ 'GET /api/auth/me': noSession });
@@ -15,9 +17,10 @@ describe('route protégée', () => {
   });
 
   it('avec session, affiche l’accueil dans la coquille', async () => {
-    fakeApi({ 'GET /api/auth/me': { status: 200, body: alice } });
+    fakeApi({ 'GET /api/auth/me': { status: 200, body: alice }, 'GET /api/studies': NO_STUDIES });
     renderAt('/');
-    expect(await screen.findByRole('heading', { name: 'Bonjour Alice Martin' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Mes études' })).toBeInTheDocument();
+    expect(screen.getByText('Bonjour Alice Martin')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Menu du compte' })).toHaveTextContent('AM');
   });
 
@@ -74,9 +77,9 @@ describe('connexion', () => {
 
 describe('inscription', () => {
   it('déjà connecté, /inscription et /connexion mènent à l’accueil', async () => {
-    fakeApi({ 'GET /api/auth/me': { status: 200, body: alice } });
+    fakeApi({ 'GET /api/auth/me': { status: 200, body: alice }, 'GET /api/studies': NO_STUDIES });
     renderAt('/signup');
-    expect(await screen.findByRole('heading', { name: 'Bonjour Alice Martin' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Mes études' })).toBeInTheDocument();
   });
 
   it('montre sous le champ l’adresse déjà utilisée', async () => {
@@ -113,13 +116,14 @@ describe('inscription', () => {
         signedUp = true;
         return { status: 201, body: alice };
       },
+      'GET /api/studies': NO_STUDIES,
     });
     renderAt('/signup');
     await userEvent.type(await screen.findByLabelText('Nom'), 'Alice Martin');
     await userEvent.type(screen.getByLabelText('Adresse e-mail'), 'alice@exemple.fr');
     await userEvent.type(screen.getByLabelText('Mot de passe'), 'cheval pomme agrafe');
     await userEvent.click(screen.getByRole('button', { name: 'Créer mon compte' }));
-    expect(await screen.findByRole('heading', { name: 'Bonjour Alice Martin' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Mes études' })).toBeInTheDocument();
   });
 });
 

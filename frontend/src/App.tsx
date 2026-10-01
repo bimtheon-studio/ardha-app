@@ -14,6 +14,8 @@ const Home = lazy(() => import('@/pages/Home').then((m) => ({ default: m.Home })
 const ForgotPassword = lazy(() => import('@/pages/ForgotPassword').then((m) => ({ default: m.ForgotPassword })));
 const ResetPassword = lazy(() => import('@/pages/ResetPassword').then((m) => ({ default: m.ResetPassword })));
 const MapPage = lazy(() => import('@/pages/MapPage').then((m) => ({ default: m.MapPage })));
+const StudyPage = lazy(() => import('@/pages/StudyPage').then((m) => ({ default: m.StudyPage })));
+const TrashPage = lazy(() => import('@/pages/TrashPage').then((m) => ({ default: m.TrashPage })));
 const NotFound = lazy(() => import('@/pages/NotFound').then((m) => ({ default: m.NotFound })));
 
 export function AppRoutes() {
@@ -34,6 +36,10 @@ export function AppRoutes() {
         >
           <Route index element={<Home />} />
           <Route path="map" element={<MapPage />} />
+          <Route path="studies/trash" element={<TrashPage />} />
+          <Route path="studies/:id" element={<StudyPage />} />
+          {/* Clé : passer d'une étude à l'autre (ou à /map) remonte la carte de zéro. */}
+          <Route path="studies/:id/map" element={<MapPage />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>
