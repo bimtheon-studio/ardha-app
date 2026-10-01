@@ -177,8 +177,16 @@ Ce que le code de once v0.3.3 impose (lu dans `internal/docker` et `internal/com
    `sha-<7>` (immuable) et `pr-<n>` ou `master`. La CI teste désormais la tête de la PR et non le
    commit de fusion, pour que `sha-<7>` désigne exactement ce commit. Rien n'est publié pour une PR
    venue d'un fork. Paquet public (porteur du produit), à basculer par un admin de l'organisation
-   après le premier push. Reste : déploiement par SSH (clé à commande forcée, à faire accepter),
-   environnements par PR, balayage nocturne.
+   après le premier push. Premier passage vert le 01/10/2026 (PR #1, image `sha-1e3a53b`).
+
+   `ardha-env ci` : la commande forcée prévue pour la clé SSH de la CI
+   (`command="/home/ubuntu/ardha/ardha-env ci",restrict` dans `authorized_keys`, **à faire
+   accepter**). Liste blanche : `create`/`remove pr-<n>`, `update pr-<n>|production` avec une image
+   `ghcr.io/bimtheon-studio/ardha:sha-<7>` seulement, `--reset-db` hors production, `list`,
+   `logs <nom> [--tail <n>]`, `sweep --keep <pr-…>` (supprime les environnements des PR fermées).
+   Ni `setup`, ni `exec`, ni `psql`, ni suppression de la production ; le script ne se met à jour
+   que par `pnpm server sync`, lancé par un humain. Reste : la clé, les jobs de déploiement des PR
+   et de la production, le balayage nocturne.
 7. **Clore** : README (section « Déployer »), journal du PLAN, décisions techniques de LD.
 
 ## Bloquant connu (levé le 01/10/2026 : dépôt créé)

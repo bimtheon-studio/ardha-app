@@ -12,6 +12,8 @@
 #   ardha-env logs <nom> [--tail <n>] [--follow]     journaux du conteneur
 #   ardha-env exec <nom> <commande…>                 commande dans le conteneur (once exec)
 #   ardha-env psql <nom> [arguments de psql…]        psql sur la base de l'environnement
+#   ardha-env sweep --keep <pr-1,pr-7,…>             supprime les PR absentes de la liste (fermées)
+#   ardha-env ci                                     commande forcée de la clé SSH de la CI
 #
 # <nom> : `production` ou `pr-<numéro>`.
 set -euo pipefail
@@ -308,6 +310,59 @@ cmd_psql() {
   docker exec -i "${tty[@]}" "$POSTGRES" psql -U postgres -d "$(database_of "$name")" "$@"
 }
 
+cmd_sweep() {
+  local keep=''
+  while (($#)); do
+    case $1 in
+      # Sans valeur : aucune PR ouverte, tout part.
+      --keep) keep=${2-}; shift; (($#)) && shift ;;
+      *) usage ;;
+    esac
+  done
+  [[ $keep =~ ^(pr-[0-9]{1,6}(,pr-[0-9]{1,6})*)?$ ]] || die "--keep : liste de pr-<n> séparés par des virgules"
+  local file name removed=0
+  for file in "$ENVS"/pr-*.env; do
+    [[ -e $file ]] || continue
+    name=$(basename "$file" .env)
+    if [[ ,$keep, != *",$name,"* ]]; then
+      cmd_remove "$name"
+      removed=$((removed + 1))
+    fi
+  done
+  echo "Balayage : $removed environnement(s) supprimé(s)."
+}
+
+# Commande forcée de la clé SSH de la CI (`command="…/ardha-env ci",restrict` dans authorized_keys) :
+# la CI ne peut que créer, mettre à jour, supprimer ou balayer des environnements de PR, mettre à
+# jour la production, lister et lire des journaux. Ni setup, ni psql, ni exec, ni suppression de la
+# production ; images de ghcr.io/bimtheon-studio/ardha à étiquette immuable seulement. Le script
+# lui-même ne se met à jour que par `pnpm server sync`, lancé par un humain.
+cmd_ci() {
+  local words=() image_re='^ghcr\.io/bimtheon-studio/ardha:sha-[0-9a-f]{7}$'
+  read -ra words <<< "${SSH_ORIGINAL_COMMAND:-}"
+  # `pnpm server` appelle `ardha/ardha-env <commande>` : même client pour un humain et pour la CI.
+  [[ ${words[0]:-} == ardha/ardha-env ]] && words=("${words[@]:1}")
+  set -- "${words[@]}"
+  local command=${1:-} name=${2:-}
+  refuse() { die "commande refusée à la CI : ${SSH_ORIGINAL_COMMAND:-(vide)}"; }
+  case $command in
+    list) (($# == 1)) || refuse ;;
+    create | remove) [[ $name =~ ^pr-[0-9]{1,6}$ ]] || refuse ;;
+    update) [[ $name =~ ^(production|pr-[0-9]{1,6})$ ]] || refuse ;;
+    logs) [[ $name =~ ^(production|pr-[0-9]{1,6})$ && ($# == 2 || ($# == 4 && $3 == --tail && $4 =~ ^[0-9]{1,5}$)) ]] || refuse ;;
+    sweep) [[ ${2:-} == --keep && $# -le 3 ]] || refuse ;;
+    *) refuse ;;
+  esac
+  case $command in
+    create | update)
+      [[ ${3:-} == --image && ${4:-} =~ $image_re ]] || refuse
+      (($# == 4)) || [[ $# == 5 && $5 == --reset-db && $name != production ]] || refuse
+      ;;
+    remove) (($# == 2)) || refuse ;;
+  esac
+  "cmd_$command" "${@:2}"
+}
+
 command=${1:-}
 (($#)) && shift
 case $command in
@@ -319,5 +374,7 @@ case $command in
   logs) cmd_logs "$@" ;;
   exec) cmd_exec "$@" ;;
   psql) cmd_psql "$@" ;;
+  sweep) cmd_sweep "$@" ;;
+  ci) cmd_ci ;;
   *) usage ;;
 esac

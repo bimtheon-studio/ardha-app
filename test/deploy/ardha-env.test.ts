@@ -42,6 +42,16 @@ function ardhaEnv(...args: string[]): Result {
   return { code: r.status ?? -1, out: r.stdout, err: r.stderr };
 }
 
+/** Comme la CI : la commande forcée de sa clé SSH reçoit la commande demandée dans SSH_ORIGINAL_COMMAND. */
+function ci(command: string): Result {
+  const r = spawnSync(path.join(ROOT, 'deploy/server/ardha-env'), ['ci'], {
+    env: { ...env, SSH_ORIGINAL_COMMAND: command },
+    encoding: 'utf8',
+    input: '',
+  });
+  return { code: r.status ?? -1, out: r.stdout, err: r.stderr };
+}
+
 function ok(...args: string[]): string {
   const r = ardhaEnv(...args);
   if (r.code !== 0) throw new Error(`ardha-env ${args.join(' ')} : code ${r.code}\n${r.out}\n${r.err}`);
@@ -150,6 +160,36 @@ describe('ardha-env', () => {
     expect(ok('psql', 'pr-1', '-qAt', '-c', 'SELECT count(*) FROM communes')).toBe('4\n');
   });
 
+  it('mode ci (clé SSH de la CI) : refuse tout ce qui sort des PR, de la mise à jour de la production et de la lecture', () => {
+    const sha = 'ghcr.io/bimtheon-studio/ardha:sha-0123abc';
+    for (const command of [
+      '',
+      'setup',
+      'psql pr-1',
+      'exec pr-1 ardha user:list',
+      'remove production --confirm production',
+      `create production --image ${sha}`,
+      `update production --image ${sha} --reset-db`,
+      'create pr-2 --image ardha:test',
+      'create pr-2 --image ghcr.io/bimtheon-studio/ardha:pr-2',
+      'create pr-2 --image ghcr.io/autre/ardha:sha-0123abc',
+      `create pr-2 --image ${sha} --memory 4096`,
+      'list; rm -rf ~',
+      'logs pr-1 --follow',
+      'sweep pr-1',
+    ]) {
+      const r = ci(command);
+      expect(r.code, command).toBe(1);
+      expect(r.err, command).toMatch(/commande refusée à la CI/);
+    }
+  });
+
+  it('mode ci : liste, journaux et balayage permis ; « ardha/ardha-env » en tête (pnpm server) accepté', () => {
+    expect(ci('ardha/ardha-env list').out).toMatch(/^pr-1\t/m);
+    expect(ci('logs pr-1 --tail 5').code).toBe(0);
+    expect(ci('sweep --keep pr-1,pr-12').out).toBe('Balayage : 0 environnement(s) supprimé(s).\n');
+  });
+
   it('update --reset-db : nouvelle base, resemée ; l’environnement (mots de passe compris) est repris', async () => {
     const before = readFileSync(path.join(home, 'envs/pr-1.env'), 'utf8');
     sql('ardha_pr_1', `INSERT INTO users (email, name) VALUES ('x@exemple.fr', 'X')`);
@@ -165,8 +205,8 @@ describe('ardha-env', () => {
     expect(ardhaEnv('remove', 'production').err).toMatch(/--confirm production/);
   });
 
-  it('remove pr-1 : ni application, ni base, ni rôle, ni clé Redis, ni fichier', () => {
-    ok('remove', 'pr-1');
+  it('sweep sans PR ouverte : pr-1 supprimée, sans application, base, rôle, clé Redis ni fichier', () => {
+    expect(ci('sweep --keep').out).toMatch(/Environnement pr-1 supprimé\.\nBalayage : 1 environnement\(s\) supprimé\(s\)\./);
     expect(sql('postgres', `SELECT count(*) FROM pg_database WHERE datname = 'ardha_pr_1'`)).toBe('0');
     expect(sql('postgres', `SELECT count(*) FROM pg_roles WHERE rolname = 'ardha_pr_1'`)).toBe('0');
     expect(docker('exec', `${ID}-redis`, 'redis-cli', '--scan', '--pattern', 'ardha-pr-1:*')).toBe('');
