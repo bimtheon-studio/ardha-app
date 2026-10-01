@@ -76,8 +76,9 @@ services_ready() {
 }
 
 once_hosts() {
-  # `once list` colore et lie les hôtes (séquences OSC 8) : on n'en garde que le texte.
-  "$ONCE" list | sed -E 's/\x1b\]8;;[^\x1b]*\x1b\\//g; s/\x1b\[[0-9;]*m//g'
+  # `once list` colore et lie les hôtes (OSC 8, terminées par BEL chez once v0.3.3, ou par ESC \) :
+  # on n'en garde que le texte.
+  "$ONCE" list | sed -E 's/\x1b\]8;;[^\x07\x1b]*(\x07|\x1b\\)//g; s/\x1b\[[0-9;]*m//g'
 }
 
 app_exists() { once_hosts | grep -q "^$1 "; }

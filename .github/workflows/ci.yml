@@ -26,7 +26,7 @@ env:
   COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
-  verifier:
+  test:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -118,8 +118,8 @@ jobs:
   # Environnement de la PR (ardha-pr-<n>.once.florent.cc), créé ou mis à jour avec l'image testée.
   # Base recréée si ce push touche drizzle/. Jamais pour une PR venue d'un fork. Interrupteur :
   # variable du dépôt DEPLOY_ONCE=true, posée une fois la clé SSH de la CI installée.
-  environnement-pr:
-    needs: verifier
+  deploy-pr:
+    needs: test
     if: vars.DEPLOY_ONCE == 'true' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -160,7 +160,8 @@ jobs:
             # Migrations modifiées par ce push (ou historique réécrit : on ne sait pas) : base neuve.
             if ! git diff --quiet "$BEFORE" "$COMMIT" -- drizzle/ 2>/dev/null; then reset='--reset-db'; fi
             server update "$NAME" --image "$image" $reset
-            [[ -n $reset ]] && echo "fresh=true" >> "$GITHUB_OUTPUT"
+            # Un `&&` en dernière commande ferait échouer l'étape quand la base est gardée.
+            if [[ -n $reset ]]; then echo "fresh=true" >> "$GITHUB_OUTPUT"; fi
           else
             server create "$NAME" --image "$image"
             echo "fresh=true" >> "$GITHUB_OUTPUT"
@@ -189,8 +190,8 @@ jobs:
           gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --edit-last --create-if-none --body "$body"
 
   # master → production (ardha.once.florent.cc), avec l'image testée.
-  production:
-    needs: verifier
+  deploy-production:
+    needs: test
     if: vars.DEPLOY_ONCE == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-24.04
     timeout-minutes: 15

@@ -97,8 +97,8 @@ case $command in
   list)
     for f in "$STATE"/apps/*; do
       [[ -e $f && $f != *.env ]] || continue
-      # Comme once : hôte en lien OSC 8 et en couleur.
-      printf '\e]8;;https://%s\e\\\e[94m%s\e[0m\e]8;;\e\\ (running)\n' "$(basename "$f")" "$(basename "$f")"
+      # Octet pour octet comme once v0.3.3 : lien OSC 8 terminé par BEL, couleur, reset `ESC [m`.
+      printf '\e]8;;https://%s\a\e[94m%s\e[m\e]8;;\a (running)\n' "$(basename "$f")" "$(basename "$f")"
     done
     ;;
   exec)

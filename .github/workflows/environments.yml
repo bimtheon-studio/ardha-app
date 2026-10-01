@@ -1,7 +1,7 @@
 # Environnements de PR sur le serveur once (lot LD) : supprimé à la fermeture de la PR ; chaque nuit,
 # balayage de ceux dont la PR n'est plus ouverte (fermeture manquée, échec). Par la clé SSH de la CI,
 # dont la commande forcée (`ardha-env ci`) n'accepte que ces opérations.
-name: Environnements
+name: Environments
 
 on:
   pull_request:
@@ -15,7 +15,7 @@ permissions:
   pull-requests: read
 
 jobs:
-  nettoyer:
+  cleanup:
     # Interrupteur : variable du dépôt DEPLOY_ONCE=true, posée une fois la clé SSH de la CI installée.
     if: vars.DEPLOY_ONCE == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
