@@ -66,7 +66,9 @@ sur ce qui n'en dépend pas.
 - **Lint obligatoire avant chaque commit** : hook `tools/hooks/pre-commit`, installé par
   `pnpm install`. Ne jamais le contourner (`--no-verify`).
 - Une branche par lot ou par fonctionnalité, partie de `master`. Commits locaux autorisés, en français.
-- **Pas de remote pour l'instant, donc pas de push.** Ne jamais réécrire un historique déjà partagé.
+- Remote `origin` : https://github.com/bimtheon-studio/ardha-app (**public**). **Pousser seulement
+  sur demande du porteur du produit** ; les PR visent `master` (D-11). Ne jamais réécrire un
+  historique déjà partagé.
 - Terminer chaque message de commit par :
   ```
   Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
