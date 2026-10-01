@@ -161,7 +161,7 @@ s'appellent eux-mêmes en HTTP avec un secret ; demain, seul le worker sort.
 | Supabase Storage, 10 Go | S3, URL signées |
 | 21 fichiers du front qui appellent les API publiques | le worker, un adaptateur par source |
 | cartes PDF et vignettes capturées dans le navigateur | composées par le worker |
-| Netlify et Lovable, fusion = production | `master` → production, `staging` (branches pré-fusionnées) → serveur de staging |
+| Netlify et Lovable, fusion = production | `master` → production, un environnement éphémère par PR (D-11, D-13) |
 
 ### Les données : 34 tables
 
@@ -278,16 +278,16 @@ tâches Node. Livré en L0 (D-09).
 |---|---|
 | CI | types, lint, tests unitaires et d'intégration, migrations rejouées depuis zéro, contrôle « base bête », build |
 | Couverture | seuil à cliquet par package, au moins 90 % sur le domaine |
-| CD | les PR visent `master`, qui déploie la production ; `staging` est une copie de `master` dans laquelle on pré-fusionne les branches en cours pour les essayer sur le serveur de staging, reprise régulièrement depuis `master` ; environnements éphémères par branche dans un second temps (D-11) |
+| CD | les PR visent `master`, qui déploie la production ; chaque PR a son environnement éphémère, supprimé à la fermeture ; pas de branche `staging` (D-11, D-13) |
 | Migrations | SQL versionné, en avant seulement, appliqué uniquement par la CD ; ajout puis retrait en deux temps pour ne pas couper le service |
-| Sauvegardes | restauration à un instant donné chez l'hébergeur, dump chiffré chaque nuit chez un autre fournisseur, test de restauration automatique chaque semaine ; les règles issues du LLM se sauvegardent comme les données client |
+| Sauvegardes | sauvegarde automatique de once, avec un dump cohérent de la base déposé dans `/storage` par le hook `pre-backup` (D-13) ; *plus tard* : copie chiffrée chez un autre fournisseur et test de restauration automatique, dès qu'il y aura des données client ; les règles issues du LLM se sauvegardent comme les données client |
 | Observabilité | Sentry, logs structurés, alertes sur le retard de la file, le coût LLM et les erreurs de tuiles, métriques par source externe |
 
 ## 9. Risques
 
 | Risque | Parade |
 |---|---|
-| Une réécriture longue qui ne livre rien | tranches verticales, staging dès L0 ; l'ancienne application tourne jusqu'à la bascule |
+| Une réécriture longue qui ne livre rien | tranches verticales, déployées dès le lot LD (production et environnements par PR) ; l'ancienne application tourne jusqu'à la bascule |
 | Des comportements perdus en route | fiches arbitrées, recette comparée |
 | L3 bloqué par l'extracteur voisin | L1, L2, L4 et L5 avancent sans lui |
 | Le coût LLM de reconstruction | n'extraire que les segments modifiés, par ordre de priorité des communes |
@@ -301,7 +301,7 @@ tâches Node. Livré en L0 (D-09).
 couverture tenu, recette faite sur les communes de référence.
 
 **Pour la v1** : L0 → L8 clos, L9 en CLI ; `docker compose up` rend une application complète avec seed ;
-`master` déploie la production et `staging` le serveur de staging ; sauvegarde nocturne et test de
+`master` déploie la production, chaque PR son environnement éphémère ; sauvegarde nocturne et test de
 restauration hebdomadaire au vert ; aucune référence à Supabase ni à la constellation dans le dépôt.
 
 ## 11. Décisions prises
@@ -321,8 +321,9 @@ sur un fait nouveau, pas sur une préférence.
 | D-08 | Fonds de carte chez IGN en accès direct, sous surveillance (*amendée le 01/10/2026 par le porteur du produit : OpenStreetMap par défaut, fonds IGN au choix, F-01 Q8*) ; cartes des PDF et vignettes composées par le worker | un proxy de tuiles dès maintenant | aucune panne des tuiles de fond dans l'historique, contrairement aux API de données ; erreurs mesurées dans Sentry, proxy déclenché sur critère ; Leaflet conservé en L1 |
 | D-09 | Une stack par worktree : ports déterministes par branche, seed par fixtures, tests sans Internet | une stack locale unique | faire coder des agents en parallèle, puis sur des instances éphémères |
 | D-10 | PostgreSQL 18 (18.6), PostGIS 3.6, pgvector 0.8.5 | PostgreSQL 17 | dernière majeure, supportée jusqu'au 14/11/2030 ; images `postgis/postgis:18-3.6` et `pgvector/pgvector:0.8.5-pg18` disponibles |
-| D-11 | Déploiement par branches : `master` → production, `staging` → serveur de staging ; environnements éphémères par branche dans un second temps | staging automatique et production sur tag | les PR visent `master` ; `staging` est une copie de `master` dans laquelle on pré-fusionne les branches en cours, reprise régulièrement depuis `master` |
+| D-11 | Déploiement par branches : `master` → production, `staging` → serveur de staging ; environnements éphémères par branche dans un second temps (*amendée le 01/10/2026 par le porteur du produit : branche `staging` abandonnée, un environnement éphémère par PR dès le lot LD, supprimé à la fermeture*) | staging automatique et production sur tag | les PR visent `master` ; `staging` est une copie de `master` dans laquelle on pré-fusionne les branches en cours, reprise régulièrement depuis `master` |
 | D-12 | Volet agent non repris au départ : clients, annonces, mandats, rapprochement acquéreurs, fiche commerciale IA, profil professionnel (logo, agence) | le porter en v1 | un autre métier (la transaction), sans usage (tables vides) ; le mandat de vente pèse réglementairement (loi n° 70-9 du 2 janvier 1970, décret n° 72-678 du 20 juillet 1972), à instruire si on y revient |
+| D-13 | Hébergement sur un serveur **once** (37signals), d'abord celui du porteur du produit (`*.once.florent.cc`) : l'application en **une image Docker** (API + worker), PostgreSQL et Redis en **conteneurs partagés sur le même serveur, hors once**, branchés sur le réseau Docker `once` ; une base et un préfixe Redis par environnement (01/10/2026) | Clever Cloud (étudié le 01/10 : faisable, ~60 €/mois) ; Postgres dans l'image ; passer à SQLite | coût marginal nul, environnements par PR sous le DNS joker existant ; once lance la nouvelle version **sur le même volume avant d'arrêter l'ancienne** (`basecamp/once@da130f0`, `internal/docker/application.go`, `deployWithVolume`) : un Postgres dans `/storage` serait corrompu ; SQLite rouvrirait D-05, D-06 et D-10. Écart assumé avec « tout au nom du produit » (§3) tant qu'il n'y a pas de client |
 
 Mesures du 29/09 : registre npm (`prisma` latest = 8.0.0-rc.19, stable 7.10.0 ; `drizzle-orm` 0.45.3 ;
 `pg-boss` 12.35.0), postgresql.org (18.6, pas de 19), Docker Hub (`postgis/postgis:18-3.6`,
@@ -377,7 +378,8 @@ Les arbitrages fonctionnels, rendus le 01/10/2026, sont dans [F-01](fiches/F-01-
 | Sujet | Question |
 |---|---|
 | Propriété | À quel nom ouvrir le dépôt, le cloud, le domaine, le compte LLM, Sentry ? |
-| Hébergeur | Lequel, en fin de L0 : PostgreSQL 18 avec PostGIS et pgvector, Redis, S3, dans l'UE |
+| ~~Hébergeur~~ | ~~Lequel ?~~ Tranché le 01/10/2026 : once (D-13) |
+| Fichiers sous once | S3 (MinIO à côté de Postgres) ou fichiers dans `/storage`, sauvegardés par once ? À trancher au premier fichier stocké (L3, PDF d'urbanisme) |
 | LLM | Garder Azure OpenAI sur un compte propre, ou changer ? |
 | Extracteur voisin | Caler le format de sortie de `plui-extract` sur `reglement_segment` (conditionne L3) |
 | Fonds de carte | Quel taux d'erreurs de tuiles déclenche le proxy ? À fixer après quelques semaines de mesure |
@@ -388,6 +390,10 @@ vers des comptes pas encore recréés) ; aucune migration ne les a réinjectées
 été supprimée le 27/09. Sans conséquence pour la réécriture, qui repart de zéro.
 
 ## Journal
+
+- **01/10/2026** — **hébergement : once** (D-13), après étude de Clever Cloud ; branche `staging`
+  abandonnée au profit d'un environnement éphémère par PR (D-11 amendée). Feuille de route :
+  [`lots/LD-deploiement.md`](lots/LD-deploiement.md).
 
 - **01/10/2026** — fond de carte par défaut : **OpenStreetMap** (porteur du produit), fonds IGN au
   choix ; D-08 annotée. Tuiles OSM soumises à une politique d'usage : fournisseur ou proxy à prévoir
