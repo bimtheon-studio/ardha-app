@@ -289,8 +289,8 @@ describe('protection contre les requêtes intersites', () => {
 });
 
 describe('système', () => {
-  it('santé : base et Redis joignables', async () => {
-    const r = await http().get('/api/health');
+  it('santé (/up) : base et Redis joignables', async () => {
+    const r = await http().get('/up');
     expect(r.status).toBe(200);
     expect(r.body).toEqual({ status: 'ok', db: 'ok', redis: 'ok' });
   });

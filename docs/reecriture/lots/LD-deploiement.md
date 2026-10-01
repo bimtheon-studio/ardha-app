@@ -44,9 +44,58 @@ Le serveur héberge d'autres applications du porteur du produit.
 - Ce qui s'installe sur le serveur (fichier Compose, script) est **versionné dans le dépôt** et copié
   par la commande de déploiement : le serveur se reconstruit depuis le dépôt.
 
+## Inspection du serveur (étape 1, 01/10/2026, lecture seule)
+
+| Point | Constat |
+| --- | --- |
+| Machine | VPS Ubuntu 24.04.4, noyau 6.8, x86_64, **4 vCPU** |
+| Mémoire | **7,7 Go**, 3,2 Go utilisés, **4,5 Go disponibles**, **pas de swap** |
+| Disque | 72 Go, **39 Go libres** ; images Docker 26,6 Go (15,6 Go récupérables : pas à nous d'y toucher) |
+| once | **v0.3.3** = `basecamp/once@da130f0`, le commit cité par D-13 ; tâches de fond (`once background`) disponibles |
+| Docker | 29.7.2 ; `ubuntu` est dans le groupe `docker` (pas de `sudo` nécessaire) |
+| Réseau `once` | bridge `172.18.0.0/16`, non interne (sortie Internet possible : le worker en a besoin) |
+| Ports écoutés | 22, 80, 443 (kamal-proxy), 53 (résolveur local), `127.0.0.1:1318` ; **5432, 6379 et 5000 libres** |
+| Applications | 16 applications once, toutes `running`, aucune ne commence par `ardha` ; la plus lourde, fizzy, ~960 Mo |
+| Compose | aucun projet ; aucun Postgres ni Redis sur la machine |
+
+Ce que le code de once v0.3.3 impose (lu dans `internal/docker` et `internal/command`) :
+
+- **`deploy` et `update` font toujours un `docker pull`** (`application.go`, `pullImage`) : une image
+  chargée par `docker load` sans registre ne suffit pas. Il faut un registre joignable par le démon
+  Docker du serveur (identifiants possibles : `--registry-username`, `--registry-password-stdin`).
+- Le nom de l'application vient du dernier segment de l'image (`helpers.go`, `NameFromImageRef`) :
+  avec une image `…/ardha`, les conteneurs s'appellent `once-app-ardha…`. Les commandes `update`,
+  `remove`, `exec` désignent l'application **par son hôte**.
+- **`update --env` remplace tout l'environnement** (`settings_flags.go`, `applyChanges`) : il faut
+  repasser toutes les variables à chaque mise à jour. Les variables sont stockées dans une étiquette
+  du conteneur (`containerConfig`) : visibles par `docker inspect`, donc par `ubuntu` seulement.
+- Déploiement : kamal-proxy attend `/up` sain **en 120 s** (`proxy.go`, `deployTimeout`), puis once
+  vérifie `https://<hôte>/up` en 30 s, et supprime l'application si la vérification échoue
+  (`deploy.go`, `VerifyHTTPOrRemove`). Migrations et seed ne doivent pas retarder `/up` au-delà.
+- Sauvegarde : si `/hooks/pre-backup` existe et réussit, **pas de pause du conteneur** ; once archive
+  `/storage` et les réglages de l'application (`application_backup.go`). Restauration : nouvelle
+  application **sur l'hôte de l'archive**, refusée s'il est pris ; `/hooks/post-restore` tourne dans
+  un conteneur temporaire avec l'environnement de l'application, avant le démarrage.
+- **L'ancien conteneur est supprimé de force** une fois le nouveau en service
+  (`removeContainersExcept`, `ContainerRemove` avec `Force`) : SIGKILL, sans SIGTERM. Un job BullMQ
+  en cours est alors repris par BullMQ comme job bloqué (*stalled*) ; l'arrêt propre du lanceur ne
+  sert qu'à `once stop` et aux redémarrages de Docker.
+- Journaux : `json-file`, 10 Mo, un seul fichier ; once n'a pas de commande `logs` : passer par
+  `docker logs` sur le conteneur `once-app-<nom>-<id>`.
+
+## Arbitrages du porteur du produit (01/10/2026)
+
+- **Registre : ghcr.io dès maintenant** (pas de registre sur le serveur). Dépôt GitHub :
+  **`bimtheon-studio/ardha-app`** ; image proposée `ghcr.io/bimtheon-studio/ardha` (applications
+  once `ardha…`), à confirmer. Création du dépôt et premier push **en attente de son feu vert**.
+- Hôte de production : **`ardha.once.florent.cc`** ; PR : `ardha-pr-<n>.once.florent.cc`.
+- Mémoire : Postgres ~512 Mo, Redis 64 Mo, production `--memory 1024`, PR `--memory 512`, **au plus
+  4 environnements de PR** à la fois (le 5e est refusé). Plafonds à revoir après mesure de l'image.
+
 ## Étapes
 
-1. **Inspecter le serveur** (lecture seule) et consigner ce qu'on y trouve dans ce fichier.
+1. **Inspecter le serveur** (lecture seule) et consigner ce qu'on y trouve dans ce fichier : fait,
+   voir ci-dessus.
 2. **Code, testable en local et en CI, tests d'abord** :
    - `Dockerfile` en plusieurs étapes (Node 26.10 et pnpm 12.8 au build, comme `mise.toml`) ; image
      finale avec `pg_dump` 18 et `fixtures/http` (seed des communes de référence) ;
@@ -64,6 +113,18 @@ Le serveur héberge d'autres applications du porteur du produit.
    - hooks `/hooks/pre-backup` et `/hooks/post-restore` ;
    - test « image » : construire l'image, la démarrer contre la stack locale, vérifier `/up`, `/`,
      `/map`, une connexion ; l'ajouter à la CI.
+
+   **Fait (01/10/2026)** : `Dockerfile` (Node 26.10 trixie-slim, tini, `pg_dump` 18.6 du dépôt PGDG,
+   570 Mo) ; lanceur `src/launcher` (migrations sous `pg_advisory_lock`, API, worker relancé avec
+   attente croissante, seed `--if-empty` si `ARDHA_SEED_ON_BOOT`, SIGTERM transmis, SIGKILL après
+   8 s) ; `/up` **remplace `/api/health`** (porteur du produit : une seule route de santé) ;
+   `BASE_URL` → `WEB_ORIGIN`, `DISABLE_SSL` → cookie sans `Secure` ; `REDIS_PREFIX` (files sous
+   `<préfixe>:bull`, limiteur sous `<préfixe>:<cookie>:rate-limit`) ; front servi par l'API
+   (`FRONTEND_DIR`) ; hooks `pre-backup` (dump sans les extensions, qui appartiennent au serveur) et
+   `post-restore` (une transaction, échec si le dump manque) ; CLI dans le conteneur : `ardha …`.
+   `pnpm test:image` (8 tests, 11 s une fois l'image en cache) ajouté à la CI. Mesure : **pic de
+   422 Mio** pendant le seed des quatre communes, **154 Mio** au repos ; le plafond de 512 Mo des PR
+   tient, sans grande marge.
 3. **Serveur** : `deploy/server/compose.yaml` (Postgres, Redis ; réseau `once`) et un script serveur
    `ardha-env create|update|remove|list <nom>` (base + rôle, `once deploy`/`update`/`remove`,
    clés Redis). La clé SSH de la CI ne pourra lancer que ce script (commande forcée dans

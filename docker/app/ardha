@@ -1,0 +1,3 @@
+#!/bin/sh
+# La CLI d'Ardha dans le conteneur : `once exec <hôte> ardha user:create-admin …`.
+exec node --enable-source-maps /app/dist/cli/main.js "$@"

@@ -28,7 +28,11 @@ export default defineConfig({
     host: '127.0.0.1',
     port: portWeb,
     strictPort: true,
-    proxy: { '/api': { target: `http://127.0.0.1:${portApi}`, xfwd: true } },
+    // `/up` aussi : l'e2e attend l'API à travers le front.
+    proxy: {
+      '/api': { target: `http://127.0.0.1:${portApi}`, xfwd: true },
+      '/up': { target: `http://127.0.0.1:${portApi}`, xfwd: true },
+    },
   },
   preview: { host: '127.0.0.1', port: portWeb, strictPort: true },
 });

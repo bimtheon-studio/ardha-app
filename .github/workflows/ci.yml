@@ -1,12 +1,13 @@
 # CI d'Ardha (PLAN §8) : types, lint, contrôle « base bête », tests unitaires et d'intégration sur
-# la stack Docker (migrations rejouées depuis une base vide), build, tests e2e dans Chromium.
+# la stack Docker (migrations rejouées depuis une base vide), build, tests e2e dans Chromium, image
+# de production construite et démarrée contre la stack (lot LD).
 # Chaque étape se rejoue en local avec la même commande `pnpm`.
 name: CI
 
 on:
   pull_request:
   push:
-    branches: [master, staging]
+    branches: [master]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -58,6 +59,10 @@ jobs:
           # Le front vient d'être construit ; le Chromium de Playwright plutôt que celui du système.
           E2E_SKIP_FRONT_BUILD: '1'
           ARDHA_CHROMIUM: ''
+
+      # Image once : /up, front servi par l'API, connexion, seed, sauvegarde et restauration, arrêt propre.
+      - name: Image de production
+        run: pnpm test:image
 
       - name: Rapport e2e
         if: failure()

@@ -1,0 +1,13 @@
+#!/bin/sh
+# Hook de once, après `once restore`, avant le démarrage de l'application : recharge dans la base de
+# l'environnement le dump déposé par pre-backup. Tout ou rien (une transaction) ; sans dump, échec :
+# une restauration qui ne restaure pas la base doit se voir.
+set -eu
+dump=/storage/database.dump
+if [ ! -f "$dump" ]; then
+  echo "post-restore : $dump absent de la sauvegarde" >&2
+  exit 1
+fi
+pg_restore --clean --if-exists --no-owner --no-acl --single-transaction --exit-on-error \
+  --dbname="$DATABASE_URL" "$dump"
+echo "post-restore : base restaurée depuis $dump"

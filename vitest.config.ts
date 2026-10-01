@@ -20,6 +20,8 @@ export default defineConfig({
         test: {
           name: 'integration',
           include: ['test/**/*.test.ts'],
+          // L'image a son propre passage (`pnpm test:image`, vitest.image.config.ts) : build Docker, lent.
+          exclude: ['test/image/**'],
           globalSetup: ['test/setup-db.ts'],
           // Une base par worker, clonée de la base modèle : les fichiers tournent en parallèle.
           setupFiles: ['test/worker-db.ts'],
@@ -29,7 +31,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts', 'tools/**/*.ts'],
-      exclude: ['**/*.test.ts', 'src/{routes,worker,cli}/main.ts', 'tools/*/cli.ts', 'src/*/index.ts'],
+      exclude: ['**/*.test.ts', 'src/{routes,worker,cli,launcher}/main.ts', 'tools/*/cli.ts', 'src/*/index.ts'],
       // Seuils à cliquet (PLAN §8) : `autoUpdate` les remonte quand la couverture progresse,
       // jamais ne les baisse ; la CI échoue en dessous. Au moins 90 % sur le domaine.
       thresholds: {

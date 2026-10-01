@@ -30,7 +30,7 @@ export default defineConfig({
   webServer: {
     command: 'node e2e/stack.ts',
     // Par le front : répond quand le front et, derrière lui, l’API sont prêts.
-    url: `http://127.0.0.1:${web}/api/health`,
+    url: `http://127.0.0.1:${web}/up`,
     timeout: 120_000,
     reuseExistingServer: false,
     stdout: 'pipe',

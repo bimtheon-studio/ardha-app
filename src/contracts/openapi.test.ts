@@ -17,9 +17,9 @@ describe('documentOpenApi', () => {
       '/api/communes/locate',
       '/api/communes/{code}',
       '/api/communes/{code}/cadastre',
-      '/api/health',
       '/api/map/layers',
       '/api/parcels',
+      '/up',
     ]);
     const login = doc.paths['/api/auth/login']?.post as { responses: Record<string, unknown>; requestBody: unknown };
     expect(Object.keys(login.responses)).toEqual(['200', 'default']);

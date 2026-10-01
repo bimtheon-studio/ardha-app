@@ -8,6 +8,7 @@ import { Logger } from 'nestjs-pino';
 
 import { ApiModule } from './api.module.ts';
 import { CONFIG, type Config } from '../config/config.ts';
+import { serveFrontend } from './http/frontend.ts';
 
 /** Réglages HTTP communs à l'application réelle et à celle des tests. */
 export function configureApp(app: NestExpressApplication): NestExpressApplication {
@@ -17,6 +18,7 @@ export function configureApp(app: NestExpressApplication): NestExpressApplicatio
   app.use(cookieParser());
   app.useBodyParser('json', { limit: '100kb' });
   app.enableShutdownHooks();
+  if (c.FRONTEND_DIR) serveFrontend(app, c.FRONTEND_DIR);
   return app;
 }
 

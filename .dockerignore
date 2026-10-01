@@ -1,0 +1,14 @@
+# Contexte de l'image : le code et ce dont le build a besoin, rien de local.
+**/node_modules
+**/dist
+**/coverage
+.git
+.pixel
+.env*
+docker-compose.override.yaml
+docs
+e2e
+test
+playwright-report
+test-results
+*.log

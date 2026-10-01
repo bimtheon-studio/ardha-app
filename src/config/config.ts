@@ -20,8 +20,19 @@ const Schema = z.object({
   /** Nombre de mandataires (proxy, répartiteur) devant l'API, pour lire la vraie IP du client. */
   TRUST_PROXY: z.coerce.number().int().min(0).default(0),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
-  /** Préfixe des clés BullMQ dans Redis : les tests ont le leur, pour ne pas croiser le worker de dev. */
-  QUEUE_PREFIX: z.string().regex(/^[A-Za-z0-9:_-]+$/).default('ardha:bull'),
+  /**
+   * Préfixe de toutes les clés Redis d'un environnement (files, cache, limiteur) : plusieurs
+   * environnements partagent le même Redis sur le serveur (D-13).
+   */
+  REDIS_PREFIX: z.string().regex(/^[A-Za-z0-9_-]+$/).default('ardha'),
+  /** Préfixe des clés BullMQ : `<REDIS_PREFIX>:bull` ; les tests ont le leur, pour ne pas croiser le worker de dev. */
+  QUEUE_PREFIX: z.string().regex(/^[A-Za-z0-9:_-]+$/).optional(),
+  /** once sert l'application sans TLS (`--disable-tls`) : le cookie de session perd alors `Secure`. */
+  DISABLE_SSL: z.stringbool().default(false),
+  /** Sème les communes de référence au démarrage du conteneur si la base est vide (environnements de PR). */
+  ARDHA_SEED_ON_BOOT: z.stringbool().default(false),
+  /** Front construit (`frontend/dist`) servi par l'API, à la même origine ; absent en développement (Vite). */
+  FRONTEND_DIR: z.string().optional(),
   /**
    * Sources publiques : `live` (Internet), `recorded` (réponses de `fixtures/http`, sans Internet :
    * tests, e2e, démonstration hors ligne), `record` (Internet, et chaque réponse est enregistrée
@@ -33,7 +44,12 @@ const Schema = z.object({
   LOOKUP_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
 });
 
-export type Config = z.infer<typeof Schema> & { production: boolean };
+export type Config = Omit<z.infer<typeof Schema>, 'QUEUE_PREFIX'> & {
+  QUEUE_PREFIX: string;
+  production: boolean;
+  /** Cookie de session `Secure` : en production, sauf derrière once sans TLS. */
+  secureCookies: boolean;
+};
 
 export const CONFIG = Symbol('CONFIG');
 
@@ -43,10 +59,17 @@ export function loadLocalEnv(root = REPO_ROOT): void {
 }
 
 export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const r = Schema.safeParse(env);
+  // once injecte l'URL publique de l'application dans BASE_URL.
+  const r = Schema.safeParse({ ...env, WEB_ORIGIN: env.WEB_ORIGIN ?? env.BASE_URL });
   if (!r.success) {
     const details = r.error.issues.map((i) => `  ${i.path.join('.')} : ${i.message}`).join('\n');
     throw new Error(`Configuration invalide :\n${details}\n(en local : \`pnpm start\` génère .env.local)`);
   }
-  return { ...r.data, production: r.data.NODE_ENV === 'production' };
+  const production = r.data.NODE_ENV === 'production';
+  return {
+    ...r.data,
+    QUEUE_PREFIX: r.data.QUEUE_PREFIX ?? `${r.data.REDIS_PREFIX}:bull`,
+    production,
+    secureCookies: production && !r.data.DISABLE_SSL,
+  };
 }

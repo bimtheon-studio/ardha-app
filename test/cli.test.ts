@@ -47,6 +47,17 @@ describe('CLI', () => {
     expect(REFERENCE_COMMUNES).toEqual(['94046', '74010', '37261', '37023']);
   });
 
+  it('seed --if-empty : ne fait rien sur une base déjà semée, sème une base vide (environnements de PR)', async () => {
+    await run('seed', '37023');
+    output = [];
+    await run('seed', '--if-empty', '37023');
+    expect(output).toEqual(['Seed : base déjà semée, rien à faire.']);
+    await pool.query('TRUNCATE communes, parcels, source_states CASCADE');
+    output = [];
+    await run('seed', '--if-empty', '37023');
+    expect(output).toEqual(['Seed : Beaumont-Village (37023) chargée, 1145 parcelles, millésime 2026-09-01.']);
+  });
+
   it('crée un administrateur et affiche le lien pour choisir son mot de passe', async () => {
     await run('user:create-admin', '--email', 'admin@ardha.fr', '--name', 'Admin');
     expect(output[0]).toMatch(/^Administrateur créé : admin@ardha\.fr \(/);
