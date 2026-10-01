@@ -369,6 +369,8 @@ Les arbitrages fonctionnels, rendus le 01/10/2026, sont dans [F-01](fiches/F-01-
 | DT-24 | Carte : react-leaflet 5, rendu canvas, parcelles demandées **par cases de 0,01°** (cache réutilisé), au zoom ≥ 16 ; sélection et vue dans l'URL | un GeoJSON par déplacement de carte | D-08 (Leaflet en L1) ; milliers de polygones sans ralentir |
 | DT-25 | Tests d'intégration **en parallèle** : une base par worker de Vitest, clonée d'une base modèle migrée | une base unique, fichiers en série | 8,4 s → 3,5 s pour le back de L0 ; isolement des files BullMQ par préfixe de test |
 | DT-26 | **e2e Playwright** sur une stack jetable (`e2e/stack.ts` : base `ardha_e2e`, sources enregistrées, tuiles interceptées), ports e2e décalés par worktree (17000, 18000), Chromium du système ou de Playwright | e2e contre la stack de dev | reproductible, sans Internet, en parallèle d'une stack de dev ; 12 s tout compris |
+| DT-27 | **Lint obligatoire en pre-commit** : hook versionné `tools/hooks/pre-commit` (`core.hooksPath`, posé par `prepare` à l'installation), fichiers indexés seulement, tout le dépôt si la configuration change | husky, lint-staged | consigne du porteur du produit (01/10/2026) ; aucune dépendance de plus ; ~2 s par commit |
+| DT-28 | **Perf des tests suivie** : `pnpm test:perf` (durée par suite, fichiers et tests les plus lents), journal `docs/reecriture/PERF-TESTS.md` ; front testé sous **happy-dom** | jsdom | consigne du porteur du produit (01/10/2026) : la base de tests va grossir vite ; happy-dom : front 5,1 → 4,3 s |
 
 ## 12. Questions ouvertes
 
@@ -386,6 +388,11 @@ vers des comptes pas encore recréés) ; aucune migration ne les a réinjectées
 été supprimée le 27/09. Sans conséquence pour la réécriture, qui repart de zéro.
 
 ## Journal
+
+- **01/10/2026** — lint obligatoire en pre-commit (DT-27) ; perf des tests mesurée et consignée
+  (DT-28, [`PERF-TESTS.md`](PERF-TESTS.md)) : 269 tests, 27 s tout compris. L'e2e construisait le
+  front en mode développement : corrigé (front de production), et ne sème plus que les communes des
+  adresses de référence (19,9 → 16,4 s).
 
 - **01/10/2026** — arbitrages de F-01 rendus par le porteur du produit (Q1 à Q11) : Q1 à Q3, Q5 à Q7,
   Q9, Q10 confirmés ; **sélection libre** avec avertissement (Q4) ; **OpenStreetMap** ajouté aux

@@ -1,5 +1,5 @@
 // Page de la carte (F-01), contre une fausse API. La carte Leaflet est remplacée par un double qui
-// expose ses rappels (vue, clic sur une parcelle) : jsdom ne dessine pas de carte, l'e2e s'en charge.
+// expose ses rappels (vue, clic sur une parcelle) : happy-dom ne dessine pas de carte, l'e2e s'en charge.
 import type { Commune, ParcelFeature } from '@contracts';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -309,12 +309,10 @@ describe('carte : fond', () => {
 
   it('sans stockage local (navigation privée stricte), le fond estompé ne dure que la visite', async () => {
     api();
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+    const blocked = () => {
       throw new Error('bloqué');
-    });
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('bloqué');
-    });
+    };
+    vi.stubGlobal('localStorage', { getItem: blocked, setItem: blocked, clear: () => undefined });
     await openMap();
     await userEvent.click(screen.getByRole('checkbox', { name: 'Estomper le fond' }));
     expect(screen.getByTestId('map')).toHaveAttribute('data-muted', 'true');

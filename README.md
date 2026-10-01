@@ -25,6 +25,8 @@ Beaumont-Village) depuis les réponses enregistrées de `fixtures/http`, sans In
 commune se charge d'elle-même quand on la regarde sur la carte : c'est le worker qui va chercher son
 cadastre (il lui faut Internet ; `ARDHA_SOURCES=recorded` l'en prive).
 
+`pnpm install` installe aussi le hook git `pre-commit` (lint obligatoire des fichiers indexés).
+
 Créer un administrateur (la commande affiche un lien pour choisir son mot de passe) :
 
 ```bash
@@ -57,6 +59,7 @@ hasard) et vérifie que les ports sont libres. En cas de collision :
 | `pnpm stop` · `pnpm destroy` · `pnpm status` | arrêter ; supprimer conteneurs et volumes ; ports et conteneurs |
 | `pnpm test` | tests unitaires et d'intégration (bases `ardha_test_w*` du worktree, en parallèle) des outils, du back et du front, avec couverture à cliquet |
 | `pnpm test:e2e` | parcours dans Chromium sur une stack jetable (base `ardha_e2e`, ports e2e, sans Internet) |
+| `pnpm test:perf [--e2e] [--record]` | durée de chaque suite, fichiers et tests les plus lents ; `--record` consigne dans [`docs/reecriture/PERF-TESTS.md`](docs/reecriture/PERF-TESTS.md) |
 | `pnpm lint` · `pnpm typecheck` | lint (dont les frontières de l'architecture) ; types |
 | `pnpm doctrine [--base]` | contrôle « base bête » des migrations ; `--base` : aussi le schéma migré |
 | `pnpm migration:generate` | nouvelle migration SQL depuis `src/db/schema.ts` |

@@ -1,0 +1,24 @@
+#!/bin/sh
+# Lint obligatoire avant chaque commit (consigne du porteur du produit, 01/10/2026). Installé par
+# `pnpm install` (script `prepare` : `git config core.hooksPath tools/hooks`).
+#
+# Lint des fichiers indexés seulement, pour rester rapide ; tout le dépôt si la configuration du
+# lint, des types ou des dépendances change. Le lint lit le fichier du disque : une indexation
+# partielle (`git add -p`) est jugée sur la version complète du fichier.
+set -e
+
+if git diff --cached --name-only | grep -qE '^(eslint\.config\.js|package\.json|pnpm-lock\.yaml|(.*/)?tsconfig[^/]*\.json)$'; then
+  echo "pre-commit : configuration modifiée, lint de tout le dépôt…"
+  exec pnpm lint
+fi
+
+if git diff --cached --quiet --diff-filter=ACMR -- '*.ts' '*.tsx' '*.js' '*.mjs' '*.cjs'; then
+  exit 0
+fi
+
+echo "pre-commit : lint des fichiers indexés…"
+git diff --cached --name-only -z --diff-filter=ACMR -- '*.ts' '*.tsx' '*.js' '*.mjs' '*.cjs' \
+  | xargs -0 pnpm exec eslint --max-warnings=0 --no-warn-ignored || {
+  echo "pre-commit : lint en échec, commit refusé. Corriger (pnpm lint), puis recommencer." >&2
+  exit 1
+}

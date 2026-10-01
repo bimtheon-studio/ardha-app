@@ -1,6 +1,6 @@
 // La carte Leaflet (D-08) : fond IGN en tuiles, parcelles en vecteur (rendu canvas : des milliers de
 // polygones sans ralentir), adresse choisie. Rendu seul : l'état vit dans la page. Couvert par l'e2e
-// (jsdom ne dessine pas de carte).
+// (happy-dom ne dessine pas de carte).
 import 'leaflet/dist/leaflet.css';
 
 import type { Basemap, ParcelFeature } from '@contracts';

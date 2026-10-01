@@ -42,6 +42,9 @@ sur ce qui n'en dépend pas.
   (`fixtures/http`, `pnpm cli source:record`), jamais Internet.
 - Chaque fonctionnalité livre l'API, le front **et** des commandes CLI pour la piloter et la
   déboguer, avec tests unitaires, d'intégration et e2e (`pnpm test`, `pnpm test:e2e`).
+- **La performance des tests se surveille** : à chaque compte rendu, donner les durées par suite et
+  les tests les plus lents (`pnpm test:perf --e2e`) ; en fin de lot, les consigner
+  (`--record`, `docs/reecriture/PERF-TESTS.md`) et signaler toute régression.
 - Stockage de fichiers : S3 (MinIO en local).
 - **Tout est en anglais** : dossiers, fichiers, identifiants, commandes (pnpm, CLI), options,
   variables d'environnement, routes (API et front), champs JSON, codes d'erreur, **tables et colonnes**
@@ -60,6 +63,8 @@ sur ce qui n'en dépend pas.
 
 ## Git
 
+- **Lint obligatoire avant chaque commit** : hook `tools/hooks/pre-commit`, installé par
+  `pnpm install`. Ne jamais le contourner (`--no-verify`).
 - Une branche par lot ou par fonctionnalité, partie de `master`. Commits locaux autorisés, en français.
 - **Pas de remote pour l'instant, donc pas de push.** Ne jamais réécrire un historique déjà partagé.
 - Terminer chaque message de commit par :

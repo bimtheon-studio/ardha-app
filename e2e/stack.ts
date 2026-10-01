@@ -1,5 +1,5 @@
 // Stack jetable des tests e2e, lancée par Playwright (`webServer`) : base `ardha_e2e` recréée,
-// migrée et semée (communes de référence), back compilé, front construit, puis API, worker et front
+// migrée et semée (communes des adresses de référence), back compilé, front construit, puis API, worker et front
 // servis sur les ports e2e du worktree. Sans Internet : sources enregistrées.
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 
@@ -10,8 +10,8 @@ import { e2eEnv, ROOT } from './env.ts';
 
 const { api, web, env } = e2eEnv();
 
-function run(command: string, args: string[]): void {
-  const r = spawnSync(command, args, { cwd: ROOT, env, stdio: 'inherit' });
+function run(command: string, args: string[], extra: NodeJS.ProcessEnv = {}): void {
+  const r = spawnSync(command, args, { cwd: ROOT, env: { ...env, ...extra }, stdio: 'inherit' });
   if (r.status !== 0) throw new Error(`Échec de ${command} ${args.join(' ')}`);
 }
 
@@ -49,8 +49,11 @@ async function clearRedis(): Promise<void> {
 await Promise.all([recreateDatabase(), clearRedis()]);
 run('pnpm', ['run', '--silent', 'build:back']);
 run('node', ['dist/cli/main.js', 'migrate']);
-run('node', ['dist/cli/main.js', 'seed']);
-if (!process.env.E2E_SKIP_FRONT_BUILD) run('pnpm', ['--filter', './frontend', 'run', '--silent', 'build']);
+// Les communes des adresses de référence seulement : Tours et Annecy pèsent 30 000 parcelles chacune,
+// et seul ce dont les scénarios ont besoin se sème (le seed complet est rejoué par `pnpm start`).
+run('node', ['dist/cli/main.js', 'seed', '94046', '74010']);
+// Le front de production, minifié : celui que les utilisateurs auront.
+if (!process.env.E2E_SKIP_FRONT_BUILD) run('pnpm', ['--filter', './frontend', 'run', '--silent', 'build'], { NODE_ENV: 'production' });
 
 /** Le front relaie `/api` : il n'est lancé qu'une fois l'API prête (Playwright attend le front). */
 async function apiReady(): Promise<void> {

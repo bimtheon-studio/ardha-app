@@ -12,6 +12,7 @@
   },
   "include": [
     "stack",
-    "doctrine"
+    "doctrine",
+    "test-perf"
   ]
 }
