@@ -108,6 +108,11 @@ Ce que le code de once v0.3.3 impose (lu dans `internal/docker` et `internal/com
   désactivés laissés tels quels. La CI n'en voit que des nombres ; la PR n'annonce que l'URL.
   Remplace l'admin de recette commun et le lien posté dans la PR (même jour). Nouvelle commande
   d'administration `ardha user:set-password --password-stdin`.
+- **Tests du déploiement en CI seulement si la PR touche au déploiement** (`Dockerfile`, `docker/`,
+  `deploy/`, `tools/server/`, `test/deploy/`, `src/launcher/`, workflows, `drizzle/`), **jamais sur
+  `master`** (porteur du produit, 01/10/2026 : « phase d'itération ultra rapide, pas besoin de
+  sécuriser le devops »). Sinon, simple construction de l'image publiée ; `deploy-pr` la déploie en
+  vrai de toute façon.
 - Hôte de production : **`ardha.once.florent.cc`** ; PR : `ardha-pr-<n>.once.florent.cc`.
 - Mémoire : Postgres ~512 Mo, Redis 64 Mo, production `--memory 1024`, PR `--memory 512`, **au plus
   4 environnements de PR** à la fois (le 5e est refusé). Plafonds à revoir après mesure de l'image.

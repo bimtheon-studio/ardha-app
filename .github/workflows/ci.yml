@@ -1,7 +1,7 @@
 # CI d'Ardha (PLAN §8) : types, lint, contrôle « base bête », tests unitaires et d'intégration sur
 # la stack Docker (migrations rejouées depuis une base vide), build, tests e2e dans Chromium, image
-# de production construite et démarrée contre la stack (lot LD), puis publiée sur ghcr.io : l'image
-# testée, pas une autre construction.
+# de production construite (testée contre la stack si la PR touche au déploiement) puis publiée sur
+# ghcr.io (lot LD).
 # Chaque étape se rejoue en local avec la même commande `pnpm`.
 name: CI
 
@@ -35,6 +35,8 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ env.COMMIT }}
+          # Historique complet : comparaison avec la base de la PR (fichiers du déploiement).
+          fetch-depth: 0
 
       # Node et pnpm aux versions de mise.toml.
       - uses: jdx/mise-action@v3
@@ -74,12 +76,30 @@ jobs:
           E2E_SKIP_FRONT_BUILD: '1'
           ARDHA_CHROMIUM: ''
 
+      # Phase d'itération rapide (porteur du produit, 01/10/2026) : les tests du déploiement ne
+      # tournent que si la PR touche au déploiement ; jamais sur master. deploy-pr déploie de toute
+      # façon l'image en vrai.
+      - name: La PR touche-t-elle au déploiement ?
+        id: changes
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [[ -n $BASE ]] && ! git diff --quiet "$BASE...$COMMIT" -- Dockerfile .dockerignore docker deploy \
+               tools/server test/deploy src/launcher .github/workflows drizzle vitest.deploy.config.ts; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+
       # Image once (/up, front servi par l'API, connexion, seed, sauvegarde et restauration, arrêt
       # propre) et script serveur ardha-env, avec un faux once qui lance cette image.
       - name: Déploiement (image, ardha-env)
+        if: steps.changes.outputs.deploy == 'true'
         run: pnpm test:deploy
         env:
           ARDHA_IMAGE: ardha:ci
+
+      - name: Image de production
+        if: steps.changes.outputs.deploy != 'true'
+        run: docker build --quiet --tag ardha:ci .
 
       # Ni les PR venues d'un fork (dépôt public : pas de droits d'écriture pour elles), ni rien
       # d'autre qu'une PR ou master.
