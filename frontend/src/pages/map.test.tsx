@@ -52,6 +52,7 @@ const LAYERS = {
   ],
   defaultBasemap: 'osm',
   parcelsMinZoom: 16,
+  riskLayers: [],
 };
 
 function commune(status: Commune['cadastre']['status'], extra: Partial<Commune['cadastre']> = {}): Commune {

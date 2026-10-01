@@ -1,0 +1,279 @@
+// Page des risques d'une étude (F-04) contre une fausse API ; la carte Leaflet est remplacée par un double.
+import type { Study, StudyRisks } from '@contracts';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { alice, fakeApi, renderAt } from '@/test/helpers';
+
+let mapProps: { layers: { id: string }[]; hydrants: { id: string; label: string }[]; cavities: { id: string }[] } | undefined;
+vi.mock('@/map/leaflet/RiskMap', () => ({
+  default: (props: NonNullable<typeof mapProps>) => {
+    mapProps = props;
+    return <div data-testid="risk-map">{props.layers.map((l) => l.id).join(',')}</div>;
+  },
+}));
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  localStorage.clear();
+  mapProps = undefined;
+});
+
+const ID = '01a0f885-0000-7000-8000-000000000001';
+const ok = <T,>(data: T) => ({ status: 'ok' as const, data });
+const off = { status: 'unavailable' as const, error: 'HTTP 503' };
+
+const study: Study = {
+  id: ID,
+  name: '6 Rue Pasteur, Maisons-Alfort (+1 parcelle)',
+  communeCode: '94046',
+  communeName: 'Maisons-Alfort',
+  addressLabel: null,
+  parcelCount: 1,
+  contenance: 240,
+  area: 240,
+  thumbnailUrl: null,
+  createdAt: '2026-10-01T10:00:00Z',
+  updatedAt: '2026-10-01T10:00:00Z',
+  deletedAt: null,
+  purgeAt: null,
+  parcels: [
+    {
+      id: '94046000AY0096',
+      communeCode: '94046',
+      prefix: '000',
+      section: 'AY',
+      number: '0096',
+      label: 'AY 96',
+      contenance: 240,
+      area: 240,
+      version: '2026-09-01',
+      geometry: { type: 'Polygon', coordinates: [[[2.4297, 48.7999], [2.43, 48.7999], [2.43, 48.8001], [2.4297, 48.7999]]] },
+    },
+  ],
+  address: null,
+  addresses: [],
+  chosenAddressId: null,
+  nameIsProvisional: false,
+  addressPending: false,
+  thumbnailPending: false,
+  steps: [],
+};
+
+const result: NonNullable<StudyRisks['result']> = {
+  version: 1,
+  center: [2.43, 48.8],
+  communes: [
+    {
+      code: '94046',
+      name: 'Maisons-Alfort',
+      radon: ok(1),
+      seismic: ok(1),
+      hazards: ok([{ code: '11', label: 'Inondation' }]),
+      plans: ok([
+        {
+          id: '94DDT20090002',
+          kind: 'PPRN',
+          label: 'PPRI Marne et Seine',
+          model: 'PPRN-I',
+          modifiedAt: '27/02/2025',
+          flood: true,
+          zones: [{ code: 'ZR', label: 'Interdiction', name: 'zone rouge de grand écoulement' }],
+          url: 'https://www.georisques.gouv.fr/risques/plans-prevention-risques/donnees#/dossier/94DDT20090002',
+        },
+        { id: 'P2', kind: 'PPRT', label: 'PPRT dépôt', model: null, modifiedAt: null, flood: false, zones: [], url: 'u' },
+      ]),
+      catnat: ok({ count: 9, truncated: false, latest: [{ id: 'X', label: 'Inondations et/ou Coulées de Boue', start: '15/01/2018', published: null }] }),
+    },
+    { code: '94080', name: null, radon: off, seismic: off, hazards: ok([]), plans: ok([]), catnat: ok({ count: 0, truncated: false, latest: [] }) },
+  ],
+  parcels: [
+    {
+      id: '94046000AY0096',
+      label: 'AY 96',
+      point: [2.4298, 48.8],
+      clay: ok('moyen'),
+      flood: ok({
+        hazard: 'moyen',
+        scenarios: [
+          { type: '01', scenario: '02MOY', heightMin: 2, heightMax: 10 },
+          { type: '03', scenario: '04FAI', heightMin: 0.5, heightMax: 1 },
+        ],
+        reference: { height: 2, atLeast: true },
+      }),
+      elevation: ok({ min: 32.14, max: 32.55, mean: 32.31, range: 0.41, points: 11 }),
+      floodLevel: { level: 34.31, atLeast: true },
+    },
+    { id: '94046000AY0097', label: 'AY 97', point: [2.43, 48.8], clay: off, flood: ok({ hazard: null, scenarios: [], reference: null }), elevation: ok(null), floodLevel: null },
+  ],
+  cavities: ok({ truncated: false, items: [{ id: 'C1', name: 'Carrière', type: 'naturelle', point: [2.43, 48.8], distanceM: 1500 }] }),
+  installations: ok({ count: 37, truncated: false, items: [{ id: '1', name: 'BIO SPRINGER', regime: 'Autorisation', seveso: 'Seveso seuil bas', point: [2.43, 48.8], distanceM: 392 }] }),
+  pollutedSites: ok({ count: 16, truncated: false, items: [{ id: 'S', kind: 'CASIAS', name: 'Ancien garage', url: 'https://fiche', distanceM: 330 }, { id: 'S2', kind: 'SIS', name: null, url: null, distanceM: 900 }] }),
+  hydrants: ok({ items: [{ id: 'node/1', point: [2.43, 48.8], type: 'pillar', flowRate: null, diameter: null, ref: null, distanceM: 111 }] }),
+};
+
+const axes: StudyRisks['axes'] = [
+  { key: 'flood', label: 'Inondation', state: 'Aléa moyen', severity: 'medium', detail: 'Parcelle en zone inondable' },
+  { key: 'clay', label: 'Retrait-gonflement des argiles', state: 'Source indisponible : à vérifier', severity: 'unknown', detail: null },
+];
+const sources: StudyRisks['sources'] = [{ key: 'georisques', label: 'Géorisques', url: 'https://www.georisques.gouv.fr', licence: 'Licence ouverte 2.0' }];
+const ready: StudyRisks = { status: 'ready', stale: false, requestedAt: '2026-10-01T10:00:00Z', computedAt: '2026-10-01T10:01:00Z', error: null, result, axes, sources };
+const none: StudyRisks = { status: 'none', stale: false, requestedAt: null, computedAt: null, error: null, result: null, axes: null, sources };
+const LAYERS = {
+  basemaps: [{ id: 'osm', label: 'OSM', url: 'https://osm/{z}/{x}/{y}', attribution: 'OSM', maxZoom: 19 }],
+  defaultBasemap: 'absent',
+  parcelsMinZoom: 16,
+  riskLayers: [
+    { id: 'ppr-flood', label: 'Zonage des PPR inondation', url: 'https://wms', layers: 'PPRN_ZONE_INOND', attribution: 'G' },
+    { id: 'clay', label: 'Retrait-gonflement des argiles', url: 'https://wms', layers: 'ALEARG_REALISE', attribution: 'G' },
+  ],
+};
+
+function api(routes: Record<string, unknown>) {
+  return fakeApi({
+    'GET /api/auth/me': { status: 200, body: alice },
+    'GET /api/map/layers': { status: 200, body: LAYERS },
+    [`GET /api/studies/${ID}`]: { status: 200, body: study },
+    ...(routes as Record<string, never>),
+  });
+}
+
+describe('page des risques', () => {
+  it('jamais analysée : l’analyse se demande d’elle-même, puis tout s’affiche', async () => {
+    let state: StudyRisks = none;
+    const calls = api({
+      [`GET /api/studies/${ID}/risks`]: () => ({ status: 200, body: state }),
+      [`POST /api/studies/${ID}/risks`]: () => {
+        state = ready;
+        return { status: 202, body: { ...none, status: 'queued' } };
+      },
+    });
+    renderAt(`/studies/${ID}/risks`);
+    expect(await screen.findByText('Analyse en cours…')).toBeInTheDocument();
+    expect(calls.find((c) => c.key === `POST /api/studies/${ID}/risks`)?.body).toEqual({ force: false });
+
+    const synthesis = await screen.findByRole('region', { name: 'Synthèse' }, { timeout: 3000 });
+    expect(within(synthesis).getAllByRole('listitem').map((li) => li.dataset.severity)).toEqual(['medium', 'unknown']);
+    expect(synthesis).toHaveTextContent('Aléa moyen');
+    expect(screen.getByText('Analyse du 1 octobre 2026')).toBeInTheDocument();
+
+    const parcels = screen.getByRole('region', { name: 'Par parcelle' });
+    expect(parcels).toHaveTextContent('moyen (centennal) : plus de 2 m');
+    expect(parcels).toHaveTextContent('extrême : 0,5 à 1 m (submersion marine)');
+    expect(parcels).toHaveTextContent('cote de crue indicative : au moins 34,31 m NGF');
+    expect(parcels).toHaveTextContent('Indisponible (source muette) : à vérifier');
+    expect(parcels).toHaveTextContent('hors zone');
+    expect(parcels).toHaveTextContent('aucune');
+
+    const communes = screen.getByRole('region', { name: 'Communes' });
+    expect(within(communes).getByRole('link', { name: 'PPRI Marne et Seine' })).toHaveAttribute('href', result.communes[0]!.plans.status === 'ok' ? result.communes[0]!.plans.data[0]!.url : '');
+    expect(communes).toHaveTextContent('ZR Interdiction : zone rouge de grand écoulement');
+    expect(communes).toHaveTextContent('9 (dernier : Inondations et/ou Coulées de Boue, 15/01/2018)');
+    expect(communes).toHaveTextContent('Aucun PPR sur la commune.');
+
+    const nearby = screen.getByRole('region', { name: 'Alentours' });
+    expect(nearby).toHaveTextContent('1, la plus proche à 1,5 km');
+    expect(nearby).toHaveTextContent('1 sur 37 dans la commune');
+    expect(nearby).toHaveTextContent('Seveso seuil bas');
+    expect(within(nearby).getByRole('link', { name: 'fiche' })).toHaveAttribute('href', 'https://fiche');
+    expect(nearby).toHaveTextContent('1, la plus proche à 111 m');
+    expect(screen.getByRole('region', { name: 'Sources' })).toHaveTextContent('Géorisques · Licence ouverte 2.0');
+    await waitFor(() => expect(mapProps?.hydrants).toEqual([{ id: 'node/1', point: [2.43, 48.8], label: 'Borne incendie · 111 m' }]));
+    expect(mapProps!.cavities).toHaveLength(1);
+  });
+
+  it('couches de risques : cochées, retenues dans le navigateur ; sans stockage, pour la visite', async () => {
+    api({ [`GET /api/studies/${ID}/risks`]: { status: 200, body: ready } });
+    renderAt(`/studies/${ID}/risks`);
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Zonage des PPR inondation' }));
+    expect(await screen.findByTestId('risk-map')).toHaveTextContent('ppr-flood');
+    expect(localStorage.getItem('ardha.risks.layers')).toBe('["ppr-flood"]');
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Zonage des PPR inondation' }));
+    expect(screen.getByTestId('risk-map')).toHaveTextContent('');
+  });
+
+  it('préférence relue ; stockage bloqué sans effet', async () => {
+    localStorage.setItem('ardha.risks.layers', '["clay", 3]');
+    api({ [`GET /api/studies/${ID}/risks`]: { status: 200, body: ready } });
+    renderAt(`/studies/${ID}/risks`);
+    expect(await screen.findByRole('checkbox', { name: 'Retrait-gonflement des argiles' })).toBeChecked();
+    const blocked = () => {
+      throw new Error('bloqué');
+    };
+    vi.stubGlobal('localStorage', { getItem: blocked, setItem: blocked, clear: () => undefined });
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Zonage des PPR inondation' }));
+    expect(screen.getByRole('checkbox', { name: 'Zonage des PPR inondation' })).toBeChecked();
+  });
+
+  it('périmée : bandeau et « Recalculer » ; recalcul forcé ; échec affiché', async () => {
+    let state: StudyRisks = { ...ready, stale: true };
+    const calls = api({
+      [`GET /api/studies/${ID}/risks`]: () => ({ status: 200, body: state }),
+      [`POST /api/studies/${ID}/risks`]: () => {
+        state = { ...ready, status: 'failed', error: 'L’analyse des risques a échoué.', stale: false };
+        return { status: 202, body: state };
+      },
+    });
+    renderAt(`/studies/${ID}/risks`);
+    const banner = await screen.findByRole('alert');
+    expect(banner).toHaveTextContent('Les parcelles de l’étude ont changé depuis cette analyse');
+    await userEvent.click(within(banner).getByRole('button', { name: 'Recalculer' }));
+    expect(await screen.findByText('L’analyse des risques a échoué.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Recalculer' }));
+    expect(calls.filter((c) => c.key.startsWith('POST')).map((c) => c.body)).toEqual([{ force: false }, { force: true }]);
+  });
+
+  it('demande refusée : message ; étude à la corbeille : ni demande ni recalcul', async () => {
+    api({
+      [`GET /api/studies/${ID}`]: { status: 200, body: { ...study, deletedAt: '2026-10-01T10:00:00Z', purgeAt: '2026-10-31T10:00:00Z' } },
+      [`GET /api/studies/${ID}/risks`]: { status: 200, body: none },
+    });
+    renderAt(`/studies/${ID}/risks`);
+    expect(await screen.findByText('Aucune analyse pour l’instant.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Recalculer' })).toBeNull();
+    expect(screen.getByText('Analyse pas encore faite')).toBeInTheDocument();
+  });
+
+  it('une demande en erreur s’affiche', async () => {
+    api({ [`GET /api/studies/${ID}/risks`]: { status: 200, body: none }, [`POST /api/studies/${ID}/risks`]: { status: 409, body: { message: 'Cette étude est dans la corbeille.' } } });
+    renderAt(`/studies/${ID}/risks`);
+    expect(await screen.findByText('Cette étude est dans la corbeille.')).toBeInTheDocument();
+  });
+
+  it('résultat calme, une commune : aucun alentour, cote exacte, préférences illisibles ignorées', async () => {
+    localStorage.setItem('ardha.risks.layers', '{"pas":"une liste"}');
+    const calm: NonNullable<StudyRisks['result']> = {
+      ...result,
+      communes: [{ ...result.communes[0]!, catnat: ok({ count: 1, truncated: false, latest: [{ id: 'Y', label: 'Tempête', start: null, published: null }] }) }],
+      parcels: [{ ...result.parcels[0]!, clay: ok(null), floodLevel: { level: 33.31, atLeast: false } }],
+      cavities: ok({ truncated: false, items: [] }),
+      pollutedSites: ok({ count: 2, truncated: false, items: [] }),
+      hydrants: ok({ items: [] }),
+    };
+    api({ [`GET /api/studies/${ID}/risks`]: { status: 200, body: { ...ready, result: calm } } });
+    renderAt(`/studies/${ID}/risks`);
+    expect(await screen.findByRole('region', { name: 'Commune' })).toHaveTextContent('1 (dernier : Tempête)');
+    expect(screen.getByRole('region', { name: 'Par parcelle' })).toHaveTextContent('cote de crue indicative : 33,31 m NGF');
+    const nearby = screen.getByRole('region', { name: 'Alentours' });
+    expect(nearby).toHaveTextContent('Aucune.');
+    expect(nearby).toHaveTextContent('Aucun (2 dans la commune).');
+    expect(nearby).toHaveTextContent('Aucune connue.');
+    expect(screen.getByRole('checkbox', { name: 'Zonage des PPR inondation' })).not.toBeChecked();
+  });
+
+  it('cavités indisponibles : pas de point sur la carte ; préférence en JSON invalide', async () => {
+    localStorage.setItem('ardha.risks.layers', '{');
+    api({ [`GET /api/studies/${ID}/risks`]: { status: 200, body: { ...ready, result: { ...result, cavities: off, hydrants: off } } } });
+    renderAt(`/studies/${ID}/risks`);
+    await screen.findByRole('region', { name: 'Alentours' });
+    await waitFor(() => expect(mapProps?.cavities).toEqual([]));
+    expect(mapProps!.hydrants).toEqual([]);
+  });
+
+  it('étude introuvable', async () => {
+    api({ [`GET /api/studies/${ID}`]: { status: 404, body: { message: 'Étude introuvable.' } }, [`GET /api/studies/${ID}/risks`]: { status: 404, body: { message: 'Étude introuvable.' } } });
+    renderAt(`/studies/${ID}/risks`);
+    expect(await screen.findByRole('heading', { name: 'Étude introuvable' })).toBeInTheDocument();
+  });
+});

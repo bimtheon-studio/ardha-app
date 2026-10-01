@@ -94,6 +94,7 @@ function study(over: Partial<Study> = {}): Study {
     steps: [
       { key: 'parcels', label: 'Parcelles', state: 'done', lot: null },
       { key: 'urbanism', label: 'Urbanisme', state: 'upcoming', lot: 'L3' },
+      { key: 'risks', label: 'Risques', state: 'todo', lot: null },
     ],
     ...over,
   };
@@ -101,7 +102,7 @@ function study(over: Partial<Study> = {}): Study {
 
 const ID = summary().id;
 const COPY = '01a0f885-0000-7000-8000-000000000002';
-const LAYERS = { basemaps: [{ id: 'osm', label: 'OpenStreetMap', url: 'https://osm/{z}/{x}/{y}', attribution: 'OSM', maxZoom: 19 }], defaultBasemap: 'osm', parcelsMinZoom: 16 };
+const LAYERS = { basemaps: [{ id: 'osm', label: 'OpenStreetMap', url: 'https://osm/{z}/{x}/{y}', attribution: 'OSM', maxZoom: 19 }], defaultBasemap: 'osm', parcelsMinZoom: 16, riskLayers: [] };
 const base = { 'GET /api/auth/me': { status: 200, body: alice }, 'GET /api/map/layers': { status: 200, body: LAYERS } };
 
 describe('accueil', () => {
@@ -200,6 +201,10 @@ describe('page de l’étude', () => {
     expect(screen.getByText('à venir (L3)')).toBeInTheDocument();
     expect(screen.getByText('faite')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Modifier les parcelles' })).toHaveAttribute('href', `/studies/${ID}/map`);
+    // Les étapes livrées mènent à leur écran ; les autres attendent leur lot.
+    expect(screen.getByRole('link', { name: 'Risques' })).toHaveAttribute('href', `/studies/${ID}/risks`);
+    expect(screen.getByRole('link', { name: 'Parcelles' })).toHaveAttribute('href', `/studies/${ID}/map`);
+    expect(screen.queryByRole('link', { name: 'Urbanisme' })).toBeNull();
   });
 
   it('nom provisoire et calcul en cours : signalés, et relus jusqu’à la fin du calcul', async () => {

@@ -17,6 +17,9 @@ import { useDuplicateStudy, useRestoreStudy, useStudy, useTrashStudy, useUpdateS
 
 const StudyMap = lazy(() => import('@/map/leaflet/StudyMap'));
 
+/** Écran de chaque étape livrée, sous `/studies/:id/`. */
+const STEP_LINKS: Partial<Record<Study['steps'][number]['key'], string>> = { parcels: 'map', risks: 'risks' };
+
 function Rename({ study, onDone }: { study: Study; onDone: () => void }) {
   const update = useUpdateStudy(study.id);
   const [name, setName] = useState(study.name);
@@ -237,7 +240,13 @@ export function StudyPage() {
               {s.steps.map((step) => (
                 <li key={step.key} className="flex items-center gap-3 px-3 py-2 text-sm">
                   {step.state === 'done' ? <Check className="size-4 text-primary" aria-hidden /> : <Circle className="size-4 text-muted-foreground" aria-hidden />}
-                  <span className={step.state === 'upcoming' ? 'flex-1 text-muted-foreground' : 'flex-1'}>{step.label}</span>
+                  {STEP_LINKS[step.key] && step.state !== 'upcoming' ? (
+                    <Link to={`/studies/${s.id}/${STEP_LINKS[step.key]}`} className="flex-1 text-primary hover:underline">
+                      {step.label}
+                    </Link>
+                  ) : (
+                    <span className={step.state === 'upcoming' ? 'flex-1 text-muted-foreground' : 'flex-1'}>{step.label}</span>
+                  )}
                   <span className="text-xs text-muted-foreground">{step.state === 'done' ? 'faite' : step.state === 'todo' ? 'à faire' : `à venir (${step.lot})`}</span>
                 </li>
               ))}
