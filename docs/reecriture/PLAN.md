@@ -191,7 +191,7 @@ un devis. La vélocité se mesure sur L1, puis on projette. Feuilles de route d�
 |---|---|---|---|
 | **L0 · Socle** ([feuille de route](lots/L0-socle.md)) | compte, connexion ; stack de dev par worktree | — | 265 + infra |
 | **L1 · Carte et parcellaire** ([feuille de route](lots/L1-carte-parcellaire.md)) | adresse, cadastre, sélection de parcelles | L0 | 1 306 + partagé |
-| **L2 · Étude** | enregistrer, rouvrir, consulter sur mobile | L1 | 1 818 |
+| **L2 · Étude** ([feuille de route](lots/L2-etude.md)) | enregistrer, rouvrir, consulter sur mobile | L1 | 1 818 |
 | **L3 · Chaîne PLU et urbanisme** | zone, règles vérifiées et citations, documents, OAP | L1, extracteur voisin | 5 563 + 20 functions (6 623) |
 | **L4 · Risques** | Géorisques, argiles, altimétrie, PPRI, poteaux incendie | L2 | 1 611 |
 | **L5 · Foncier et marché** | DVF, prix du neuf, Sitadel, indices | L2 | 1 862 + 5 functions (1 608) |
@@ -379,7 +379,7 @@ Les arbitrages fonctionnels, rendus le 01/10/2026, sont dans [F-01](fiches/F-01-
 |---|---|
 | Propriété | À quel nom ouvrir le dépôt, le cloud, le domaine, le compte LLM, Sentry ? |
 | ~~Hébergeur~~ | ~~Lequel ?~~ Tranché le 01/10/2026 : once (D-13) |
-| Fichiers sous once | S3 (MinIO à côté de Postgres) ou fichiers dans `/storage`, sauvegardés par once ? À trancher au premier fichier stocké (L3, PDF d'urbanisme) |
+| ~~Fichiers sous once~~ | Tranché le 01/10/2026 (F-02, Q11) : magasin de fichiers disque (`/storage`) en production, S3 (MinIO) en local et en test ; S3 en production par configuration plus tard |
 | LLM | Garder Azure OpenAI sur un compte propre, ou changer ? |
 | Extracteur voisin | Caler le format de sortie de `plui-extract` sur `reglement_segment` (conditionne L3) |
 | Fonds de carte | Quel taux d'erreurs de tuiles déclenche le proxy ? À fixer après quelques semaines de mesure |
@@ -390,6 +390,12 @@ vers des comptes pas encore recréés) ; aucune migration ne les a réinjectées
 été supprimée le 27/09. Sans conséquence pour la réécriture, qui repart de zéro.
 
 ## Journal
+
+- **01/10/2026** — **L2 lancé** sur la branche `l2-study` ; arbitrages F-02 Q1 à Q12 rendus :
+  enregistrement automatique après « Créer l'étude », nom proposé puis stable, adresse calculée par
+  le worker, statut remplacé par les étapes, corbeille de 30 jours, duplication, pages uniques pour
+  le mobile, vignette OSM composée par le worker, fichiers sur disque (`/storage`) en production et
+  S3 en local. Feuille de route : [`lots/L2-etude.md`](lots/L2-etude.md).
 
 - **01/10/2026** — **hébergement : once** (D-13), après étude de Clever Cloud ; branche `staging`
   abandonnée au profit d'un environnement éphémère par PR (D-11 amendée). Feuille de route :
