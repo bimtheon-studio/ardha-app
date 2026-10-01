@@ -1,0 +1,63 @@
+# Services partagés d'Ardha sur le serveur once (D-13) : PostgreSQL et Redis, hors de once, sur le
+# réseau Docker `once` (créé par once) pour que les conteneurs des applications les joignent par leur
+# nom (`ardha-postgres`, `ardha-redis`). Aucun port publié. Une base et un préfixe Redis par
+# environnement, créés par `ardha-env`. Copié sur le serveur par la commande de déploiement ; ne pas
+# lancer à la main : `ardha-env setup`.
+name: ${ARDHA_COMPOSE_PROJECT:-ardha-services}
+
+services:
+  postgres:
+    # Image du dépôt (D-10, DT-09), construite sur le serveur depuis `postgres/` (copie de docker/postgres).
+    build: ./postgres
+    image: ardha/postgres:18-3.6-pgvector-0.8.5
+    container_name: ${ARDHA_SERVICES:-ardha}-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?mot de passe dans secrets.env (ardha-env setup)}
+    # Réglé pour ~512 Mo (plafonds arbitrés le 01/10/2026) ; jusqu'à 30 connexions par environnement
+    # (API, worker, CLI : 10 chacun), production et 4 PR.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - effective_cache_size=256MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=64MB
+      - -c
+      - max_connections=200
+    mem_limit: 512m
+    volumes:
+      - postgres:/var/lib/postgresql
+    networks: [once]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:8.10.2
+    container_name: ${ARDHA_SERVICES:-ardha}-redis
+    restart: unless-stopped
+    # Pas de persistance : l'état du travail vit dans Postgres, Redis se reconstruit (PLAN §3).
+    # BullMQ exige `noeviction`.
+    command: ["redis-server", "--appendonly", "no", "--save", "", "--maxmemory", "64mb", "--maxmemory-policy", "noeviction"]
+    mem_limit: 128m
+    networks: [once]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+networks:
+  once:
+    name: ${ARDHA_NETWORK:-once}
+    external: true
+
+volumes:
+  postgres:

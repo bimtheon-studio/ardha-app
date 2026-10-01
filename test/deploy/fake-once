@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+# Faux `once` pour les tests d'ardha-env : mêmes commandes et même contrat que once v0.3.3
+# (`internal/command`), mais sans kamal-proxy ni TLS. `deploy`/`update` démarrent réellement l'image
+# sur le réseau de test, sous le nom et l'étiquette que once pose (`once-app-<nom>-<id>`, étiquette
+# `once` avec l'hôte), attendent `/up`, puis retirent l'ancien conteneur (de force, comme once).
+# Chaque appel est noté dans $FAKE_ONCE_STATE/calls (sans les valeurs de --env).
+set -euo pipefail
+STATE=${FAKE_ONCE_STATE:?}
+NETWORK=${FAKE_ONCE_NETWORK:?}
+mkdir -p "$STATE/apps"
+
+note() {
+  local out=() skip=false a
+  for a in "$@"; do
+    if $skip; then out+=("${a%%=*}=…"); skip=false; continue; fi
+    [[ $a == --env ]] && skip=true
+    out+=("$a")
+  done
+  echo "${out[*]}" >> "$STATE/calls"
+}
+note "$@"
+
+start() { # start <hôte> <image> <env…> : rend le nom du conteneur une fois /up sain
+  local host=$1 image=$2
+  shift 2
+  local app=${host%%.*} id
+  id=$(head -c 3 /dev/urandom | od -An -tx1 | tr -d ' \n')
+  local name="once-app-$app-$id" envs=()
+  for e in "$@"; do envs+=(--env "$e"); done
+  # Image locale seulement (once la tirerait du registre ; ici, pas d'Internet) : absente, c'est
+  # l'échec de pull de once.
+  docker run --detach --pull never --name "$name" --network "$NETWORK" --memory 512m \
+    --label "once={\"name\":\"$app\",\"image\":\"$image\",\"host\":\"$host\"}" \
+    --volume "$app-fake-storage:/storage" \
+    --env "BASE_URL=http://$host" --env DISABLE_SSL=true --env SECRET_KEY_BASE=fake \
+    "${envs[@]}" "$image" >/dev/null || return 1
+  for _ in $(seq 1 240); do
+    if docker exec "$name" node -e "fetch('http://127.0.0.1/up').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))" 2>/dev/null; then
+      echo "$name"
+      return
+    fi
+    sleep 0.25
+  done
+  docker logs --tail 30 "$name" >&2
+  docker rm --force "$name" >/dev/null
+  echo "fake-once : $host ne répond pas sur /up" >&2
+  return 1
+}
+
+settings() { # analyse les options communes ; remplit host, image, envs
+  envs=()
+  while (($#)); do
+    case $1 in
+      --host) host=$2; shift 2 ;;
+      --image) image=$2; shift 2 ;;
+      --env) envs+=("$2"); shift 2 ;;
+      --memory|--backup-path|--registry-username) shift 2 ;;
+      --auto-update=*|--auto-backup|--registry-password-stdin) shift ;;
+      *) echo "fake-once : option inconnue $1" >&2; exit 2 ;;
+    esac
+  done
+}
+
+command=$1
+shift
+case $command in
+  deploy)
+    image=$1; shift; host=''
+    settings "$@"
+    [[ ! -f $STATE/apps/$host ]] || { echo "Error: hostname already in use" >&2; exit 1; }
+    cat > /dev/null # mot de passe du registre, le cas échéant
+    name=$(start "$host" "$image" "${envs[@]}") || exit 1
+    printf '%s\n%s\n' "$name" "$image" > "$STATE/apps/$host"
+    printf '%s\n' "${envs[@]}" > "$STATE/apps/$host.env"
+    ;;
+  update)
+    host=$1; shift
+    [[ -f $STATE/apps/$host ]] || { echo "Error: application not found" >&2; exit 1; }
+    image=$(sed -n 2p "$STATE/apps/$host")
+    settings "$@"
+    old=$(sed -n 1p "$STATE/apps/$host")
+    mapfile -t previous < "$STATE/apps/$host.env"
+    ((${#envs[@]})) || envs=("${previous[@]}")
+    name=$(start "$host" "$image" "${envs[@]}") || exit 1
+    docker rm --force "$old" >/dev/null
+    printf '%s\n%s\n' "$name" "$image" > "$STATE/apps/$host"
+    printf '%s\n' "${envs[@]}" > "$STATE/apps/$host.env"
+    ;;
+  remove)
+    host=$1
+    [[ -f $STATE/apps/$host ]] || { echo "Error: application not found" >&2; exit 1; }
+    docker rm --force --volumes "$(sed -n 1p "$STATE/apps/$host")" >/dev/null
+    docker volume rm "${host%%.*}-fake-storage" >/dev/null 2>&1 || true
+    rm -f "$STATE/apps/$host" "$STATE/apps/$host.env"
+    ;;
+  list)
+    for f in "$STATE"/apps/*; do
+      [[ -e $f && $f != *.env ]] || continue
+      # Comme once : hôte en lien OSC 8 et en couleur.
+      printf '\e]8;;https://%s\e\\\e[94m%s\e[0m\e]8;;\e\\ (running)\n' "$(basename "$f")" "$(basename "$f")"
+    done
+    ;;
+  exec)
+    host=$1; shift
+    docker exec "$(sed -n 1p "$STATE/apps/$host")" "$@"
+    ;;
+  *) echo "fake-once : commande non simulée $command" >&2; exit 2 ;;
+esac

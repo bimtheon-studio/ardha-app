@@ -20,8 +20,8 @@ export default defineConfig({
         test: {
           name: 'integration',
           include: ['test/**/*.test.ts'],
-          // L'image a son propre passage (`pnpm test:image`, vitest.image.config.ts) : build Docker, lent.
-          exclude: ['test/image/**'],
+          // Le déploiement a son propre passage (`pnpm test:deploy`, vitest.deploy.config.ts) : build Docker, lent.
+          exclude: ['test/deploy/**'],
           globalSetup: ['test/setup-db.ts'],
           // Une base par worker, clonée de la base modèle : les fichiers tournent en parallèle.
           setupFiles: ['test/worker-db.ts'],

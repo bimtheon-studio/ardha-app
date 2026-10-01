@@ -60,9 +60,10 @@ jobs:
           E2E_SKIP_FRONT_BUILD: '1'
           ARDHA_CHROMIUM: ''
 
-      # Image once : /up, front servi par l'API, connexion, seed, sauvegarde et restauration, arrêt propre.
-      - name: Image de production
-        run: pnpm test:image
+      # Image once (/up, front servi par l'API, connexion, seed, sauvegarde et restauration, arrêt
+      # propre) et script serveur ardha-env, avec un faux once qui lance cette image.
+      - name: Déploiement (image, ardha-env)
+        run: pnpm test:deploy
 
       - name: Rapport e2e
         if: failure()

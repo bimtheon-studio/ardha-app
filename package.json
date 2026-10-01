@@ -27,7 +27,7 @@
     "test": "vitest run --coverage && pnpm --filter ./frontend run test",
     "doctrine": "node tools/doctrine/cli.ts",
     "test:e2e": "playwright test",
-    "test:image": "vitest run --config vitest.image.config.ts",
+    "test:deploy": "vitest run --config vitest.deploy.config.ts",
     "test:perf": "node tools/test-perf/cli.ts"
   },
   "dependencies": {

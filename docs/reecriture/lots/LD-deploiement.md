@@ -122,13 +122,35 @@ Ce que le code de once v0.3.3 impose (lu dans `internal/docker` et `internal/com
    `<préfixe>:bull`, limiteur sous `<préfixe>:<cookie>:rate-limit`) ; front servi par l'API
    (`FRONTEND_DIR`) ; hooks `pre-backup` (dump sans les extensions, qui appartiennent au serveur) et
    `post-restore` (une transaction, échec si le dump manque) ; CLI dans le conteneur : `ardha …`.
-   `pnpm test:image` (8 tests, 11 s une fois l'image en cache) ajouté à la CI. Mesure : **pic de
-   422 Mio** pendant le seed des quatre communes, **154 Mio** au repos ; le plafond de 512 Mo des PR
-   tient, sans grande marge.
+   Test de l'image (`test/deploy/image.test.ts`, 8 tests), lancé par `pnpm test:deploy` et en CI.
+   Mesure : **pic de 422 Mio** pendant le seed des quatre communes, **154 Mio** au repos ; le
+   plafond de 512 Mo des PR tient, sans grande marge.
 3. **Serveur** : `deploy/server/compose.yaml` (Postgres, Redis ; réseau `once`) et un script serveur
    `ardha-env create|update|remove|list <nom>` (base + rôle, `once deploy`/`update`/`remove`,
    clés Redis). La clé SSH de la CI ne pourra lancer que ce script (commande forcée dans
    `authorized_keys`) : à proposer au porteur du produit, pas à poser sans accord.
+
+   **Fait (01/10/2026, rien d'installé sur le serveur)** :
+   - `deploy/server/compose.yaml`, projet `ardha-services` : `ardha-postgres` (image du dépôt,
+     construite sur le serveur ; 512 Mo, `shared_buffers` 128 Mo, 200 connexions) et `ardha-redis`
+     (64 Mo, `noeviction` pour BullMQ, sans persistance) ; réseau `once` externe, aucun port publié.
+   - `deploy/server/ardha-env` (bash) : `setup`, `create`, `update [--reset-db]`, `remove`, `list`,
+     `logs`, `exec`, `psql`. Disposition sur le serveur : `~/ardha/` (`compose.yaml`, `postgres/`,
+     `ardha-env`, `secrets.env` et `envs/<nom>.env` en `600`, `backups/production`).
+     Par environnement : base et rôle `ardha_<nom>` (non superutilisateur, propriétaire de sa base ;
+     PostGIS et pgvector créés par le superutilisateur), préfixe Redis `ardha-<nom>`, application once
+     `ardha.<domaine>` ou `ardha-pr-<n>.<domaine>`, `--auto-update=false`, 1024 Mo (production,
+     avec `--auto-backup` dans `~/ardha/backups/production`) ou 512 Mo (PR, seed au démarrage).
+     Garde-fous : nom `production` ou `pr-<n>`, au plus 4 PR, pas de `--reset-db` ni de suppression
+     de la production sans `--confirm production`, un déploiement en échec ne laisse ni base ni
+     fichier. Identifiants de registre facultatifs (`REGISTRY_USERNAME`, `REGISTRY_PASSWORD` dans
+     `secrets.env`) si l'image ghcr.io reste privée.
+   - Test `test/deploy/ardha-env.test.ts` (13 tests) : services réels sous un nom de test, réseau
+     jouant le rôle de `once`, faux once (`test/deploy/fake-once`) qui démarre **l'image réelle**
+     (migrations sous le rôle de l'environnement, seed, `/up`). `shellcheck` sans remarque.
+   - Limite connue : once reçoit les variables par `--env` sur sa ligne de commande ; elles sont
+     visibles dans `ps` le temps du déploiement, et dans l'étiquette du conteneur : par `ubuntu`
+     et `root` seulement.
 4. **Commande du dépôt** pour piloter et déboguer : créer, mettre à jour, lire l'état et les logs,
    lancer une commande de la CLI dans le conteneur (`once exec`), supprimer un environnement.
 5. **Production** : `ardha.once.florent.cc` (nom à confirmer), `--auto-update=false`, image à tag

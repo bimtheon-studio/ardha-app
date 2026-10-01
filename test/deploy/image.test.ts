@@ -1,17 +1,16 @@
 // Test de l'image de production (lot LD) : construite par le Dockerfile, démarrée comme once la
 // démarre (port 80, BASE_URL, DISABLE_SSL, volume /storage), contre le Postgres et le Redis de la
-// stack du worktree, sur leur réseau Docker. `pnpm test:image` ; `ARDHA_IMAGE=<image>` pour tester
-// une image déjà construite.
+// stack du worktree, sur leur réseau Docker. `pnpm test:deploy` (l'image est construite par
+// `build-image.ts`).
 import { execFileSync, spawnSync } from 'node:child_process';
 
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { loadLocalEnv } from '../../src/config/config.ts';
+import { IMAGE } from './build-image.ts';
 
 loadLocalEnv();
-const ROOT = new URL('../..', import.meta.url).pathname;
-const IMAGE = process.env.ARDHA_IMAGE ?? 'ardha:test';
 const RUN = `ardha-image-${process.pid}`;
 const BASE_URL = 'http://ardha-image.localhost';
 const PASSWORD = 'cheval pomme agrafe';
@@ -76,10 +75,6 @@ let base: string;
 const get = (path: string, init: RequestInit = {}) => fetch(`${base}${path}`, { redirect: 'manual', ...init });
 
 beforeAll(async () => {
-  if (!process.env.ARDHA_IMAGE) {
-    const r = spawnSync('docker', ['build', '-t', IMAGE, '.'], { cwd: ROOT, stdio: ['ignore', 'ignore', 'pipe'] });
-    if (r.status !== 0) throw new Error(`docker build en échec :\n${r.stderr.toString().slice(-3000)}`);
-  }
   await Promise.all([recreate('ardha_image'), recreate('ardha_image_restore', true)]);
   docker(
     'run', '--detach', '--name', RUN,
@@ -129,8 +124,9 @@ describe('image de production', { timeout: 120_000 }, () => {
   });
 
   it('sème les communes de référence au premier démarrage', async () => {
-    await eventually(async () => (await count('ardha_image', 'SELECT count(*) AS n FROM communes')) === 4, 'seed');
-    expect(docker('logs', RUN)).toMatch(/Seed : Beaumont-Village \(37023\) chargée/);
+    // Le bilan s'imprime une fois toutes les communes chargées.
+    await eventually(async () => /Seed : Beaumont-Village \(37023\) chargée/.test(docker('logs', RUN)), 'seed');
+    expect(await count('ardha_image', 'SELECT count(*) AS n FROM communes')).toBe(4);
   });
 
   it('administrateur créé par la CLI du conteneur ; connexion par l’origine de BASE_URL, cookie sans Secure', async () => {
