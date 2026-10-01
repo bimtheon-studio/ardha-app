@@ -150,6 +150,21 @@ export function containsPoint(g: Surface, position: Position): boolean {
   return polygonsOf(g).some((rings) => inPolygon([0, 0], rings.map((r) => r.map(project))));
 }
 
+/** Distance en mètres d'un point `[lon, lat]` à la surface : 0 dedans, sinon au bord le plus proche. */
+export function distanceToPointM(g: Surface, position: Position): number {
+  const [lon = 0, lat = 0] = position;
+  const project = projector(lon, lat);
+  const polygons = polygonsOf(g).map((rings) => rings.map((r) => r.map(project)));
+  if (polygons.some((rings) => inPolygon([0, 0], rings))) return 0;
+  let best = Infinity;
+  for (const rings of polygons) {
+    for (const ring of rings) {
+      for (let i = 0; i < ring.length - 1; i++) best = Math.min(best, segmentPointDistance([0, 0], ring[i]!, ring[i + 1]!));
+    }
+  }
+  return best;
+}
+
 function expand(b: Bbox, meters: number): Bbox {
   const { m, n } = radii((b[1] + b[3]) / 2);
   const dLat = meters / (m * RAD);

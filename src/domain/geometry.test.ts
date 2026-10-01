@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { areaM2, bboxOf, containsPoint, distanceM, type MultiPolygon, type Polygon, unionBbox } from './geometry.ts';
+import { areaM2, bboxOf, containsPoint, distanceM, distanceToPointM, type MultiPolygon, type Polygon, unionBbox } from './geometry.ts';
 
 /** Rectangle `[ouest, sud, est, nord]` en degrés. */
 export function rect(w: number, s: number, e: number, n: number): Polygon {
@@ -72,5 +72,15 @@ describe('distanceM', () => {
   it('tient un segment dégénéré (deux sommets confondus)', () => {
     const degenerate: Polygon = { type: 'Polygon', coordinates: [[[2.442, 48.8], [2.442, 48.8], [2.443, 48.8], [2.443, 48.801], [2.442, 48.8]]] };
     expect(distanceM(square, degenerate)).toBeGreaterThan(70);
+  });
+});
+
+describe('distanceToPointM', () => {
+  it('0 dedans, distance au bord le plus proche dehors, trous compris', () => {
+    expect(distanceToPointM(square, [2.4405, 48.8005])).toBe(0);
+    // 0,0001° de longitude à 48,8° ≈ 7,34 m.
+    expect(distanceToPointM(square, [2.4411, 48.8005])).toBeCloseTo(7.34, 1);
+    const holed: Polygon = { type: 'Polygon', coordinates: [square.coordinates[0]!, rect(2.4402, 48.8002, 2.4408, 48.8008).coordinates[0]!] };
+    expect(distanceToPointM(holed, [2.4405, 48.8005])).toBeGreaterThan(20);
   });
 });
