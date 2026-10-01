@@ -103,7 +103,8 @@ case $command in
     ;;
   exec)
     host=$1; shift
-    docker exec "$(sed -n 1p "$STATE/apps/$host")" "$@"
+    # Comme once exec : entrée standard transmise au conteneur.
+    docker exec -i "$(sed -n 1p "$STATE/apps/$host")" "$@"
     ;;
   *) echo "fake-once : commande non simulée $command" >&2; exit 2 ;;
 esac

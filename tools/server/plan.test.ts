@@ -80,6 +80,13 @@ describe('plan', () => {
     expect(() => plan(['registry'], ctx)).toThrow(/--username manquant/);
   });
 
+  it('recette-password : le mot de passe part par l’entrée standard', () => {
+    expect(plan(['recette-password'], ctx)).toEqual([
+      { kind: 'sync' },
+      { kind: 'remote', args: ['recette-password'], tty: false, secret: 'Mot de passe commun des admins de recette : ' },
+    ]);
+  });
+
   it('sync seul', () => {
     expect(plan(['sync'], ctx)).toEqual([{ kind: 'sync' }]);
   });

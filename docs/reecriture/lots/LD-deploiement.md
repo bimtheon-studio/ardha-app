@@ -101,7 +101,13 @@ Ce que le code de once v0.3.3 impose (lu dans `internal/docker` et `internal/com
   le passent à once par `--registry-password-stdin`, jamais en argument.
 - **Lien de l'admin de recette posté dans la PR malgré le dépôt public** (porteur du produit,
   01/10/2026, risque accepté) : admin `recette@ardha.test`, lien à usage unique valable 24 h,
-  reposté à chaque base neuve (`ardha-env admin-link`, permis à la CI).
+  reposté à chaque base neuve (`ardha-env recette-admin`, permis à la CI).
+- **Mot de passe commun pour les admins de recette de tous les environnements de PR** (porteur du
+  produit, 01/10/2026 : « trop chiant sinon »), qui remplace le lien : rangé sur le serveur
+  seulement (`pnpm server recette-password`, fichier `~/ardha/recette-password` en `600`), jamais
+  dans le dépôt ni dans la PR, qui n'annonce que le compte `recette@ardha.test`. Nouvelle commande
+  d'administration `ardha user:set-password --password-stdin`. La production garde le compte
+  personnel du porteur du produit.
 - Hôte de production : **`ardha.once.florent.cc`** ; PR : `ardha-pr-<n>.once.florent.cc`.
 - Mémoire : Postgres ~512 Mo, Redis 64 Mo, production `--memory 1024`, PR `--memory 512`, **au plus
   4 environnements de PR** à la fois (le 5e est refusé). Plafonds à revoir après mesure de l'image.

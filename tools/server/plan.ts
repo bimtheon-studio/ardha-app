@@ -21,6 +21,7 @@ export interface PlanContext {
 export const USAGE = `Usage : pnpm server <commande>
   setup                                   copie les fichiers du serveur, installe Postgres et Redis
   registry --username <u>                 jeton ghcr.io (read:packages) pour once, demandé sans écho
+  recette-password                        mot de passe commun des admins de recette, demandé sans écho
   sync                                    copie seulement les fichiers du serveur (~/ardha)
   image [--push]                          construit l'image du commit courant ; --push la publie
   create <nom> [--image <image>]          crée un environnement (production, pr-<n>)
@@ -67,6 +68,8 @@ export function plan(argv: string[], ctx: PlanContext): Action[] {
       if (!username) throw new Error(`--username manquant\n\n${USAGE}`);
       return [{ kind: 'sync' }, { kind: 'remote', args: ['registry', '--username', username], tty: false, secret: 'Jeton ghcr.io (read:packages) : ' }];
     }
+    case 'recette-password':
+      return [{ kind: 'sync' }, { kind: 'remote', args: ['recette-password'], tty: false, secret: 'Mot de passe commun des admins de recette : ' }];
     case 'image': {
       const image = commitImage(ctx);
       return rest.includes('--push') ? [{ kind: 'build', image }, { kind: 'push', image }] : [{ kind: 'build', image }];

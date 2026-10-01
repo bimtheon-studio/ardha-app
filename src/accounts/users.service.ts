@@ -55,6 +55,19 @@ export class UsersService {
     return this.linkFor(await this.requireUser(email));
   }
 
+  /**
+   * Fixe le mot de passe d'un compte (administration, CLI : admin de recette des environnements de
+   * PR, lot LD) et ferme ses sessions ; rend le nombre de sessions fermées.
+   */
+  async setPassword(email: string, password: string): Promise<number> {
+    const u = await this.requireUser(email);
+    rejectPassword(password, u.email);
+    await this.users.update(u.id, { passwordHash: await this.passwords.hash(password) }, this.clock.now());
+    const closedCount = await this.sessions.removeForUser(u.id);
+    await this.auditLog.record({ origin: 'cli', action: 'user.password-set', targetId: u.id, details: { closedSessions: closedCount } });
+    return closedCount;
+  }
+
   /** Désactive le compte et ferme ses sessions ; rend le nombre de sessions fermées. */
   async deactivate(email: string): Promise<number> {
     const u = await this.requireUser(email);

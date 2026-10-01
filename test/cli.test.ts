@@ -1,5 +1,7 @@
 // Les commandes de la CLI, de bout en bout sur la base de test.
 import { CommandTestFactory } from 'nest-commander-testing';
+import { Readable } from 'node:stream';
+
 import pg from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -56,6 +58,32 @@ describe('CLI', () => {
     output = [];
     await run('seed', '--if-empty', '37023');
     expect(output).toEqual(['Seed : Beaumont-Village (37023) chargée, 1145 parcelles, millésime 2026-09-01.']);
+  });
+
+  it('user:set-password : mot de passe lu sur l’entrée standard, règle appliquée, sessions fermées', async () => {
+    const withStdin = async (input: string, ...args: string[]) => {
+      const original = Object.getOwnPropertyDescriptor(process, 'stdin')!;
+      Object.defineProperty(process, 'stdin', { value: Readable.from([Buffer.from(input)]), configurable: true });
+      try {
+        await run(...args);
+      } finally {
+        Object.defineProperty(process, 'stdin', original);
+      }
+    };
+    await run('user:create-admin', '-e', 'recette@ardha.test', '-n', 'Recette');
+    const id = (await pool.query<{ id: string }>(`SELECT id FROM users WHERE email = 'recette@ardha.test'`)).rows[0]!.id;
+    await pool.query(
+      `INSERT INTO sessions (user_id, token_hash, expires_at, absolute_expires_at) VALUES ($1, 'x', now() + interval '1 day', now() + interval '1 day')`,
+      [id],
+    );
+    output = [];
+    await withStdin('court\n', 'user:set-password', '-e', 'recette@ardha.test', '--password-stdin');
+    expect(errors.join('')).toMatch(/au moins 12 caractères/);
+    await withStdin('cheval pomme agrafe\n', 'user:set-password', '-e', 'recette@ardha.test', '--password-stdin');
+    expect(output).toEqual(['Mot de passe défini pour recette@ardha.test ; 1 session(s) fermée(s).']);
+    const r = await pool.query(`SELECT password_hash IS NOT NULL AS set FROM users WHERE id = $1`, [id]);
+    expect(r.rows[0].set).toBe(true);
+    expect((await pool.query(`SELECT count(*)::int AS n FROM sessions WHERE user_id = $1`, [id])).rows[0].n).toBe(0);
   });
 
   it('crée un administrateur et affiche le lien pour choisir son mot de passe', async () => {

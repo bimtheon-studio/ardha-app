@@ -73,6 +73,26 @@ export class ResetPasswordCommand extends EmailCommand {
   }
 }
 
+@Command({
+  name: 'user:set-password',
+  description: 'Fixe le mot de passe d’un compte, lu sur l’entrée standard, et ferme ses sessions',
+})
+export class SetPasswordCommand extends EmailCommand {
+  constructor(private readonly users: UsersService) {
+    super();
+  }
+
+  @Option({ flags: '--password-stdin', description: 'Lit le mot de passe sur l’entrée standard (obligatoire)', required: true })
+  parsePasswordStdin(): boolean {
+    return true;
+  }
+
+  async run(_: string[], options: EmailOptions): Promise<void> {
+    const closedCount = await this.users.setPassword(options.email, await readStdin());
+    console.log(`Mot de passe défini pour ${options.email} ; ${closedCount} session(s) fermée(s).`);
+  }
+}
+
 @Command({ name: 'user:deactivate', description: 'Désactive un compte et ferme ses sessions' })
 export class DeactivateCommand extends EmailCommand {
   constructor(private readonly users: UsersService) {

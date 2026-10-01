@@ -12,7 +12,8 @@
 #   ardha-env logs <nom> [--tail <n>] [--follow]     journaux du conteneur
 #   ardha-env exec <nom> <commande…>                 commande dans le conteneur (once exec)
 #   ardha-env psql <nom> [arguments de psql…]        psql sur la base de l'environnement
-#   ardha-env admin-link pr-<n>                      admin de recette : création ou nouveau lien (24 h)
+#   ardha-env recette-password                       mot de passe commun des admins de recette (entrée standard)
+#   ardha-env recette-admin pr-<n>                   admin de recette prêt (mot de passe commun, ou lien 24 h)
 #   ardha-env registry --username <u>                identifiants de ghcr.io (jeton lu sur l'entrée standard)
 #   ardha-env sweep --keep <pr-1,pr-7,…>             supprime les PR absentes de la liste (fermées)
 #   ardha-env ci                                     commande forcée de la clé SSH de la CI
@@ -349,19 +350,41 @@ cmd_registry() {
   echo "Identifiants du registre enregistrés pour $username (pris en compte au prochain create)."
 }
 
-# Admin de recette d'un environnement de PR, pour la CI qui poste son lien dans la PR : créé s'il
-# n'existe pas, sinon nouveau lien (à usage unique, 24 h). Décision du porteur du produit
-# (01/10/2026) : lien posté malgré le dépôt public.
-cmd_admin_link() {
+# Mot de passe commun des admins de recette (porteur du produit, 01/10/2026 : le même partout),
+# lu sur l'entrée standard, gardé sur le serveur seulement (`recette-password`, 600) : jamais dans
+# le dépôt, public, ni dans les commentaires de PR.
+RECETTE_PASSWORD="$ARDHA_HOME/recette-password"
+
+cmd_recette_password() {
+  local password
+  IFS= read -r password || true
+  ((${#password} >= 12)) || die "mot de passe d'au moins 12 caractères attendu sur l'entrée standard"
+  [[ -d $ARDHA_HOME ]] || die "$ARDHA_HOME absent : lancer « ardha-env setup »"
+  (umask 077 && printf '%s\n' "$password" > "$RECETTE_PASSWORD")
+  echo "Mot de passe commun des admins de recette enregistré (pris en compte au prochain recette-admin)."
+}
+
+# Admin de recette d'un environnement de PR, pour la CI. Avec le mot de passe commun : créé avec
+# lui, ou le reçoit s'il n'a pas encore de mot de passe ; un admin déjà actif n'est pas touché (ses
+# sessions restent ouvertes). Sans mot de passe commun : créé, ou nouveau lien (usage unique, 24 h).
+cmd_recette_admin() {
   local name=${1:-} email=${ARDHA_PR_ADMIN_EMAIL:-recette@ardha.test}
   check_name "$name"
-  [[ $name == pr-* ]] || die "admin-link : environnements de PR seulement"
-  local host
+  [[ $name == pr-* ]] || die "recette-admin : environnements de PR seulement"
+  local host status
   host=$(host_of "$name")
-  if "$ONCE" exec "$host" ardha user:list | grep -q "^$email"$'\t'; then
-    "$ONCE" exec "$host" ardha user:reset-password --email "$email"
-  else
+  status=$("$ONCE" exec "$host" ardha user:list | awk -F'\t' -v e="$email" '$1 == e { print $3 }')
+  if [[ -s $RECETTE_PASSWORD ]]; then
+    if [[ -z $status ]]; then
+      "$ONCE" exec "$host" ardha user:create-admin --email "$email" --name Recette --password-stdin < "$RECETTE_PASSWORD"
+    elif [[ $status != actif ]]; then
+      "$ONCE" exec "$host" ardha user:set-password --email "$email" --password-stdin < "$RECETTE_PASSWORD"
+    fi
+    echo "Admin de recette : $email (mot de passe commun)."
+  elif [[ -z $status ]]; then
     "$ONCE" exec "$host" ardha user:create-admin --email "$email" --name Recette
+  else
+    "$ONCE" exec "$host" ardha user:reset-password --email "$email"
   fi
 }
 
@@ -403,7 +426,7 @@ cmd_ci() {
   case $command in
     list) (($# == 1)) || refuse ;;
     create | remove) [[ $name =~ ^pr-[0-9]{1,6}$ ]] || refuse ;;
-    admin-link) [[ $name =~ ^pr-[0-9]{1,6}$ && $# == 2 ]] || refuse ;;
+    recette-admin) [[ $name =~ ^pr-[0-9]{1,6}$ && $# == 2 ]] || refuse ;;
     update) [[ $name =~ ^(production|pr-[0-9]{1,6})$ ]] || refuse ;;
     logs) [[ $name =~ ^(production|pr-[0-9]{1,6})$ && ($# == 2 || ($# == 4 && $3 == --tail && $4 =~ ^[0-9]{1,5}$)) ]] || refuse ;;
     sweep) [[ ${2:-} == --keep && $# -le 3 ]] || refuse ;;
@@ -431,7 +454,8 @@ case $command in
   exec) cmd_exec "$@" ;;
   psql) cmd_psql "$@" ;;
   sweep) cmd_sweep "$@" ;;
-  admin-link) cmd_admin_link "$@" ;;
+  recette-admin) cmd_recette_admin "$@" ;;
+  recette-password) cmd_recette_password "$@" ;;
   registry) cmd_registry "$@" ;;
   ci) cmd_ci ;;
   *) usage ;;

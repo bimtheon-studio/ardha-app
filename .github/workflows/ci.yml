@@ -166,21 +166,26 @@ jobs:
             echo "fresh=true" >> "$GITHUB_OUTPUT"
           fi
 
-      # Base neuve : admin de recette et son lien (usage unique, 24 h) dans la PR. Dépôt public :
-      # risque accepté par le porteur du produit (01/10/2026), le temps que le dépôt redevienne privé.
-      - name: Lien de l'admin de recette dans la PR
+      # Base neuve : admin de recette prêt, annoncé dans la PR. Avec le mot de passe commun (rangé sur
+      # le serveur, jamais affiché) : le compte seulement. Sinon : son lien (usage unique, 24 h), posté
+      # malgré le dépôt public (risque accepté par le porteur du produit, 01/10/2026).
+      - name: Admin de recette dans la PR
         if: steps.deploiement.outputs.fresh == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.number }}
         run: |
-          link=$(ssh -o BatchMode=yes ubuntu@ssh.once.florent.cc "admin-link pr-$PR" | grep -o 'https\?://[^ ]*/reset-password#[^ ]*')
+          out=$(ssh -o BatchMode=yes ubuntu@ssh.once.florent.cc "recette-admin pr-$PR")
+          link=$(grep -o 'https\?://[^ ]*/reset-password#[^ ]*' <<< "$out" || true)
+          if [[ -n $link ]]; then
+            admin="Admin de recette \`recette@ardha.test\` : choisir son mot de passe par ce lien, à usage unique, valable 24 h :
+          $link"
+          else
+            admin="Admin de recette : \`recette@ardha.test\`, mot de passe commun des environnements de recette."
+          fi
           body="Environnement de la PR : https://ardha-pr-$PR.once.florent.cc (image \`sha-${COMMIT::7}\`)
 
-          Admin de recette \`recette@ardha.test\` : choisir son mot de passe par ce lien, à usage unique, valable 24 h :
-          $link
-
-          Nouveau lien : \`pnpm server exec pr-$PR ardha user:reset-password -e recette@ardha.test\`."
+          $admin"
           gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --edit-last --create-if-none --body "$body"
 
   # master → production (ardha.once.florent.cc), avec l'image testée.

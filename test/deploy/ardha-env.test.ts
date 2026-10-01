@@ -184,15 +184,30 @@ describe('ardha-env', () => {
     }
   });
 
-  it('admin-link : crée l’admin de recette, puis renouvelle son lien ; PR seulement, permis à la CI', () => {
-    const first = ci('admin-link pr-1');
+  it('recette-admin sans mot de passe commun : crée l’admin de recette, puis renouvelle son lien ; PR seulement, permis à la CI', () => {
+    const first = ci('recette-admin pr-1');
     expect(first.out).toMatch(/Administrateur créé : recette@ardha\.test/);
     expect(first.out).toMatch(/^http:\/\/ardha-pr-1\.test\.local\/reset-password#\S+$/m);
-    const again = ok('admin-link', 'pr-1');
+    const again = ok('recette-admin', 'pr-1');
     expect(again).toMatch(/^http:\/\/ardha-pr-1\.test\.local\/reset-password#\S+$/m);
     expect(again).not.toMatch(/Administrateur créé/);
-    expect(ardhaEnv('admin-link', 'production').err).toMatch(/environnements de PR seulement/);
-    expect(ci('admin-link production').err).toMatch(/commande refusée à la CI/);
+    expect(ardhaEnv('recette-admin', 'production').err).toMatch(/environnements de PR seulement/);
+    expect(ci('recette-admin production').err).toMatch(/commande refusée à la CI/);
+  });
+
+  it('recette-admin avec le mot de passe commun : donné à l’admin qui n’en a pas, jamais affiché ni redonné', () => {
+    const set = (password: string) =>
+      spawnSync(path.join(ROOT, 'deploy/server/ardha-env'), ['recette-password'], { env, encoding: 'utf8', input: password });
+    expect(set('court\n').stderr).toMatch(/au moins 12 caractères/);
+    expect(set('cheval pomme agrafe\n').status).toBe(0);
+    expect(statSync(path.join(home, 'recette-password')).mode & 0o777).toBe(0o600);
+    expect(ci('recette-password').err).toMatch(/commande refusée à la CI/);
+    const r = ci('recette-admin pr-1');
+    expect(r.out).toMatch(/Mot de passe défini pour recette@ardha\.test/);
+    expect(r.out).toMatch(/Admin de recette : recette@ardha\.test \(mot de passe commun\)\./);
+    expect(r.out + r.err).not.toMatch(/cheval pomme agrafe/);
+    expect(ok('exec', 'pr-1', 'ardha', 'user:list')).toMatch(/^recette@ardha\.test\tadmin\tactif\t/m);
+    expect(ci('recette-admin pr-1').out).toBe('Admin de recette : recette@ardha.test (mot de passe commun).\n');
   });
 
   it('mode ci : liste, journaux et balayage permis ; « ardha/ardha-env » en tête (pnpm server) accepté', () => {
