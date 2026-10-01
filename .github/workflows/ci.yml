@@ -114,3 +114,73 @@ jobs:
       - name: Journaux de la stack
         if: failure()
         run: docker compose logs --no-color --tail=200
+
+  # Environnement de la PR (ardha-pr-<n>.once.florent.cc), créé ou mis à jour avec l'image testée.
+  # Base recréée si ce push touche drizzle/. Jamais pour une PR venue d'un fork. Interrupteur :
+  # variable du dépôt DEPLOY_ONCE=true, posée une fois la clé SSH de la CI installée.
+  environnement-pr:
+    needs: verifier
+    if: vars.DEPLOY_ONCE == 'true' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    concurrency:
+      group: deploy-pr-${{ github.event.number }}
+      cancel-in-progress: false
+    environment:
+      name: pr-${{ github.event.number }}
+      url: https://ardha-pr-${{ github.event.number }}.once.florent.cc
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.COMMIT }}
+          fetch-depth: 0
+
+      - name: Accès SSH au serveur (clé à commande forcée, ardha-env ci)
+        env:
+          ONCE_SSH_KEY: ${{ secrets.ONCE_SSH_KEY }}
+          ONCE_KNOWN_HOSTS: ${{ secrets.ONCE_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$ONCE_SSH_KEY" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$ONCE_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Déploiement
+        env:
+          NAME: pr-${{ github.event.number }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          image="$IMAGE_REPOSITORY:sha-${COMMIT::7}"
+          server() { ssh -o BatchMode=yes ubuntu@ssh.once.florent.cc "$*"; }
+          if server list | grep -q "^$NAME"$'\t'; then
+            reset=''
+            # Migrations modifiées par ce push (ou historique réécrit : on ne sait pas) : base neuve.
+            if ! git diff --quiet "$BEFORE" "$COMMIT" -- drizzle/ 2>/dev/null; then reset='--reset-db'; fi
+            server update "$NAME" --image "$image" $reset
+          else
+            server create "$NAME" --image "$image"
+          fi
+
+  # master → production (ardha.once.florent.cc), avec l'image testée.
+  production:
+    needs: verifier
+    if: vars.DEPLOY_ONCE == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    environment:
+      name: production
+      url: https://ardha.once.florent.cc
+    steps:
+      - name: Accès SSH au serveur (clé à commande forcée, ardha-env ci)
+        env:
+          ONCE_SSH_KEY: ${{ secrets.ONCE_SSH_KEY }}
+          ONCE_KNOWN_HOSTS: ${{ secrets.ONCE_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$ONCE_SSH_KEY" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$ONCE_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Déploiement
+        run: ssh -o BatchMode=yes ubuntu@ssh.once.florent.cc "update production --image $IMAGE_REPOSITORY:sha-${COMMIT::7}"
