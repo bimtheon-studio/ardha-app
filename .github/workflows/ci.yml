@@ -90,8 +90,25 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Navigateur en cache (clé : version de Playwright) ; les bibliothèques système s'installent
+      # à chaque passage (apt, hors cache).
+      - name: Version de Playwright
+        id: playwright
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache de Chromium
+        id: chromium-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
       - name: Chromium des tests e2e
-        run: pnpm exec playwright install --with-deps chromium
+        env:
+          HIT: ${{ steps.chromium-cache.outputs.cache-hit }}
+        run: |
+          if [[ $HIT == true ]]; then pnpm exec playwright install-deps chromium
+          else pnpm exec playwright install --with-deps chromium; fi
 
       # Stack jetable (base ardha_e2e, sources enregistrées, tuiles servies par le test) : sans Internet.
       - name: Tests e2e
@@ -114,6 +131,25 @@ jobs:
             echo "deploy=true" >> "$GITHUB_OUTPUT"
           fi
 
+      # Image de l'application, avec le cache de couches d'Actions : apt (pg_dump) et pnpm install ne
+      # se refont que si leurs entrées changent. Builder à part (`use: false`) : les autres builds et
+      # Compose gardent le builder par défaut.
+      - name: Builder Docker avec cache
+        id: buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          use: false
+
+      - name: Image de production
+        uses: docker/build-push-action@v6
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          context: .
+          load: true
+          tags: ardha:ci
+          cache-from: type=gha,scope=ardha
+          cache-to: type=gha,mode=max,scope=ardha
+
       # Image once (/up, front servi par l'API, connexion, seed, sauvegarde et restauration, arrêt
       # propre) et script serveur ardha-env, avec un faux once qui lance cette image.
       - name: Déploiement (image, ardha-env)
@@ -121,10 +157,8 @@ jobs:
         run: pnpm test:deploy
         env:
           ARDHA_IMAGE: ardha:ci
-
-      - name: Image de production
-        if: steps.changes.outputs.deploy != 'true'
-        run: docker build --quiet --tag ardha:ci .
+          # Construite à l'étape précédente : pas de second build.
+          ARDHA_IMAGE_BUILT: 'true'
 
       # Étiquettes : sha-<7> (immuable, celle que l'on déploie), et pr-<n> ou master (mobiles).
       - name: Publication de l'image
