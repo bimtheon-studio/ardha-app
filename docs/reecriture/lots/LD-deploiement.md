@@ -177,6 +177,15 @@ Ce que le code de once v0.3.3 impose (lu dans `internal/docker` et `internal/com
    qui exécute la commande dans un `HOME` temporaire).
 5. **Production** : `ardha.once.florent.cc` (nom à confirmer), `--auto-update=false`, image à tag
    immuable (`sha-…`) ; créer l'administrateur par `once exec … user:create-admin`.
+   **Fait (01/10/2026)** : services partagés installés (`pnpm server setup` : `ardha-postgres`
+   52 Mio, `ardha-redis` 32 Mio au repos) ; identifiants ghcr.io déposés (`pnpm server registry`) ;
+   **production** créée en 27 s (`pnpm server create production`, image `sha-5888b33` testée par
+   la CI) : `https://ardha.once.florent.cc`, `/up` au vert, certificat Let's Encrypt, 165 Mio sur
+   1 Go ; administrateur florent.destremau@gmail.com créé (`pnpm server exec production ardha
+   user:create-admin`) ; Beaumont-Village chargée à la demande par le worker, depuis Internet.
+   Le jeton ghcr.io a transité par la conversation de l'agent : **à régénérer**, puis redéposer par
+   `pnpm server registry` dans un terminal.
+
 6. **CI/CD et environnements par PR** (GitHub Actions) : image publiée sur ghcr.io (`sha-…`, `pr-N`,
    `master`) ; push sur `master` → production ; PR ouverte ou mise à jour → `ardha-env create|update
    pr-N`, lien de mot de passe de l'admin en commentaire ; base recréée si la PR touche `drizzle/` ;
