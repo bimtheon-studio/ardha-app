@@ -88,6 +88,10 @@ Ce que le code de once v0.3.3 impose (lu dans `internal/docker` et `internal/com
 - **Registre : ghcr.io dès maintenant** (pas de registre sur le serveur). Dépôt GitHub :
   **`bimtheon-studio/ardha-app`** ; image proposée `ghcr.io/bimtheon-studio/ardha` (applications
   once `ardha…`), à confirmer. Création du dépôt et premier push **en attente de son feu vert**.
+- **Dépôt créé** le 01/10/2026 : https://github.com/bimtheon-studio/ardha-app, **public**. Image
+  ghcr.io publique possible : once la tire sans identifiants. Les PR venues d'un fork ne doivent
+  pas déployer (pas de secrets ni d'accès au serveur pour elles). Push sur demande du porteur du
+  produit seulement.
 - Hôte de production : **`ardha.once.florent.cc`** ; PR : `ardha-pr-<n>.once.florent.cc`.
 - Mémoire : Postgres ~512 Mo, Redis 64 Mo, production `--memory 1024`, PR `--memory 512`, **au plus
   4 environnements de PR** à la fois (le 5e est refusé). Plafonds à revoir après mesure de l'image.
@@ -153,6 +157,14 @@ Ce que le code de once v0.3.3 impose (lu dans `internal/docker` et `internal/com
      et `root` seulement.
 4. **Commande du dépôt** pour piloter et déboguer : créer, mettre à jour, lire l'état et les logs,
    lancer une commande de la CLI dans le conteneur (`once exec`), supprimer un environnement.
+
+   **Fait (01/10/2026)** : `pnpm server <commande>` (`tools/server`) — `setup`, `sync` (copie
+   `deploy/server` et `docker/postgres` dans `~/ardha` par `tar` dans le tuyau SSH), `image
+   [--push]` (image du commit, `ghcr.io/bimtheon-studio/ardha:sha-<7>`, refusée si l'arbre n'est pas
+   propre), `create`, `update`, `remove`, `list`, `logs`, `exec`, `psql`, transmis à `ardha-env`
+   (arguments échappés pour le shell distant, `-t` quand il faut un terminal). Image par défaut :
+   celle du commit courant. Serveur : `ARDHA_SERVER`. Tests : `tools/server` (15 tests, faux ssh
+   qui exécute la commande dans un `HOME` temporaire).
 5. **Production** : `ardha.once.florent.cc` (nom à confirmer), `--auto-update=false`, image à tag
    immuable (`sha-…`) ; créer l'administrateur par `once exec … user:create-admin`.
 6. **CI/CD et environnements par PR** (GitHub Actions) : image publiée sur ghcr.io (`sha-…`, `pr-N`,
@@ -161,9 +173,9 @@ Ce que le code de once v0.3.3 impose (lu dans `internal/docker` et `internal/com
    PR fermée → `ardha-env remove pr-N` ; balayage nocturne des environnements orphelins.
 7. **Clore** : README (section « Déployer »), journal du PLAN, décisions techniques de LD.
 
-## Bloquant connu
+## Bloquant connu (levé le 01/10/2026 : dépôt créé)
 
-**Le dépôt n'a pas de remote** (CLAUDE.md) : pas de GitHub Actions ni de ghcr.io tant qu'il n'existe
+**Le dépôt n'avait pas de remote** (CLAUDE.md) : pas de GitHub Actions ni de ghcr.io tant qu'il n'existe
 pas. Les étapes 1 à 5 avancent sans lui (image construite en local, poussée vers un registre ou
 transférée par `docker save | ssh … docker load`, selon ce que once accepte : à vérifier). Demander au
 porteur du produit où créer le dépôt (question « Propriété », PLAN §12) avant l'étape 6.
