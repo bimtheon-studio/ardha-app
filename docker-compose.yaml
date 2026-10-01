@@ -4,7 +4,8 @@
 services:
   postgres:
     build: ./docker/postgres
-    image: ardha/postgres:18-3.6-pgvector-0.8.5
+    # La CI fournit l'image toute faite (ghcr.io, étiquette tirée du contenu de docker/postgres).
+    image: ${ARDHA_POSTGRES_IMAGE:-ardha/postgres:18-3.6-pgvector-0.8.5}
     environment:
       POSTGRES_USER: ardha
       POSTGRES_DB: ardha

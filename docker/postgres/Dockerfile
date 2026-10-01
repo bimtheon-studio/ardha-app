@@ -17,3 +17,5 @@ COPY --from=pgvector /tmp/installation/usr/share/postgresql/18/extension/ /usr/s
 # L'image PostGIS crée les extensions dans la base par défaut au premier démarrage ; on n'en veut
 # aucune d'office : c'est la première migration qui les déclare.
 RUN rm -f /docker-entrypoint-initdb.d/*postgis*.sh
+# Rattache le paquet ghcr.io (image de la CI) au dépôt.
+LABEL org.opencontainers.image.source=https://github.com/bimtheon-studio/ardha-app
