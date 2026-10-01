@@ -166,27 +166,19 @@ jobs:
             server create "$NAME" --image "$image"
             echo "fresh=true" >> "$GITHUB_OUTPUT"
           fi
+          # Comptes de l'équipe : la liste (e-mails, mots de passe) est lue sur le serveur ; la CI n'en
+          # voit que des nombres.
+          server accounts "$NAME"
 
-      # Base neuve : admin de recette prêt, annoncé dans la PR. Avec le mot de passe commun (rangé sur
-      # le serveur, jamais affiché) : le compte seulement. Sinon : son lien (usage unique, 24 h), posté
-      # malgré le dépôt public (risque accepté par le porteur du produit, 01/10/2026).
-      - name: Admin de recette dans la PR
+      # Base neuve : l'environnement annoncé dans la PR. Les comptes de l'équipe y sont, avec leurs
+      # mots de passe habituels ; ni e-mail ni mot de passe dans la PR (dépôt public).
+      - name: Lien de l'environnement dans la PR
         if: steps.deploiement.outputs.fresh == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.number }}
         run: |
-          out=$(ssh -o BatchMode=yes ubuntu@ssh.once.florent.cc "recette-admin pr-$PR")
-          link=$(grep -o 'https\?://[^ ]*/reset-password#[^ ]*' <<< "$out" || true)
-          if [[ -n $link ]]; then
-            admin="Admin de recette \`recette@ardha.test\` : choisir son mot de passe par ce lien, à usage unique, valable 24 h :
-          $link"
-          else
-            admin="Admin de recette : \`recette@ardha.test\`, mot de passe commun des environnements de recette."
-          fi
-          body="Environnement de la PR : https://ardha-pr-$PR.once.florent.cc (image \`sha-${COMMIT::7}\`)
-
-          $admin"
+          body="Environnement de la PR : https://ardha-pr-$PR.once.florent.cc (image \`sha-${COMMIT::7}\`). Comptes de l'équipe prêts, mots de passe habituels."
           gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --edit-last --create-if-none --body "$body"
 
   # master → production (ardha.once.florent.cc), avec l'image testée.
@@ -212,4 +204,6 @@ jobs:
           printf '%s\n' "$ONCE_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
       - name: Déploiement
-        run: ssh -o BatchMode=yes ubuntu@ssh.once.florent.cc "update production --image $IMAGE_REPOSITORY:sha-${COMMIT::7}"
+        run: |
+          ssh -o BatchMode=yes ubuntu@ssh.once.florent.cc "update production --image $IMAGE_REPOSITORY:sha-${COMMIT::7}"
+          ssh -o BatchMode=yes ubuntu@ssh.once.florent.cc "accounts production"

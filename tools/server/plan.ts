@@ -21,7 +21,10 @@ export interface PlanContext {
 export const USAGE = `Usage : pnpm server <commande>
   setup                                   copie les fichiers du serveur, installe Postgres et Redis
   registry --username <u>                 jeton ghcr.io (read:packages) pour once, demandé sans écho
-  recette-password                        mot de passe commun des admins de recette, demandé sans écho
+  team-set --email <e> --name <nom>       compte d'équipe, mot de passe demandé sans écho (liste sur le serveur)
+  team-list                               comptes d'équipe (sans les mots de passe)
+  team-remove --email <e>
+  accounts <nom>                          crée les comptes d'équipe manquants dans un environnement
   sync                                    copie seulement les fichiers du serveur (~/ardha)
   image [--push]                          construit l'image du commit courant ; --push la publie
   create <nom> [--image <image>]          crée un environnement (production, pr-<n>)
@@ -68,8 +71,14 @@ export function plan(argv: string[], ctx: PlanContext): Action[] {
       if (!username) throw new Error(`--username manquant\n\n${USAGE}`);
       return [{ kind: 'sync' }, { kind: 'remote', args: ['registry', '--username', username], tty: false, secret: 'Jeton ghcr.io (read:packages) : ' }];
     }
-    case 'recette-password':
-      return [{ kind: 'sync' }, { kind: 'remote', args: ['recette-password'], tty: false, secret: 'Mot de passe commun des admins de recette : ' }];
+    case 'team-set':
+      return [{ kind: 'sync' }, { kind: 'remote', args: ['team-set', ...rest], tty: false, secret: 'Mot de passe du compte : ' }];
+    case 'team-list':
+    case 'team-remove':
+      return [remote([command, ...rest])];
+    case 'accounts':
+      name();
+      return [remote([command, ...rest])];
     case 'image': {
       const image = commitImage(ctx);
       return rest.includes('--push') ? [{ kind: 'build', image }, { kind: 'push', image }] : [{ kind: 'build', image }];

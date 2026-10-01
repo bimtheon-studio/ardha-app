@@ -80,11 +80,15 @@ describe('plan', () => {
     expect(() => plan(['registry'], ctx)).toThrow(/--username manquant/);
   });
 
-  it('recette-password : le mot de passe part par l’entrée standard', () => {
-    expect(plan(['recette-password'], ctx)).toEqual([
+  it('comptes d’équipe : le mot de passe part par l’entrée standard ; liste, retrait et accounts transmis', () => {
+    expect(plan(['team-set', '--email', 'a@exemple.fr', '--name', 'Alice Martin'], ctx)).toEqual([
       { kind: 'sync' },
-      { kind: 'remote', args: ['recette-password'], tty: false, secret: 'Mot de passe commun des admins de recette : ' },
+      { kind: 'remote', args: ['team-set', '--email', 'a@exemple.fr', '--name', 'Alice Martin'], tty: false, secret: 'Mot de passe du compte : ' },
     ]);
+    expect(plan(['team-list'], ctx)).toEqual([{ kind: 'remote', args: ['team-list'], tty: false }]);
+    expect(plan(['team-remove', '--email', 'a@exemple.fr'], ctx)).toEqual([{ kind: 'remote', args: ['team-remove', '--email', 'a@exemple.fr'], tty: false }]);
+    expect(plan(['accounts', 'production'], ctx)).toEqual([{ kind: 'remote', args: ['accounts', 'production'], tty: false }]);
+    expect(() => plan(['accounts'], ctx)).toThrow(/nom d’environnement manquant/);
   });
 
   it('sync seul', () => {

@@ -184,30 +184,44 @@ describe('ardha-env', () => {
     }
   });
 
-  it('recette-admin sans mot de passe commun : crée l’admin de recette, puis renouvelle son lien ; PR seulement, permis à la CI', () => {
-    const first = ci('recette-admin pr-1');
-    expect(first.out).toMatch(/Administrateur créé : recette@ardha\.test/);
-    expect(first.out).toMatch(/^http:\/\/ardha-pr-1\.test\.local\/reset-password#\S+$/m);
-    const again = ok('recette-admin', 'pr-1');
-    expect(again).toMatch(/^http:\/\/ardha-pr-1\.test\.local\/reset-password#\S+$/m);
-    expect(again).not.toMatch(/Administrateur créé/);
-    expect(ardhaEnv('recette-admin', 'production').err).toMatch(/environnements de PR seulement/);
-    expect(ci('recette-admin production').err).toMatch(/commande refusée à la CI/);
+  it('comptes de l’équipe : liste sur le serveur seulement (600), mots de passe lus sur l’entrée standard ; pas pour la CI', () => {
+    const set = (email: string, name: string, password: string) =>
+      spawnSync(path.join(ROOT, 'deploy/server/ardha-env'), ['team-set', '--email', email, '--name', name], { env, encoding: 'utf8', input: password });
+    expect(set('alice@exemple.fr', 'Alice', 'court\n').stderr).toMatch(/au moins 12 caractères/);
+    expect(set('pas-un-email', 'Alice', 'cheval pomme agrafe\n').stderr).toMatch(/e-mail invalide/);
+    expect(set('alice@exemple.fr', 'Alice Martin', 'cheval pomme agrafe\n').status).toBe(0);
+    expect(set('bob@exemple.fr', 'Bob', 'tartine beurre confiture\n').status).toBe(0);
+    // Remplacer un compte ne le duplique pas.
+    expect(set('alice@exemple.fr', 'Alice Martin', 'cheval pomme agrafe\n').stdout).toMatch(/alice@exemple\.fr enregistré/);
+    expect(statSync(path.join(home, 'team')).mode & 0o777).toBe(0o600);
+    expect(ok('team-list')).toBe('alice@exemple.fr\tAlice Martin\nbob@exemple.fr\tBob\n');
+    for (const command of ['team-list', 'team-set --email x@exemple.fr --name X', 'team-remove --email bob@exemple.fr']) {
+      expect(ci(command).err, command).toMatch(/commande refusée à la CI/);
+    }
   });
 
-  it('recette-admin avec le mot de passe commun : donné à l’admin qui n’en a pas, jamais affiché ni redonné', () => {
-    const set = (password: string) =>
-      spawnSync(path.join(ROOT, 'deploy/server/ardha-env'), ['recette-password'], { env, encoding: 'utf8', input: password });
-    expect(set('court\n').stderr).toMatch(/au moins 12 caractères/);
-    expect(set('cheval pomme agrafe\n').status).toBe(0);
-    expect(statSync(path.join(home, 'recette-password')).mode & 0o777).toBe(0o600);
-    expect(ci('recette-password').err).toMatch(/commande refusée à la CI/);
-    const r = ci('recette-admin pr-1');
-    expect(r.out).toMatch(/Mot de passe défini pour recette@ardha\.test/);
-    expect(r.out).toMatch(/Admin de recette : recette@ardha\.test \(mot de passe commun\)\./);
-    expect(r.out + r.err).not.toMatch(/cheval pomme agrafe/);
-    expect(ok('exec', 'pr-1', 'ardha', 'user:list')).toMatch(/^recette@ardha\.test\tadmin\tactif\t/m);
-    expect(ci('recette-admin pr-1').out).toBe('Admin de recette : recette@ardha.test (mot de passe commun).\n');
+  it('accounts : crée les comptes absents avec leur mot de passe ; sortie sans e-mail ni mot de passe (journaux de CI publics)', () => {
+    const r = ci('accounts pr-1');
+    expect(r.code).toBe(0);
+    expect(r.out).toBe('Comptes de l’équipe sur pr-1 : 2 créé(s), 0 mot(s) de passe donné(s), 0 inchangé(s).\n');
+    expect(r.out + r.err).not.toMatch(/exemple\.fr|cheval|tartine/);
+    const users = ok('exec', 'pr-1', 'ardha', 'user:list');
+    expect(users).toMatch(/^alice@exemple\.fr\tadmin\tactif\tAlice Martin\t/m);
+    expect(users).toMatch(/^bob@exemple\.fr\tadmin\tactif\tBob\t/m);
+  });
+
+  it('accounts : donne son mot de passe au compte qui n’en a pas, laisse les comptes actifs et désactivés', () => {
+    ok('exec', 'pr-1', 'ardha', 'user:deactivate', '--email', 'bob@exemple.fr');
+    sql('ardha_pr_1', `UPDATE users SET password_hash = NULL WHERE email = 'alice@exemple.fr'`);
+    expect(ci('accounts pr-1').out).toBe('Comptes de l’équipe sur pr-1 : 0 créé(s), 1 mot(s) de passe donné(s), 1 inchangé(s).\n');
+    expect(ok('exec', 'pr-1', 'ardha', 'user:list')).toMatch(/^bob@exemple\.fr\tadmin\tdésactivé\t/m);
+    expect(ci('accounts pr-1').out).toBe('Comptes de l’équipe sur pr-1 : 0 créé(s), 0 mot(s) de passe donné(s), 2 inchangé(s).\n');
+  });
+
+  it('team-remove : retire un compte de la liste (pas des environnements)', () => {
+    expect(ok('team-remove', '--email', 'bob@exemple.fr')).toMatch(/bob@exemple\.fr retiré/);
+    expect(ok('team-list')).toBe('alice@exemple.fr\tAlice Martin\n');
+    expect(ardhaEnv('team-remove', '--email', 'bob@exemple.fr').err).toMatch(/bob@exemple\.fr absent de la liste/);
   });
 
   it('mode ci : liste, journaux et balayage permis ; « ardha/ardha-env » en tête (pnpm server) accepté', () => {

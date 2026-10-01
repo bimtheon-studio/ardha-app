@@ -12,8 +12,9 @@
 #   ardha-env logs <nom> [--tail <n>] [--follow]     journaux du conteneur
 #   ardha-env exec <nom> <commande…>                 commande dans le conteneur (once exec)
 #   ardha-env psql <nom> [arguments de psql…]        psql sur la base de l'environnement
-#   ardha-env recette-password                       mot de passe commun des admins de recette (entrée standard)
-#   ardha-env recette-admin pr-<n>                   admin de recette prêt (mot de passe commun, ou lien 24 h)
+#   ardha-env team-set --email <e> --name <nom>      compte d'équipe (mot de passe lu sur l'entrée standard)
+#   ardha-env team-list | team-remove --email <e>    comptes d'équipe (sans les mots de passe)
+#   ardha-env accounts <nom>                         comptes d'équipe présents, avec leur mot de passe
 #   ardha-env registry --username <u>                identifiants de ghcr.io (jeton lu sur l'entrée standard)
 #   ardha-env sweep --keep <pr-1,pr-7,…>             supprime les PR absentes de la liste (fermées)
 #   ardha-env ci                                     commande forcée de la clé SSH de la CI
@@ -351,42 +352,84 @@ cmd_registry() {
   echo "Identifiants du registre enregistrés pour $username (pris en compte au prochain create)."
 }
 
-# Mot de passe commun des admins de recette (porteur du produit, 01/10/2026 : le même partout),
-# lu sur l'entrée standard, gardé sur le serveur seulement (`recette-password`, 600) : jamais dans
-# le dépôt, public, ni dans les commentaires de PR.
-RECETTE_PASSWORD="$ARDHA_HOME/recette-password"
+# Comptes de l'équipe (porteur du produit, 01/10/2026) : les mêmes comptes, avec les mêmes mots de
+# passe, dans chaque environnement, pour toujours pouvoir s'y reconnecter. La liste vit sur le
+# serveur seulement (`team`, 600 : e-mail, nom, mot de passe, séparés par des tabulations) : jamais
+# dans le dépôt, public, ni dans les journaux de la CI.
+TEAM="$ARDHA_HOME/team"
 
-cmd_recette_password() {
+check_email() {
+  [[ ${1:-} =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] || die "e-mail invalide « ${1:-} »"
+}
+
+cmd_team_set() {
+  local email='' name=''
+  while (($#)); do
+    case $1 in
+      --email) email=${2:-}; shift 2 ;;
+      --name) name=${2:-}; shift 2 ;;
+      *) usage ;;
+    esac
+  done
+  check_email "$email"
+  [[ -n $name && $name != *$'\t'* ]] || die "--name manquant"
   local password
   IFS= read -r password || true
   ((${#password} >= 12)) || die "mot de passe d'au moins 12 caractères attendu sur l'entrée standard"
+  [[ $password != *$'\t'* ]] || die "mot de passe sans tabulation attendu"
   [[ -d $ARDHA_HOME ]] || die "$ARDHA_HOME absent : lancer « ardha-env setup »"
-  (umask 077 && printf '%s\n' "$password" > "$RECETTE_PASSWORD")
-  echo "Mot de passe commun des admins de recette enregistré (pris en compte au prochain recette-admin)."
+  (
+    umask 077
+    touch "$TEAM"
+    # Remplacé à sa place, ou ajouté en fin de liste ; valeurs passées par l'environnement (awk -v
+    # interpréterait les barres obliques inverses d'un mot de passe).
+    E=$email N=$name P=$password awk -F'\t' '
+      $1 == ENVIRON["E"] { print ENVIRON["E"] "\t" ENVIRON["N"] "\t" ENVIRON["P"]; done = 1; next }
+      { print }
+      END { if (!done) print ENVIRON["E"] "\t" ENVIRON["N"] "\t" ENVIRON["P"] }' "$TEAM" > "$TEAM.tmp"
+    mv "$TEAM.tmp" "$TEAM"
+  )
+  echo "Compte d'équipe $email enregistré (pris en compte au prochain déploiement, ou par « accounts »)."
 }
 
-# Admin de recette d'un environnement de PR, pour la CI. Avec le mot de passe commun : créé avec
-# lui, ou le reçoit s'il n'a pas encore de mot de passe ; un admin déjà actif n'est pas touché (ses
-# sessions restent ouvertes). Sans mot de passe commun : créé, ou nouveau lien (usage unique, 24 h).
-cmd_recette_admin() {
-  local name=${1:-} email=${ARDHA_PR_ADMIN_EMAIL:-recette@ardha.test}
-  check_name "$name"
-  [[ $name == pr-* ]] || die "recette-admin : environnements de PR seulement"
-  local host status
-  host=$(host_of "$name")
-  status=$("$ONCE" exec "$host" ardha user:list | awk -F'\t' -v e="$email" '$1 == e { print $3 }')
-  if [[ -s $RECETTE_PASSWORD ]]; then
-    if [[ -z $status ]]; then
-      "$ONCE" exec "$host" ardha user:create-admin --email "$email" --name Recette --password-stdin < "$RECETTE_PASSWORD"
-    elif [[ $status != actif ]]; then
-      "$ONCE" exec "$host" ardha user:set-password --email "$email" --password-stdin < "$RECETTE_PASSWORD"
-    fi
-    echo "Admin de recette : $email (mot de passe commun)."
-  elif [[ -z $status ]]; then
-    "$ONCE" exec "$host" ardha user:create-admin --email "$email" --name Recette
-  else
-    "$ONCE" exec "$host" ardha user:reset-password --email "$email"
+cmd_team_list() {
+  [[ -f $TEAM ]] || return 0
+  awk -F'\t' '{ print $1 "\t" $2 }' "$TEAM"
+}
+
+cmd_team_remove() {
+  [[ ${1:-} == --email ]] || usage
+  local email=${2:-}
+  if [[ ! -f $TEAM ]] || ! awk -F'\t' -v e="$email" '$1 == e { found = 1 } END { exit !found }' "$TEAM"; then
+    die "$email absent de la liste"
   fi
+  (umask 077 && awk -F'\t' -v e="$email" '$1 != e' "$TEAM" > "$TEAM.tmp" && mv "$TEAM.tmp" "$TEAM")
+  echo "Compte d'équipe $email retiré de la liste (les comptes déjà créés restent dans les environnements)."
+}
+
+# Comptes de l'équipe dans un environnement : créés s'ils manquent, mot de passe donné à qui n'en a
+# pas ; un compte actif (sessions comprises) ou désactivé n'est pas touché. Ne dit que des nombres.
+cmd_accounts() {
+  local name=${1:-}
+  check_name "$name"
+  local host created=0 given=0 unchanged=0 users email person password status
+  host=$(host_of "$name")
+  [[ -s $TEAM ]] || { echo "Comptes de l’équipe : aucun (« ardha-env team-set »)."; return; }
+  users=$("$ONCE" exec "$host" ardha user:list)
+  while IFS=$'\t' read -r email person password; do
+    [[ -n $email ]] || continue
+    status=$(awk -F'\t' -v e="$email" '$1 == e { print $3 }' <<< "$users")
+    if [[ -z $status ]]; then
+      printf '%s\n' "$password" | "$ONCE" exec "$host" ardha user:create-admin --email "$email" --name "$person" --password-stdin >/dev/null
+      created=$((created + 1))
+    elif [[ $status == 'mot de passe à choisir' ]]; then
+      printf '%s\n' "$password" | "$ONCE" exec "$host" ardha user:set-password --email "$email" --password-stdin >/dev/null
+      given=$((given + 1))
+    else
+      unchanged=$((unchanged + 1))
+    fi
+  done < "$TEAM"
+  echo "Comptes de l’équipe sur $name : $created créé(s), $given mot(s) de passe donné(s), $unchanged inchangé(s)."
 }
 
 cmd_sweep() {
@@ -427,7 +470,7 @@ cmd_ci() {
   case $command in
     list) (($# == 1)) || refuse ;;
     create | remove) [[ $name =~ ^pr-[0-9]{1,6}$ ]] || refuse ;;
-    recette-admin) [[ $name =~ ^pr-[0-9]{1,6}$ && $# == 2 ]] || refuse ;;
+    accounts) [[ $name =~ ^(production|pr-[0-9]{1,6})$ && $# == 2 ]] || refuse ;;
     update) [[ $name =~ ^(production|pr-[0-9]{1,6})$ ]] || refuse ;;
     logs) [[ $name =~ ^(production|pr-[0-9]{1,6})$ && ($# == 2 || ($# == 4 && $3 == --tail && $4 =~ ^[0-9]{1,5}$)) ]] || refuse ;;
     sweep) [[ ${2:-} == --keep && $# -le 3 ]] || refuse ;;
@@ -455,8 +498,10 @@ case $command in
   exec) cmd_exec "$@" ;;
   psql) cmd_psql "$@" ;;
   sweep) cmd_sweep "$@" ;;
-  recette-admin) cmd_recette_admin "$@" ;;
-  recette-password) cmd_recette_password "$@" ;;
+  team-set) cmd_team_set "$@" ;;
+  team-list) cmd_team_list "$@" ;;
+  team-remove) cmd_team_remove "$@" ;;
+  accounts) cmd_accounts "$@" ;;
   registry) cmd_registry "$@" ;;
   ci) cmd_ci ;;
   *) usage ;;
