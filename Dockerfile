@@ -44,6 +44,9 @@ COPY --chmod=755 docker/app/hooks /hooks
 COPY --chmod=755 docker/app/ardha /usr/local/bin/ardha
 RUN install -d -o node -g node /storage
 
+# Rattache le paquet ghcr.io au dépôt (droits, page du paquet).
+LABEL org.opencontainers.image.source=https://github.com/bimtheon-studio/ardha-app \
+      org.opencontainers.image.description="Ardha : API, worker et front, pour once"
 ENV NODE_ENV=production \
     API_HOST=0.0.0.0 \
     API_PORT=80 \

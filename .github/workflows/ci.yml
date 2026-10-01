@@ -1,6 +1,7 @@
 # CI d'Ardha (PLAN §8) : types, lint, contrôle « base bête », tests unitaires et d'intégration sur
 # la stack Docker (migrations rejouées depuis une base vide), build, tests e2e dans Chromium, image
-# de production construite et démarrée contre la stack (lot LD).
+# de production construite et démarrée contre la stack (lot LD), puis publiée sur ghcr.io : l'image
+# testée, pas une autre construction.
 # Chaque étape se rejoue en local avec la même commande `pnpm`.
 name: CI
 
@@ -13,6 +14,17 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  # Publication de l'image sur ghcr.io avec le GITHUB_TOKEN (aucun jeton personnel).
+  packages: write
+
+env:
+  IMAGE_REPOSITORY: ghcr.io/bimtheon-studio/ardha
+  # Le commit testé et publié : la tête de la PR (pas le commit de fusion que GitHub construit par
+  # défaut), pour que l'étiquette sha-<7> désigne exactement ce commit.
+  COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+
 jobs:
   verifier:
     runs-on: ubuntu-24.04
@@ -21,6 +33,8 @@ jobs:
       CI: 'true'
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.COMMIT }}
 
       # Node et pnpm aux versions de mise.toml.
       - uses: jdx/mise-action@v3
@@ -64,6 +78,30 @@ jobs:
       # propre) et script serveur ardha-env, avec un faux once qui lance cette image.
       - name: Déploiement (image, ardha-env)
         run: pnpm test:deploy
+        env:
+          ARDHA_IMAGE: ardha:ci
+
+      # Ni les PR venues d'un fork (dépôt public : pas de droits d'écriture pour elles), ni rien
+      # d'autre qu'une PR ou master.
+      - name: Connexion à ghcr.io
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Étiquettes : sha-<7> (immuable, celle que l'on déploie), et pr-<n> ou master (mobiles).
+      - name: Publication de l'image
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          MOVING_TAG: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'master' }}
+        run: |
+          for tag in "sha-${COMMIT::7}" "$MOVING_TAG"; do
+            docker tag ardha:ci "$IMAGE_REPOSITORY:$tag"
+            docker push --quiet "$IMAGE_REPOSITORY:$tag"
+          done
+          echo "Image publiée : $IMAGE_REPOSITORY:sha-${COMMIT::7} ($MOVING_TAG)" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Rapport e2e
         if: failure()

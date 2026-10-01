@@ -171,6 +171,14 @@ Ce que le code de once v0.3.3 impose (lu dans `internal/docker` et `internal/com
    `master`) ; push sur `master` → production ; PR ouverte ou mise à jour → `ardha-env create|update
    pr-N`, lien de mot de passe de l'admin en commentaire ; base recréée si la PR touche `drizzle/` ;
    PR fermée → `ardha-env remove pr-N` ; balayage nocturne des environnements orphelins.
+
+   **En cours (01/10/2026)** : la CI publie l'image **qu'elle vient de tester** (`pnpm test:deploy`
+   avec `ARDHA_IMAGE=ardha:ci`) sur `ghcr.io/bimtheon-studio/ardha` avec le `GITHUB_TOKEN` :
+   `sha-<7>` (immuable) et `pr-<n>` ou `master`. La CI teste désormais la tête de la PR et non le
+   commit de fusion, pour que `sha-<7>` désigne exactement ce commit. Rien n'est publié pour une PR
+   venue d'un fork. Paquet public (porteur du produit), à basculer par un admin de l'organisation
+   après le premier push. Reste : déploiement par SSH (clé à commande forcée, à faire accepter),
+   environnements par PR, balayage nocturne.
 7. **Clore** : README (section « Déployer »), journal du PLAN, décisions techniques de LD.
 
 ## Bloquant connu (levé le 01/10/2026 : dépôt créé)
