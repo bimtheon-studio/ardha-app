@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Tâches de fond de la CI (un seul job, étapes en parallèle) : `start` lance une commande détachée,
+# dont la sortie et le code vont dans $RUNNER_TEMP ; `wait` attend sa fin, affiche son journal (groupe
+# replié dans GitHub Actions) et rend son code. Les préparations lentes (images Docker, stack) avancent
+# pendant le lint et les types, sans minute de runner de plus.
+#
+#   tools/ci/background start <nom> <commande…>
+#   tools/ci/background wait <nom>
+set -euo pipefail
+
+DIR=${RUNNER_TEMP:-/tmp}/ardha-background
+
+case ${1:-} in
+  start)
+    name=$2
+    shift 2
+    mkdir -p "$DIR"
+    rm -f "$DIR/$name.status"
+    # Détachée (setsid) : elle survit à la fin de l'étape qui la lance.
+    setsid "$0" run "$name" "$@" < /dev/null > /dev/null 2>&1 &
+    echo "Tâche de fond « $name » lancée."
+    ;;
+  run)
+    name=$2
+    shift 2
+    set +e
+    "$@" > "$DIR/$name.log" 2>&1
+    echo $? > "$DIR/$name.status.tmp"
+    mv "$DIR/$name.status.tmp" "$DIR/$name.status"
+    ;;
+  wait)
+    name=$2
+    until [[ -f $DIR/$name.status ]]; do sleep 1; done
+    echo "::group::Journal de « $name »"
+    cat "$DIR/$name.log"
+    echo "::endgroup::"
+    code=$(cat "$DIR/$name.status")
+    ((code == 0)) || echo "::error::La tâche de fond « $name » a échoué (code $code)."
+    exit "$code"
+    ;;
+  *)
+    sed -n '/^#   tools/s/^#   //p' "$0" >&2
+    exit 2
+    ;;
+esac

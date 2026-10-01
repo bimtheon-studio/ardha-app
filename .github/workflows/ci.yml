@@ -44,15 +44,6 @@ jobs:
       - name: Dépendances
         run: pnpm install --frozen-lockfile
 
-      - name: Lint (et frontières de l'architecture)
-        run: pnpm lint
-
-      - name: Types
-        run: pnpm typecheck
-
-      - name: Doctrine « base bête » — migrations
-        run: pnpm doctrine
-
       # Ni les PR venues d'un fork (dépôt public : pas de droits d'écriture pour elles), ni rien
       # d'autre qu'une PR ou master.
       - name: Connexion à ghcr.io
@@ -63,23 +54,57 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # pgvector se compile en ~35 s : l'image Postgres se construit une fois par contenu de
-      # docker/postgres (étiquette = empreinte git du dossier), se publie, puis se télécharge.
-      - name: Image Postgres (construite une fois, publiée sur ghcr.io)
+      # Builder à part (`use: false`) pour l'image de l'application et son cache de couches d'Actions ;
+      # les autres builds et Compose gardent le builder par défaut. Le cache `gha` hors de
+      # build-push-action a besoin des variables du runtime d'Actions.
+      - name: Builder Docker avec cache
+        id: buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          use: false
+
+      - name: Variables du cache d'Actions pour buildx
+        uses: crazy-max/ghaction-github-runtime@v3
+
+      # Un seul job (minutes de runner), étapes en parallèle : les préparations lentes partent en
+      # tâche de fond (tools/ci/background) pendant le lint, les types et la doctrine.
+      # - stack : image Postgres (pgvector compilé une fois par contenu de docker/postgres, publié
+      #   sur ghcr.io, puis téléchargé), puis Postgres, Redis et MinIO, migrations depuis zéro, seed ;
+      # - image : image de l'application, cache de couches d'Actions (apt et pnpm install ne se
+      #   refont que si leurs entrées changent).
+      - name: Préparations en tâche de fond (stack, image de l'application)
         env:
           CAN_PUSH: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+          BUILDER: ${{ steps.buildx.outputs.name }}
         run: |
-          image="ghcr.io/bimtheon-studio/ardha-postgres:$(git rev-parse --short=12 HEAD:docker/postgres)"
-          echo "ARDHA_POSTGRES_IMAGE=$image" >> "$GITHUB_ENV"
-          if ! docker pull --quiet "$image"; then
-            docker build --quiet --tag "$image" docker/postgres
-            if [[ $CAN_PUSH == true ]]; then docker push --quiet "$image"; fi
-          fi
-          # Le Compose du serveur (tests d'ardha-env) attend l'étiquette locale : sans elle, il recompile.
-          docker tag "$image" ardha/postgres:18-3.6-pgvector-0.8.5
+          postgres="ghcr.io/bimtheon-studio/ardha-postgres:$(git rev-parse --short=12 HEAD:docker/postgres)"
+          echo "ARDHA_POSTGRES_IMAGE=$postgres" >> "$GITHUB_ENV"
+          export ARDHA_POSTGRES_IMAGE=$postgres
+          # Variables développées par le bash de la tâche de fond (environnement hérité), pas ici.
+          # shellcheck disable=SC2016
+          tools/ci/background start stack bash -c '
+            set -e
+            if ! docker pull --quiet "$ARDHA_POSTGRES_IMAGE"; then
+              docker build --quiet --tag "$ARDHA_POSTGRES_IMAGE" docker/postgres
+              if [[ $CAN_PUSH == true ]]; then docker push --quiet "$ARDHA_POSTGRES_IMAGE"; fi
+            fi
+            # Étiquette locale attendue par le Compose du serveur (tests ardha-env) : sinon, il recompile.
+            docker tag "$ARDHA_POSTGRES_IMAGE" ardha/postgres:18-3.6-pgvector-0.8.5
+            pnpm start --infra'
+          tools/ci/background start image docker buildx build --builder "$BUILDER" --load --tag ardha:ci \
+            --cache-from type=gha,scope=ardha --cache-to type=gha,mode=max,scope=ardha .
 
-      - name: Stack (Postgres, Redis, MinIO), migrations depuis zéro, seed
-        run: pnpm start --infra
+      - name: Lint (et frontières de l'architecture)
+        run: pnpm lint
+
+      - name: Types
+        run: pnpm typecheck
+
+      - name: Doctrine « base bête » — migrations
+        run: pnpm doctrine
+
+      - name: Stack prête (Postgres, Redis, MinIO), migrations depuis zéro, seed
+        run: tools/ci/background wait stack
 
       - name: Doctrine « base bête » — schéma migré
         run: pnpm doctrine --base
@@ -125,28 +150,12 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           if [[ -n $BASE ]] && ! git diff --quiet "$BASE...$COMMIT" -- Dockerfile .dockerignore docker deploy \
-               tools/server test/deploy src/launcher .github/workflows drizzle vitest.deploy.config.ts; then
+               tools/server tools/ci test/deploy src/launcher .github/workflows drizzle vitest.deploy.config.ts; then
             echo "deploy=true" >> "$GITHUB_OUTPUT"
           fi
 
-      # Image de l'application, avec le cache de couches d'Actions : apt (pg_dump) et pnpm install ne
-      # se refont que si leurs entrées changent. Builder à part (`use: false`) : les autres builds et
-      # Compose gardent le builder par défaut.
-      - name: Builder Docker avec cache
-        id: buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          use: false
-
-      - name: Image de production
-        uses: docker/build-push-action@v6
-        with:
-          builder: ${{ steps.buildx.outputs.name }}
-          context: .
-          load: true
-          tags: ardha:ci
-          cache-from: type=gha,scope=ardha
-          cache-to: type=gha,mode=max,scope=ardha
+      - name: Image de production prête
+        run: tools/ci/background wait image
 
       # Image once (/up, front servi par l'API, connexion, seed, sauvegarde et restauration, arrêt
       # propre) et script serveur ardha-env, avec un faux once qui lance cette image.
@@ -155,7 +164,7 @@ jobs:
         run: pnpm test:deploy
         env:
           ARDHA_IMAGE: ardha:ci
-          # Construite à l'étape précédente : pas de second build.
+          # Construite en tâche de fond : pas de second build.
           ARDHA_IMAGE_BUILT: 'true'
 
       # Étiquettes : sha-<7> (immuable, celle que l'on déploie), et pr-<n> ou master (mobiles).
