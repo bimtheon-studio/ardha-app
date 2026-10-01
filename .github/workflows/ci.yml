@@ -75,6 +75,8 @@ jobs:
             docker build --quiet --tag "$image" docker/postgres
             if [[ $CAN_PUSH == true ]]; then docker push --quiet "$image"; fi
           fi
+          # Le Compose du serveur (tests d'ardha-env) attend l'étiquette locale : sans elle, il recompile.
+          docker tag "$image" ardha/postgres:18-3.6-pgvector-0.8.5
 
       - name: Stack (Postgres, Redis, MinIO), migrations depuis zéro, seed
         run: pnpm start --infra
