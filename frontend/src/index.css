@@ -122,7 +122,7 @@
   }
 }
 
-/* Carte (F-01) : fond estompé (#23), comme l'ancienne option « OpenStreetMap estompé ». */
+/* Carte (F-01) : fond estompé (#23) ; les parcelles non sélectionnées s'effacent aussi (MapView). */
 .map-muted .leaflet-tile-pane {
   filter: grayscale(1) contrast(0.78) brightness(1.18);
   opacity: 0.55;

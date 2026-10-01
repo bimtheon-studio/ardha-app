@@ -77,6 +77,20 @@ test('fonds de carte : OpenStreetMap par défaut, plan IGN et photographies au c
   await expect.poll(() => tiles.some((t) => t.includes('ORTHOIMAGERY.ORTHOPHOTOS'))).toBe(true);
 });
 
+test('estomper le fond : effet immédiat, sans recharger la page, retenu à la visite suivante', async ({ page }) => {
+  await page.goto(`/map?at=${VIEW.lat},${VIEW.lon},${VIEW.zoom}`);
+  const tilePane = page.locator('.leaflet-tile-pane');
+  await expect(tilePane).toHaveCSS('filter', 'none');
+  await page.getByRole('checkbox', { name: 'Estomper le fond' }).check();
+  await expect(page.locator('.leaflet-container')).toHaveClass(/map-muted/);
+  await expect(tilePane).not.toHaveCSS('filter', 'none');
+  await page.reload();
+  await expect(page.getByRole('checkbox', { name: 'Estomper le fond' })).toBeChecked();
+  await expect(page.locator('.leaflet-container')).toHaveClass(/map-muted/);
+  await page.getByRole('checkbox', { name: 'Estomper le fond' }).uncheck();
+  await expect(tilePane).toHaveCSS('filter', 'none');
+});
+
 test.describe('sur mobile', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 

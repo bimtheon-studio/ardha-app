@@ -41,6 +41,8 @@ const STYLE = {
   default: { color: '#0033A8', weight: 1, opacity: 0.8, fillColor: '#0033A8', fillOpacity: 0.04 },
   hover: { color: '#0033A8', weight: 2.5, opacity: 1, fillColor: '#0033A8', fillOpacity: 0.12 },
   selected: { color: '#0033A8', weight: 2.5, opacity: 1, fillColor: '#0033A8', fillOpacity: 0.4 },
+  /** Fond estompé : les parcelles non sélectionnées s'effacent presque, la sélection ressort. */
+  faded: { color: '#0033A8', weight: 0.5, opacity: 0.2, fillColor: '#0033A8', fillOpacity: 0 },
 } satisfies Record<string, L.PathOptions>;
 
 function viewportOf(map: L.Map): Viewport {
@@ -69,18 +71,39 @@ function Move({ target }: { target: Target | null }) {
   return null;
 }
 
-function ParcelsLayer({ parcels, selected, onClick }: { parcels: ParcelFeature[]; selected: ReadonlySet<string>; onClick: (f: ParcelFeature) => void }) {
+/**
+ * Fond estompé : une classe sur le conteneur de la carte. react-leaflet ne relit pas `className`
+ * après la création de la carte : on la pose donc ici, à chaque changement.
+ */
+function Muted({ muted }: { muted: boolean }) {
+  const map = useMap();
+  useEffect(() => {
+    map.getContainer().classList.toggle('map-muted', muted);
+  }, [map, muted]);
+  return null;
+}
+
+interface LayerProps {
+  parcels: ParcelFeature[];
+  selected: ReadonlySet<string>;
+  muted: boolean;
+  onClick: (f: ParcelFeature) => void;
+}
+
+function ParcelsLayer({ parcels, selected, muted, onClick }: LayerProps) {
   const map = useMap();
   const layer = useRef<L.GeoJSON | null>(null);
   const selectedRef = useRef(selected);
+  const mutedRef = useRef(muted);
   const clickRef = useRef(onClick);
   useEffect(() => {
     selectedRef.current = selected;
+    mutedRef.current = muted;
     clickRef.current = onClick;
   });
 
   useEffect(() => {
-    const styleOf = (id: string) => (selectedRef.current.has(id) ? STYLE.selected : STYLE.default);
+    const styleOf = (id: string) => (selectedRef.current.has(id) ? STYLE.selected : mutedRef.current ? STYLE.faded : STYLE.default);
     const geo = L.geoJSON(undefined, {
       style: (f) => styleOf(String(f?.id)),
       onEachFeature: (f: ParcelFeature, l) => {
@@ -112,9 +135,9 @@ function ParcelsLayer({ parcels, selected, onClick }: { parcels: ParcelFeature[]
   useEffect(() => {
     layer.current!.eachLayer((l) => {
       const id = String((l as L.Layer & { feature?: ParcelFeature }).feature?.id);
-      (l as L.Path).setStyle(selected.has(id) ? STYLE.selected : STYLE.default);
+      (l as L.Path).setStyle(selected.has(id) ? STYLE.selected : muted ? STYLE.faded : STYLE.default);
     });
-  }, [selected, parcels]);
+  }, [selected, muted, parcels]);
 
   return null;
 }
@@ -125,7 +148,7 @@ export default function MapView({ basemap, muted, initialView, target, marker, p
       center={[initialView.lat, initialView.lon]}
       zoom={initialView.zoom}
       maxZoom={basemap.maxZoom}
-      className={`h-full w-full ${muted ? 'map-muted' : ''}`}
+      className="h-full w-full"
       preferCanvas
       zoomControl
       attributionControl
@@ -133,7 +156,8 @@ export default function MapView({ basemap, muted, initialView, target, marker, p
       <TileLayer key={basemap.id} url={basemap.url} attribution={basemap.attribution} maxZoom={basemap.maxZoom} maxNativeZoom={basemap.maxZoom} />
       <ViewportEvents onViewport={onViewport} />
       <Move target={target} />
-      <ParcelsLayer parcels={showParcels ? parcels : []} selected={selected} onClick={onParcelClick} />
+      <Muted muted={muted} />
+      <ParcelsLayer parcels={showParcels ? parcels : []} selected={selected} muted={muted} onClick={onParcelClick} />
       {marker && (
         <CircleMarker center={[marker.lat, marker.lon]} radius={7} pathOptions={{ color: '#fff', weight: 2, fillColor: '#C1272D', fillOpacity: 1 }}>
           <Tooltip permanent direction="top" offset={[0, -8]}>

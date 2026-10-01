@@ -23,6 +23,7 @@ export function BasemapSwitch({ basemaps, value, muted, onChange, onMutedChange 
         <input type="checkbox" checked={muted} onChange={(e) => onMutedChange(e.target.checked)} />
         Estomper le fond
       </label>
+      <p className="pl-6 text-xs text-muted-foreground">Seule la sélection reste en évidence.</p>
     </fieldset>
   );
 }
