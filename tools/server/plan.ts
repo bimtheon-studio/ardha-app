@@ -5,7 +5,7 @@ export type Action =
   | { kind: 'sync' }
   | { kind: 'build'; image: string }
   | { kind: 'push'; image: string }
-  | { kind: 'remote'; args: string[]; tty: boolean };
+  | { kind: 'remote'; args: string[]; tty: boolean; secret?: string };
 
 export interface PlanContext {
   /** Dépôt de l'image, sans étiquette (`ghcr.io/bimtheon-studio/ardha`). */
@@ -20,6 +20,7 @@ export interface PlanContext {
 
 export const USAGE = `Usage : pnpm server <commande>
   setup                                   copie les fichiers du serveur, installe Postgres et Redis
+  registry --username <u>                 jeton ghcr.io (read:packages) pour once, demandé sans écho
   sync                                    copie seulement les fichiers du serveur (~/ardha)
   image [--push]                          construit l'image du commit courant ; --push la publie
   create <nom> [--image <image>]          crée un environnement (production, pr-<n>)
@@ -60,6 +61,12 @@ export function plan(argv: string[], ctx: PlanContext): Action[] {
       return [{ kind: 'sync' }];
     case 'setup':
       return [{ kind: 'sync' }, remote(['setup'])];
+    case 'registry': {
+      const i = rest.indexOf('--username');
+      const username = i >= 0 ? rest[i + 1] : undefined;
+      if (!username) throw new Error(`--username manquant\n\n${USAGE}`);
+      return [{ kind: 'sync' }, { kind: 'remote', args: ['registry', '--username', username], tty: false, secret: 'Jeton ghcr.io (read:packages) : ' }];
+    }
     case 'image': {
       const image = commitImage(ctx);
       return rest.includes('--push') ? [{ kind: 'build', image }, { kind: 'push', image }] : [{ kind: 'build', image }];

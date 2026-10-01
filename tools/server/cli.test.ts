@@ -1,7 +1,7 @@
 // `pnpm server` de bout en bout, sans serveur : un faux ssh exécute la commande distante dans un
 // HOME temporaire (ce que ferait le shell de `ubuntu`), et ardha-env y parle au faux once.
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -62,6 +62,18 @@ describe('pnpm server', () => {
     const r = server('remove', 'production');
     expect(r.code).toBe(1);
     expect(r.err).toMatch(/supprimer la production demande « --confirm production »/);
+  });
+
+  it('registry : le jeton lu sur l’entrée standard arrive dans ~/ardha/secrets.env, pas dans les arguments', () => {
+    writeFileSync(path.join(home, 'ardha/secrets.env'), 'POSTGRES_PASSWORD=x\n', { mode: 0o600 });
+    const r = spawnSync(process.execPath, [path.join(ROOT, 'tools/server/cli.ts'), 'registry', '--username', 'ci-bot'], {
+      cwd: ROOT,
+      env,
+      encoding: 'utf8',
+      input: 'ghp_jeton123\n',
+    });
+    expect(r.status).toBe(0);
+    expect(readFileSync(path.join(home, 'ardha/secrets.env'), 'utf8')).toBe('POSTGRES_PASSWORD=x\nREGISTRY_USERNAME=ci-bot\nREGISTRY_PASSWORD=ghp_jeton123\n');
   });
 
   it('une commande inconnue affiche l’aide', () => {

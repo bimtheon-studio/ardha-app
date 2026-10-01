@@ -72,6 +72,14 @@ describe('plan', () => {
     expect(plan(['psql', 'production'], ctx)).toEqual([{ kind: 'remote', args: ['psql', 'production'], tty: false }]);
   });
 
+  it('registry : le jeton part par l’entrée standard, jamais en argument', () => {
+    expect(plan(['registry', '--username', 'ci-bot'], ctx)).toEqual([
+      { kind: 'sync' },
+      { kind: 'remote', args: ['registry', '--username', 'ci-bot'], tty: false, secret: 'Jeton ghcr.io (read:packages) : ' },
+    ]);
+    expect(() => plan(['registry'], ctx)).toThrow(/--username manquant/);
+  });
+
   it('sync seul', () => {
     expect(plan(['sync'], ctx)).toEqual([{ kind: 'sync' }]);
   });

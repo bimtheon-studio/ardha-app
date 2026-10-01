@@ -93,10 +93,12 @@ Ce que le code de once v0.3.3 impose (lu dans `internal/docker` et `internal/com
   pas déployer (pas de secrets ni d'accès au serveur pour elles). Push sur demande du porteur du
   produit seulement.
 - **Le dépôt passera en privé à terme** ; d'ici là, priorité au fonctionnel (porteur du produit,
-  01/10/2026). Le jour du passage en privé, le paquet ghcr.io le suivra : poser
-  `REGISTRY_USERNAME` et `REGISTRY_PASSWORD` (jeton `read:packages`) dans `~/ardha/secrets.env`,
-  puis `update` de chaque environnement avec `--registry-…` (once garde les identifiants d'un
-  déploiement à l'autre).
+  01/10/2026).
+- **Paquet ghcr.io privé** : le porteur du produit ne peut pas le rendre public (réglage de
+  l'organisation). once s'authentifie donc : jeton GitHub *classic* `read:packages` (seul type
+  accepté par ghcr.io), déposé par `pnpm server registry --username <compte>` (demandé sans écho,
+  envoyé par l'entrée standard, rangé dans `~/ardha/secrets.env` en `600`) ; `create` et `update`
+  le passent à once par `--registry-password-stdin`, jamais en argument.
 - **Lien de l'admin de recette posté dans la PR malgré le dépôt public** (porteur du produit,
   01/10/2026, risque accepté) : admin `recette@ardha.test`, lien à usage unique valable 24 h,
   reposté à chaque base neuve (`ardha-env admin-link`, permis à la CI).

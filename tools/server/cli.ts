@@ -14,12 +14,41 @@ const REPOSITORY = process.env.ARDHA_IMAGE_REPOSITORY ?? 'ghcr.io/bimtheon-studi
 
 const git = (...args: string[]) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
 
-function run(command: string, args: string[], options: { input?: NodeJS.ReadableStream } = {}): Promise<number> {
+function run(command: string, args: string[], options: { input?: NodeJS.ReadableStream | string } = {}): Promise<number> {
   return new Promise((resolve) => {
-    const child = spawn(command, args, { cwd: ROOT, stdio: [options.input ? 'pipe' : 'inherit', 'inherit', 'inherit'] });
-    if (options.input && child.stdin) options.input.pipe(child.stdin);
+    const child = spawn(command, args, { cwd: ROOT, stdio: [options.input !== undefined ? 'pipe' : 'inherit', 'inherit', 'inherit'] });
+    if (typeof options.input === 'string') child.stdin?.end(options.input);
+    else if (options.input && child.stdin) options.input.pipe(child.stdin);
     child.on('exit', (code, signal) => resolve(code ?? (signal ? 128 : 1)));
   });
+}
+
+/** Secret demandé sans écho sur un terminal, sinon lu sur l'entrée standard (première ligne). */
+async function readSecret(prompt: string): Promise<string> {
+  const stdin = process.stdin;
+  if (!stdin.isTTY) {
+    const chunks: Buffer[] = [];
+    for await (const c of stdin) chunks.push(c as Buffer);
+    return Buffer.concat(chunks).toString('utf8').split(/\r?\n/)[0]!.trim();
+  }
+  process.stderr.write(prompt);
+  stdin.setRawMode(true);
+  stdin.resume();
+  let value = '';
+  try {
+    for await (const chunk of stdin) {
+      for (const ch of (chunk as Buffer).toString('utf8')) {
+        if (ch === '\u0003') throw new Error('Interrompu.');
+        if (ch === '\r' || ch === '\n') return value.trim();
+        value = ch === '\u007f' ? value.slice(0, -1) : value + ch;
+      }
+    }
+    return value.trim();
+  } finally {
+    stdin.setRawMode(false);
+    stdin.pause();
+    process.stderr.write('\n');
+  }
 }
 
 async function sync(): Promise<number> {
@@ -41,8 +70,11 @@ async function execute(action: Action): Promise<number> {
     case 'push':
       console.log(`Publication de ${action.image} …`);
       return run('docker', ['push', action.image]);
-    case 'remote':
-      return run(SSH, [...(action.tty ? ['-t'] : []), SERVER, ['ardha/ardha-env', ...action.args].map(shellQuote).join(' ')]);
+    case 'remote': {
+      const command = [...(action.tty ? ['-t'] : []), SERVER, ['ardha/ardha-env', ...action.args].map(shellQuote).join(' ')];
+      if (action.secret === undefined) return run(SSH, command);
+      return run(SSH, command, { input: `${await readSecret(action.secret)}\n` });
+    }
   }
 }
 

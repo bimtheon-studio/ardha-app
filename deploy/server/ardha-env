@@ -13,6 +13,7 @@
 #   ardha-env exec <nom> <commande…>                 commande dans le conteneur (once exec)
 #   ardha-env psql <nom> [arguments de psql…]        psql sur la base de l'environnement
 #   ardha-env admin-link pr-<n>                      admin de recette : création ou nouveau lien (24 h)
+#   ardha-env registry --username <u>                identifiants de ghcr.io (jeton lu sur l'entrée standard)
 #   ardha-env sweep --keep <pr-1,pr-7,…>             supprime les PR absentes de la liste (fermées)
 #   ardha-env ci                                     commande forcée de la clé SSH de la CI
 #
@@ -99,6 +100,15 @@ env_args() {
     [[ -n $line && $line != \#* ]] && printf '%s\0' --env "$line"
   done < "$(env_file "$1")"
 }
+
+# Identifiants de ghcr.io (paquet privé), s'il y en a dans secrets.env (`ardha-env registry`) : once
+# reçoit le nom en argument, le jeton par l'entrée standard.
+registry_args() {
+  if [[ -f $SECRETS ]] && grep -q '^REGISTRY_USERNAME=' "$SECRETS"; then
+    printf '%s\n' --registry-username "$(sed -n 's/^REGISTRY_USERNAME=//p' "$SECRETS")" --registry-password-stdin
+  fi
+}
+registry_password() { sed -n 's/^REGISTRY_PASSWORD=//p' "$SECRETS" 2>/dev/null || true; }
 
 create_database() {
   local db=$1 password=$2
@@ -194,13 +204,13 @@ cmd_create() {
   local envs=()
   mapfile -d '' envs < <(env_args "$name")
   args+=("${envs[@]}")
-  if [[ -f $SECRETS ]] && grep -q '^REGISTRY_USERNAME=' "$SECRETS"; then
-    args+=(--registry-username "$(sed -n 's/^REGISTRY_USERNAME=//p' "$SECRETS")" --registry-password-stdin)
-  fi
+  local registry=()
+  mapfile -t registry < <(registry_args)
+  args+=("${registry[@]}")
   [[ $name == production ]] && mkdir -p "$ARDHA_HOME/backups/production"
 
   echo "Déploiement de $image sur https://$host …"
-  if ! sed -n 's/^REGISTRY_PASSWORD=//p' "$SECRETS" 2>/dev/null | "$ONCE" "${args[@]}"; then
+  if ! registry_password | "$ONCE" "${args[@]}"; then
     # once a déjà retiré l'application ; on retire le reste, pour ne rien laisser.
     drop_database "$db"
     rm -f "$(env_file "$name")" "$(meta_file "$name")"
@@ -238,7 +248,9 @@ cmd_update() {
   local envs=()
   mapfile -d '' envs < <(env_args "$name")
   echo "Mise à jour de $name vers $image …"
-  "$ONCE" update "$host" --image "$image" "${envs[@]}"
+  local registry=()
+  mapfile -t registry < <(registry_args)
+  registry_password | "$ONCE" update "$host" --image "$image" "${envs[@]}" "${registry[@]}"
   sed -i "s|^IMAGE=.*|IMAGE=$image|" "$(meta_file "$name")"
   echo "Environnement $name à jour : https://$host"
 }
@@ -309,6 +321,32 @@ cmd_psql() {
   local tty=()
   [[ -t 0 ]] && tty=(-t)
   docker exec -i "${tty[@]}" "$POSTGRES" psql -U postgres -d "$(database_of "$name")" "$@"
+}
+
+# Identifiants de ghcr.io pour once (paquet privé) : le jeton (`read:packages`) arrive par l'entrée
+# standard, jamais par la ligne de commande ; il rejoint secrets.env. `create` les passe à
+# `once deploy`, et once les garde d'un déploiement à l'autre.
+cmd_registry() {
+  local username=''
+  while (($#)); do
+    case $1 in
+      --username) username=${2:-}; shift 2 ;;
+      *) usage ;;
+    esac
+  done
+  [[ $username =~ ^[A-Za-z0-9-]+$ ]] || die "--username : identifiant GitHub attendu"
+  local token
+  IFS= read -r token || true
+  [[ -n $token ]] || die "jeton vide : le passer sur l'entrée standard"
+  [[ $token =~ ^[A-Za-z0-9_]+$ ]] || die "jeton inattendu (caractères hors [A-Za-z0-9_])"
+  [[ -f $SECRETS ]] || die "$SECRETS absent : lancer « ardha-env setup »"
+  (
+    umask 077
+    grep -v '^REGISTRY_' "$SECRETS" > "$SECRETS.tmp" || true
+    printf 'REGISTRY_USERNAME=%s\nREGISTRY_PASSWORD=%s\n' "$username" "$token" >> "$SECRETS.tmp"
+    mv "$SECRETS.tmp" "$SECRETS"
+  )
+  echo "Identifiants du registre enregistrés pour $username (pris en compte au prochain create)."
 }
 
 # Admin de recette d'un environnement de PR, pour la CI qui poste son lien dans la PR : créé s'il
@@ -394,6 +432,7 @@ case $command in
   psql) cmd_psql "$@" ;;
   sweep) cmd_sweep "$@" ;;
   admin-link) cmd_admin_link "$@" ;;
+  registry) cmd_registry "$@" ;;
   ci) cmd_ci ;;
   *) usage ;;
 esac

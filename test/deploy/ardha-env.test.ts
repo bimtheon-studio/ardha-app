@@ -227,10 +227,28 @@ describe('ardha-env', () => {
     expect(ok('list')).toMatch(/^production\t.*\trunning\t/m);
   });
 
+  it('registry : identifiants de ghcr.io (paquet privé) dans secrets.env, lus sur l’entrée standard ; pas pour la CI', () => {
+    const set = (password: string) =>
+      spawnSync(path.join(ROOT, 'deploy/server/ardha-env'), ['registry', '--username', 'ci-bot'], { env, encoding: 'utf8', input: password });
+    expect(set('').stderr).toMatch(/jeton vide/);
+    expect(set('ghp_premier\n').status).toBe(0);
+    expect(set('ghp_second\n').stdout).toMatch(/Identifiants du registre enregistrés pour ci-bot/);
+    const secrets = readFileSync(path.join(home, 'secrets.env'), 'utf8');
+    expect(secrets).toMatch(/^POSTGRES_PASSWORD=\S+$/m);
+    expect(secrets.match(/^REGISTRY_/gm)).toHaveLength(2);
+    expect(secrets).toMatch(/^REGISTRY_USERNAME=ci-bot$/m);
+    expect(secrets).toMatch(/^REGISTRY_PASSWORD=ghp_second$/m);
+    expect(statSync(path.join(home, 'secrets.env')).mode & 0o777).toBe(0o600);
+    expect(ci('registry --username x').err).toMatch(/commande refusée à la CI/);
+  });
+
   it('un déploiement en échec ne laisse rien', () => {
     const r = ardhaEnv('create', 'pr-7', '--image', 'ardha:inexistante');
     expect(r.code).toBe(1);
     expect(r.err).toMatch(/échec du déploiement de pr-7 : rien n'a été gardé/);
+    // once a reçu les identifiants du registre, le mot de passe par l'entrée standard.
+    expect(calls().at(-1)).toMatch(/ --registry-username ci-bot --registry-password-stdin$/);
+    expect(readFileSync(path.join(state, 'registry-password'), 'utf8')).toBe('ghp_second\n');
     expect(sql('postgres', `SELECT count(*) FROM pg_database WHERE datname = 'ardha_pr_7'`)).toBe('0');
     expect(existsSync(path.join(home, 'envs/pr-7.env'))).toBe(false);
   });

@@ -68,7 +68,8 @@ case $command in
     image=$1; shift; host=''
     settings "$@"
     [[ ! -f $STATE/apps/$host ]] || { echo "Error: hostname already in use" >&2; exit 1; }
-    cat > /dev/null # mot de passe du registre, le cas échéant
+    # Mot de passe du registre (--registry-password-stdin), gardé pour que le test le vérifie.
+    cat > "$STATE/registry-password"
     name=$(start "$host" "$image" "${envs[@]}") || exit 1
     printf '%s\n%s\n' "$name" "$image" > "$STATE/apps/$host"
     printf '%s\n' "${envs[@]}" > "$STATE/apps/$host.env"
