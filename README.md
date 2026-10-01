@@ -76,9 +76,19 @@ La CLI pilote et débogue la chaîne sans le front :
 | `address:search <texte…> [--inline]` · `address:reverse <lon> <lat>` | géocodage, par le worker ou sur place |
 | `source:record <url…>` | enregistre la réponse réelle d'une source dans `fixtures/http` |
 | `seed [codes…]` | sème les communes de référence, ou celles données |
+| `study:create --user <e-mail> <IDU…> [--inline]` | crée une étude ; adresse et vignette par le worker, ou sur place avec `--inline` |
+| `study:list [--user] [-q <texte>] [--trash]` · `study:show <id>` | études (ou corbeille), recherche ; une étude : parcelles, adresses, étapes |
+| `study:rename` · `study:address` · `study:add-parcel` · `study:remove-parcel` | renommer, choisir l'adresse (identifiant BAN), modifier les parcelles |
+| `study:duplicate` · `study:delete` · `study:restore` · `study:purge [--days]` | copie ; corbeille ; restauration ; purge (le worker la fait chaque nuit, après 30 jours) |
+| `study:refresh <id> [--inline]` · `study:thumbnail <id> --out <png>` | recalcule adresse et vignette ; écrit la vignette dans un fichier |
 
 Pour enregistrer d'un coup tout ce dont une commande a besoin :
-`ARDHA_SOURCES=record pnpm cli commune:load --inline 74010`.
+`ARDHA_SOURCES=record pnpm cli commune:load --inline 74010`, ou, pour l'adresse et la vignette d'une
+étude (BAN, tuiles OSM) : `ARDHA_SOURCES=record pnpm cli study:create --user <e-mail> --inline <IDU…>`.
+
+Fichiers (vignettes d'étude) : magasin S3 en local et en test (MinIO du worktree, `FILES_DRIVER=s3`
+dans `.env.local`), disque en production (`FILES_DRIVER=disk`, `FILES_DIR=/storage/files`, sauvegardé
+avec le volume de once).
 
 ## Structure
 

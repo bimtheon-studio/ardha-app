@@ -372,6 +372,10 @@ Les arbitrages fonctionnels, rendus le 01/10/2026, sont dans [F-01](fiches/F-01-
 | DT-26 | **e2e Playwright** sur une stack jetable (`e2e/stack.ts` : base `ardha_e2e`, sources enregistrées, tuiles interceptées), ports e2e décalés par worktree (17000, 18000), Chromium du système ou de Playwright | e2e contre la stack de dev | reproductible, sans Internet, en parallèle d'une stack de dev ; 12 s tout compris |
 | DT-27 | **Lint obligatoire en pre-commit** : hook versionné `tools/hooks/pre-commit` (`core.hooksPath`, posé par `prepare` à l'installation), fichiers indexés seulement, tout le dépôt si la configuration change | husky, lint-staged | consigne du porteur du produit (01/10/2026) ; aucune dépendance de plus ; ~2 s par commit |
 | DT-28 | **Perf des tests suivie** : `pnpm test:perf` (durée par suite, fichiers et tests les plus lents), journal `docs/reecriture/PERF-TESTS.md` ; front testé sous **happy-dom** | jsdom | consigne du porteur du produit (01/10/2026) : la base de tests va grossir vite ; happy-dom : front 5,1 → 4,3 s |
+| DT-29 | **Étude** : `studies` + `study_parcels` (copie de la géométrie, de la contenance et du millésime ; pas de clé vers `parcels`) ; écritures **commutatives** (ajouter ou retirer *une* parcelle, sous `FOR UPDATE`) plutôt qu'une version d'étude | une colonne `version` et des conflits 409 | deux onglets ne s'écrasent pas, sans écran de conflit ; la référence se remplace à chaque millésime, la copie reste (PLAN §4) |
+| DT-30 | Ce que le worker déduit d'une étude (adresse, vignette) vaut pour une **empreinte des parcelles** (`parcels_key`, FNV-1a des IDU triés) : jobId par empreinte, écriture seulement si l'empreinte n'a pas bougé, réconciliation des études « en retard » | un état `pending/ready` par calcul | aucun calcul périmé n'écrase un plus récent ; l'état reste dans Postgres, Redis se reconstruit (PLAN §3) |
+| DT-31 | **Magasin de fichiers** à deux implémentations (`src/shared/files.ts`) : disque (`/storage`, production) et S3 (`@aws-sdk/client-s3`, MinIO en local et en test) | S3 seul ; fichiers en base | F-02 Q11 (porteur du produit, 01/10/2026) : rien de plus à installer ni à sauvegarder sous once ; S3 par configuration le jour venu |
+| DT-32 | **Vignette** composée par le worker avec **sharp** 0.35 (tuiles assemblées + contours en SVG, PNG en palette, 480 × 300, ≈ 20 Ko), cadrage Web Mercator dans le domaine (`frameBbox`) | canvas dans Node ; tuile brute comme avant | D-08 ; binaires précompilés, sans dépendance système dans l'image |
 
 ## 12. Questions ouvertes
 
@@ -390,6 +394,10 @@ vers des comptes pas encore recréés) ; aucune migration ne les a réinjectées
 été supprimée le 27/09. Sans conséquence pour la réécriture, qui repart de zéro.
 
 ## Journal
+
+- **01/10/2026** — **L2 codé et recetté en local** sur `l2-study` (F-02) : études en base, API,
+  worker (adresse, vignette), CLI `study:*`, accueil, page de l'étude, corbeille, carte de l'étude ;
+  DT-29 à DT-32. Tests : 333 back, 70 front, 11 e2e, 37 s en tout (machine chargée).
 
 - **01/10/2026** — **L2 lancé** sur la branche `l2-study` ; arbitrages F-02 Q1 à Q12 rendus :
   enregistrement automatique après « Créer l'étude », nom proposé puis stable, adresse calculée par

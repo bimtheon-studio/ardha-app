@@ -1,6 +1,6 @@
 # F-02 · Étude : enregistrer, rouvrir, consulter sur mobile
 
-> Lot : L2 · Statut : `conçue` (01/10/2026) ; arbitrages Q1 à Q12 rendus par le porteur du produit le 01/10/2026
+> Lot : L2 · Statut : `recettée` (01/10/2026, en local) ; arbitrages Q1 à Q12 rendus par le porteur du produit le 01/10/2026
 > Branche : `l2-study`
 > Ancien code : `bimtheon-studio/ardha` @ `2a7f9a0` (export de `origin/main`)
 
@@ -197,7 +197,20 @@ recommandation partout, sauf pour Q9, Q10 et Q12.
 
 ## Recette
 
-À faire : Maisons-Alfort (2 rue Étienne Dolet), Annecy (18 rue de Morette).
+Le 01/10/2026, en local (sources en direct pour la CLI et l'écran, enregistrées pour les tests) :
+
+| Cas | Résultat |
+|---|---|
+| Maisons-Alfort, AY146 (2 rue Étienne Dolet) | « 2 Rue Etienne Dolet, Maisons-Alfort », 344 m² ; la BAN écrit « Etienne », sans accent |
+| Maisons-Alfort, AY96 + AY97 | « 6 Rue Pasteur, Maisons-Alfort (+1 parcelle) », 510 m² (507 m² calculés), 5 adresses trouvées |
+| … puis + AY98 | adresse recalculée : « 6 Avenue de la République » (une avenue passe devant une rue) ; nom inchangé |
+| Annecy, AS71 (18 rue de Morette) | « 8 Rue de Morette, Annecy » : la règle prend le plus petit numéro ; le 18 se choisit parmi les 6 adresses trouvées |
+| Beaumont-Village, ZA1 (14,6 ha, rural) | aucune adresse à moins de 10 m : « Beaumont-Village — ZA 1 » |
+| Création par la CLI `--inline` | 2,6 s, BAN (5 points) et tuiles OSM comprises ; vignette 480 × 300 de 20 Ko |
+| Écran, dans Chromium (Playwright) | sélection → « Créer l'étude » → page de l'étude ; renommer ; clic sur une parcelle de la carte de l'étude (ajout, retrait, dernière refusée) ; dupliquer ; corbeille et « Annuler » ; restaurer depuis la corbeille ; recherche ; 375 px sans défilement horizontal |
+
+Écarts constatés : aucun bloquant. À suivre : la vignette sur fond OSM (Q12) relève de la politique
+d'usage des tuiles, comme la carte (fournisseur à prévoir avant la production).
 
 ## Écarts assumés
 
@@ -206,3 +219,9 @@ recommandation partout, sauf pour Q9, Q10 et Q12.
 - Plus de version mobile séparée (Q7).
 - Couverture personnelle reportée (Q6) ; vignette composée côté serveur (D-08).
 - Le nom ne suit plus les parcelles une fois proposé (Q2).
+- Le classement des adresses suit l'ancien (voie d'abord, puis plus petit numéro) : sur une grande
+  parcelle à plusieurs numéros, le plus petit l'emporte (Annecy : 8 et non 18 rue de Morette) ;
+  l'utilisateur choisit une autre adresse en un clic.
+- Recherche faite dans l'application, sans accents ni casse, sur les études de l'utilisateur
+  (quelques centaines au plus en v1) ; à passer en SQL si les volumes grossissent.
+- Pas de rôle de parcelle (PLAN §4) avant L7.

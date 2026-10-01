@@ -31,10 +31,17 @@
    parcelles, corbeille, vue mobile).
 10. **Clore** : fiche, README, journal du PLAN, décisions techniques, perf des tests consignée.
 
+## État au 01/10/2026
+
+Étapes 1 à 9 faites sur `l2-study`, critères de fin tenus en local (recette de
+[F-02](../fiches/F-02-etude.md#recette)). Reste : pousser la branche et ouvrir la PR (sur demande du
+porteur du produit) ; CI et environnement de PR à vérifier à ce moment-là.
+
 ## Critères de fin
 
-- Sur Maisons-Alfort (AY96 + AY97) : l'étude créée s'appelle « 2 Rue Étienne Dolet, Maisons-Alfort
-  (+1 parcelle) » une fois l'adresse trouvée, sans Internet (sources enregistrées).
+- Sur Maisons-Alfort, la parcelle de l'adresse de référence (AY146) donne une étude nommée « 2 Rue
+  Etienne Dolet, Maisons-Alfort » une fois l'adresse trouvée (la BAN écrit « Etienne »), sans Internet
+  (sources enregistrées) ; AY96 + AY97 donnent « 6 Rue Pasteur, Maisons-Alfort (+1 parcelle) ».
 - L'accueil liste les études avec leur vignette ; la recherche trouve par nom et par commune.
 - Modifier les parcelles d'une étude recalcule adresse et vignette ; le nom ne bouge pas.
 - Une étude supprimée se restaure depuis la corbeille ; la purge l'efface après 30 jours.
