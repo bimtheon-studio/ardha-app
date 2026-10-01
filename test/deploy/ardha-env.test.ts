@@ -13,6 +13,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { IMAGE } from './build-image.ts';
 
 const ROOT = new URL('../..', import.meta.url).pathname;
+/** Migrations du dépôt, d'après le journal de drizzle-kit. */
+const MIGRATIONS = (JSON.parse(readFileSync(path.join(ROOT, 'drizzle/meta/_journal.json'), 'utf8')) as { entries: unknown[] }).entries.length;
 const ID = `ardha-envtest-${process.pid}`;
 const DOMAIN = 'test.local';
 const home = mkdtempSync(path.join(tmpdir(), 'ardha-env-'));
@@ -122,7 +124,7 @@ describe('ardha-env', () => {
   it('create production : base et rôle à son nom, sans droits de superutilisateur ; migrée, pas semée', () => {
     expect(ok('create', 'production', '--image', IMAGE)).toMatch(/Environnement production prêt : https:\/\/ardha\.test\.local/);
     expect(sql('postgres', `SELECT rolsuper FROM pg_roles WHERE rolname = 'ardha_production'`)).toBe('f');
-    expect(sql('ardha_production', 'SELECT count(*) FROM drizzle.__drizzle_migrations')).toBe('3');
+    expect(sql('ardha_production', 'SELECT count(*) FROM drizzle.__drizzle_migrations')).toBe(String(MIGRATIONS));
     expect(sql('ardha_production', 'SELECT count(*) FROM communes')).toBe('0');
     expect(statSync(path.join(home, 'envs/production.env')).mode & 0o777).toBe(0o600);
     expect(calls().at(-1)).toBe(
