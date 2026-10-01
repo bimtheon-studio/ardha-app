@@ -106,3 +106,32 @@ it('erreurs : auteur absent ou inconnu, étude inconnue', async () => {
   expect(errors.join('\n')).toMatch(/Indiquez l’auteur : --user <email>[\s\S]*Aucun compte avec l’adresse personne@ardha\.test[\s\S]*Étude introuvable\./);
   process.exitCode = 0;
 });
+
+it('risk:analyze --inline, risk:show, risk:commune, risk:point', async () => {
+  const s = await json('study:create', '--user', 'etude@ardha.test', AY96, AY97);
+  const analyzed = await run('risk:analyze', s.id, '--inline');
+  expect(analyzed).toMatch(/^Analyse : prête, calculée le /);
+  expect(analyzed).toContain('!!  Inondation : Aléa moyen');
+  expect(analyzed).toContain('PPRI Marne et Seine [PPRN-I, 2 zone(s)]');
+  expect(analyzed).toContain('TRI : aléa moyen ; moyen (centennal) plus de 2 m');
+  expect(analyzed).toContain('cote indicative au moins 34.31 m NGF');
+  expect(analyzed).toContain('bornes incendie à 400 m : 7, la plus proche à 111 m');
+  const shown = JSON.parse(await run('risk:show', s.id, '--json')) as { status: string; result: { parcels: { point: [number, number] }[] } };
+  expect(shown.status).toBe('ready');
+
+  expect(await run('risk:commune', '94046')).toMatch(/^radon : classe 1 ; sismicité : zone 1\nGASPAR : Inondation, Transport de marchandises dangereuses\nPPRN PPRI Marne et Seine \(PPRN-I, 27\/02\/2025\) : 2 zone\(s\)/);
+  const [lon, lat] = shown.result.parcels[0]!.point;
+  const point = await run('risk:point', String(lon), String(lat));
+  expect(point).toContain('argiles : moyen');
+  expect(point).toContain('Débordement de cours d’eau, scénario moyen (centennal) : plus de 2 m');
+  // Sans analyse, puis avec des sources muettes (AY146 : réponses des parcelles non enregistrées).
+  const other = await json('study:create', '--user', 'etude@ardha.test', AY146);
+  expect(await run('risk:show', other.id)).toBe('Analyse : jamais demandée');
+  const muted = await run('risk:analyze', other.id, '--inline');
+  expect(muted).toContain('?   Retrait-gonflement des argiles : Source indisponible : à vérifier');
+  expect(muted).toMatch(/argiles : indisponible \(Réponse enregistrée absente/);
+  expect(muted).toMatch(/bornes incendie à 400 m : indisponible/);
+  await run('risk:point', 'x', '1');
+  expect(errors.join('\n')).toContain('Point invalide : x 1');
+  process.exitCode = 0;
+});

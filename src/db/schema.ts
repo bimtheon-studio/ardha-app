@@ -15,10 +15,12 @@ import {
   primaryKey,
   text,
   timestamp,
+  unique,
   uuid,
 } from 'drizzle-orm/pg-core';
 
 import type { Address } from '../contracts/geo.ts';
+import type { RisksResult } from '../contracts/risks.ts';
 
 const id = () => uuid().primaryKey().default(sql`uuidv7()`);
 const timestampTz = () => timestamp({ withTimezone: true, mode: 'date' });
@@ -224,8 +226,38 @@ export const studyParcel = pgTable(
   (t) => [primaryKey({ columns: [t.studyId, t.parcelId] })],
 );
 
+export const analysisKind = pgEnum('analysis_kind', ['risks']);
+export const analysisStatus = pgEnum('analysis_status', ['queued', 'running', 'ready', 'failed']);
+
+/**
+ * Analyses d'une étude (PLAN §4) : une par type (risques en L4, urbanisme en L3…), calculée par le
+ * worker pour une empreinte de parcelles ; périmée quand l'étude n'a plus ces parcelles. Le résultat
+ * suit un schéma versionné du contrat ; il cite ses sources et leur date d'interrogation.
+ */
+export const studyAnalysis = pgTable(
+  'study_analyses',
+  {
+    id: id(),
+    studyId: uuid()
+      .notNull()
+      .references(() => study.id, { onDelete: 'cascade' }),
+    kind: analysisKind().notNull(),
+    status: analysisStatus().notNull(),
+    /** Empreinte des parcelles pour laquelle l'analyse est demandée, puis calculée. */
+    parcelsKey: text().notNull(),
+    result: jsonb().$type<RisksResult>(),
+    error: text(),
+    attempts: integer().notNull().default(0),
+    requestedAt: timestampTz().notNull().defaultNow(),
+    startedAt: timestampTz(),
+    computedAt: timestampTz(),
+  },
+  (t) => [unique('study_analyses_study_kind_unique').on(t.studyId, t.kind), index().on(t.status)],
+);
+
 export type UserRow = typeof user.$inferSelect;
 export type SessionRow = typeof session.$inferSelect;
 export type PasswordResetRow = typeof passwordReset.$inferSelect;
 export type SourceStateRow = typeof sourceState.$inferSelect;
 export type StudyRow = typeof study.$inferSelect;
+export type StudyAnalysisRow = typeof studyAnalysis.$inferSelect;

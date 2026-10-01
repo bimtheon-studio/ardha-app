@@ -120,7 +120,19 @@ export const Basemap = z.object({
 });
 export type Basemap = z.infer<typeof Basemap>;
 
-export const MapLayers = z.object({ basemaps: z.array(Basemap), defaultBasemap: z.string(), parcelsMinZoom: z.number().int() });
+/** Couche de risques en WMS, affichée par-dessus le fond (F-04, Q8). */
+export const RiskLayer = z.object({
+  id: z.string(),
+  label: z.string(),
+  /** Adresse du service WMS. */
+  url: z.string(),
+  /** Couches WMS, séparées par des virgules. */
+  layers: z.string(),
+  attribution: z.string(),
+});
+export type RiskLayer = z.infer<typeof RiskLayer>;
+
+export const MapLayers = z.object({ basemaps: z.array(Basemap), defaultBasemap: z.string(), parcelsMinZoom: z.number().int(), riskLayers: z.array(RiskLayer) });
 export type MapLayers = z.infer<typeof MapLayers>;
 
 export const geoRoutes = {

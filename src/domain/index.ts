@@ -10,3 +10,4 @@ export * from './selection.ts';
 export * from './addresses.ts';
 export * from './study.ts';
 export * from './tiles.ts';
+export * from './risks.ts';

@@ -37,9 +37,9 @@ export default defineConfig({
       thresholds: {
         autoUpdate: process.env.CI ? false : (threshold: number) => Math.floor(threshold),
         lines: 98,
-        functions: 96,
+        functions: 97,
         branches: 90,
-        statements: 97,
+        statements: 98,
         'src/domain/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/contracts/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
       },

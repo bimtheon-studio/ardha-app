@@ -31,7 +31,7 @@ beforeAll(async () => {
     imports: [ConfigModule.forConfig(testConfig()), DbModule, AccountsModule],
     providers: [
       MaintenanceProcessor,
-      { provide: Reconciliation, useValue: { run: async () => ({ communes: [], studies: [] }) } },
+      { provide: Reconciliation, useValue: { run: async () => ({ communes: [], studies: [], analyses: [] }) } },
       { provide: StudiesService, useValue: { purge: async () => [] } },
     ],
   })

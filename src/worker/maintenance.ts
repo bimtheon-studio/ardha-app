@@ -11,7 +11,8 @@ import { CADASTRE_SOURCE, CadastreService } from '../geo/cadastre.service.ts';
 import { SourceStatesRepository } from '../geo/source-states.repository.ts';
 import { Clock } from '../shared/clock.ts';
 import { MAINTENANCE_QUEUE } from '../shared/queues.ts';
-import { StudyJobs } from '../studies/studies.jobs.ts';
+import { AnalysesRepository } from '../studies/analyses.repository.ts';
+import { ANALYZE_RISKS_JOB, StudyJobs } from '../studies/studies.jobs.ts';
 import { StudiesRepository } from '../studies/studies.repository.ts';
 import { StudiesService } from '../studies/studies.service.ts';
 
@@ -30,18 +31,21 @@ export class Reconciliation {
     private readonly cadastre: CadastreService,
     private readonly studies: StudiesRepository,
     private readonly studyJobs: StudyJobs,
+    private readonly analyses: AnalysesRepository,
     private readonly clock: Clock,
   ) {}
 
   /** Réenfile les chargements et les calculs d'étude perdus ; rend les communes et études concernées. */
-  async run(): Promise<{ communes: string[]; studies: string[] }> {
+  async run(): Promise<{ communes: string[]; studies: string[]; analyses: string[] }> {
     const now = this.clock.now().getTime();
     const stalled = await this.states.stalled(CADASTRE_SOURCE, new Date(now - QUEUED_GRACE_MS), new Date(now - LOADING_GRACE_MS));
     for (const s of stalled) await this.cadastre.enqueue(s.scope);
     // Un job déjà en file ou en cours a le même jobId : le réenfiler est sans effet.
     const lagging = await this.studies.lagging(new Date(now - STUDY_GRACE_MS));
     for (const s of lagging) await this.studyJobs.enqueue({ studyId: s.id, parcelsKey: s.parcelsKey });
-    return { communes: stalled.map((s) => s.scope), studies: lagging.map((s) => s.id) };
+    const analyses = await this.analyses.stalled(new Date(now - QUEUED_GRACE_MS), new Date(now - LOADING_GRACE_MS));
+    for (const a of analyses) await this.studyJobs.enqueue({ studyId: a.studyId, parcelsKey: a.parcelsKey }, [ANALYZE_RISKS_JOB]);
+    return { communes: stalled.map((s) => s.scope), studies: lagging.map((s) => s.id), analyses: analyses.map((a) => a.studyId) };
   }
 }
 
@@ -62,6 +66,7 @@ export class MaintenanceProcessor extends WorkerHost {
       const r = await this.reconciliation.run();
       if (r.communes.length > 0) this.logger.log(`Réconciliation : commune(s) ${r.communes.join(', ')} réenfilée(s)`);
       if (r.studies.length > 0) this.logger.log(`Réconciliation : ${r.studies.length} étude(s) réenfilée(s)`);
+      if (r.analyses.length > 0) this.logger.log(`Réconciliation : ${r.analyses.length} analyse(s) réenfilée(s)`);
       return r;
     }
     if (job.name !== PURGE_JOB) throw new Error(`Tâche inconnue : ${job.name}`);

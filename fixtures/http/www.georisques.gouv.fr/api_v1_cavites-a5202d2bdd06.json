@@ -1,0 +1,5 @@
+{
+  "url": "https://www.georisques.gouv.fr/api/v1/cavites?latlon=2.429934%2C48.800028&rayon=1000&page=1&page_size=100",
+  "status": 200,
+  "contentType": "application/json"
+}

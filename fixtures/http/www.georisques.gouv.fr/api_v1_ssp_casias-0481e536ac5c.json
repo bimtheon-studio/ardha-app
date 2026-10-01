@@ -1,0 +1,5 @@
+{
+  "url": "https://www.georisques.gouv.fr/api/v1/ssp/casias?code_insee=74010&page=5&page_size=100",
+  "status": 200,
+  "contentType": "application/json"
+}

@@ -1,0 +1,5 @@
+{
+  "url": "https://www.georisques.gouv.fr/api/v1/gaspar/pprt?codeInsee=37023&page=1&page_size=50",
+  "status": 200,
+  "contentType": "application/json"
+}

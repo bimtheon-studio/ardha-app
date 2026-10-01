@@ -9,6 +9,10 @@ import { Communes } from './communes.ts';
 import { Geocoding } from './geocoding.ts';
 import { Http, LiveHttp, RecordedHttp, RecordingHttp } from './http.ts';
 import { Tiles } from './tiles.ts';
+import { Elevation } from './elevation.ts';
+import { FloodHeights } from './flood-heights.ts';
+import { Georisques } from './georisques.ts';
+import { Hydrants } from './hydrants.ts';
 
 @Module({
   providers: [
@@ -25,7 +29,11 @@ import { Tiles } from './tiles.ts';
     { provide: Communes, inject: [Http], useFactory: (http: Http) => new Communes(http) },
     { provide: Cadastre, inject: [Http], useFactory: (http: Http) => new Cadastre(http) },
     { provide: Tiles, inject: [Http], useFactory: (http: Http) => new Tiles(http) },
+    { provide: Georisques, inject: [Http], useFactory: (http: Http) => new Georisques(http) },
+    { provide: FloodHeights, inject: [Http], useFactory: (http: Http) => new FloodHeights(http) },
+    { provide: Elevation, inject: [Http], useFactory: (http: Http) => new Elevation(http) },
+    { provide: Hydrants, inject: [Http], useFactory: (http: Http) => new Hydrants(http) },
   ],
-  exports: [Http, Geocoding, Communes, Cadastre, Tiles],
+  exports: [Http, Geocoding, Communes, Cadastre, Tiles, Georisques, FloodHeights, Elevation, Hydrants],
 })
 export class SourcesModule {}

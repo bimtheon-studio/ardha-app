@@ -84,7 +84,7 @@ describe('créer une étude', () => {
     expect(created.steps.map((s) => [s.key, s.state])).toEqual([
       ['parcels', 'done'],
       ['urbanism', 'upcoming'],
-      ['risks', 'upcoming'],
+      ['risks', 'todo'],
       ['land', 'upcoming'],
       ['feasibility', 'upcoming'],
       ['report', 'upcoming'],

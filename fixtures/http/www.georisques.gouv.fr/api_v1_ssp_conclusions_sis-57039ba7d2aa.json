@@ -1,0 +1,5 @@
+{
+  "url": "https://www.georisques.gouv.fr/api/v1/ssp/conclusions_sis?code_insee=37023&page=1&page_size=100",
+  "status": 200,
+  "contentType": "application/json"
+}

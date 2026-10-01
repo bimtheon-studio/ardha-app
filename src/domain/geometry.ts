@@ -165,7 +165,8 @@ export function distanceToPointM(g: Surface, position: Position): number {
   return best;
 }
 
-function expand(b: Bbox, meters: number): Bbox {
+/** Emprise élargie de `meters` mètres de chaque côté. */
+export function expandBbox(b: Bbox, meters: number): Bbox {
   const { m, n } = radii((b[1] + b[3]) / 2);
   const dLat = meters / (m * RAD);
   const dLon = meters / (n * Math.cos(((b[1] + b[3]) / 2) * RAD) * RAD);
@@ -184,7 +185,7 @@ function bboxesMeet(a: Bbox, b: Bbox): boolean {
 export function distanceM(a: Surface, b: Surface, within = Infinity): number {
   const ba = bboxOf(a);
   const bb = bboxOf(b);
-  if (Number.isFinite(within) && !bboxesMeet(expand(ba, within), bb)) return Infinity;
+  if (Number.isFinite(within) && !bboxesMeet(expandBbox(ba, within), bb)) return Infinity;
   const project = projector((ba[0] + ba[2]) / 2, (ba[1] + ba[3]) / 2);
   const pa = polygonsOf(a).map((rings) => rings.map((r) => r.map(project)));
   const pb = polygonsOf(b).map((rings) => rings.map((r) => r.map(project)));
@@ -210,4 +211,72 @@ export function distanceM(a: Surface, b: Surface, within = Infinity): number {
     }
   }
   return best;
+}
+
+/** Distance en mètres entre deux points `[lon, lat]` (projection locale, juste à l'échelle d'une commune). */
+export function pointDistanceM(a: Position, b: Position): number {
+  const project = projector(a[0]!, a[1]!);
+  const [x, y] = project(b);
+  return Math.hypot(x, y);
+}
+
+function largestPolygon(g: Surface): readonly Ring[] {
+  let best: readonly Ring[] = [];
+  let bestArea = -1;
+  for (const rings of polygonsOf(g)) {
+    const a = areaM2({ type: 'Polygon', coordinates: rings as Position[][] });
+    if (a > bestArea) [best, bestArea] = [rings, a];
+  }
+  return best;
+}
+
+/**
+ * Un point à l'intérieur de la surface (pas forcément son centre) : le centre de sa boîte s'il est
+ * dedans, sinon le milieu du plus large segment intérieur d'une ligne horizontale (à mi-hauteur, puis
+ * au quart et aux trois quarts). Sert à interroger une couche en un point qui est bien sur la parcelle.
+ */
+export function interiorPoint(g: Surface): Position {
+  const rings = largestPolygon(g);
+  const [w, s, e, n] = bboxOf({ type: 'Polygon', coordinates: rings as Position[][] });
+  const center: Position = [(w + e) / 2, (s + n) / 2];
+  if (containsPoint(g, center)) return center;
+  for (const f of [0.5, 0.25, 0.75, 0.125, 0.875]) {
+    const lat = s + (n - s) * f;
+    const xs: number[] = [];
+    for (const ring of rings) {
+      for (let i = 0; i < ring.length - 1; i++) {
+        const [x1, y1] = ring[i]! as [number, number];
+        const [x2, y2] = ring[i + 1]! as [number, number];
+        if (y1 > lat !== y2 > lat) xs.push(x1 + ((lat - y1) * (x2 - x1)) / (y2 - y1));
+      }
+    }
+    xs.sort((a, b) => a - b);
+    let best: Position | null = null;
+    let width = 0;
+    for (let i = 0; i + 1 < xs.length; i += 2) {
+      const candidate: Position = [(xs[i]! + xs[i + 1]!) / 2, lat];
+      if (xs[i + 1]! - xs[i]! > width && containsPoint(g, candidate)) [best, width] = [candidate, xs[i + 1]! - xs[i]!];
+    }
+    if (best) return best;
+  }
+  return center;
+}
+
+/** Points le long des contours extérieurs, tous les `stepM` mètres environ, `max` au plus (sommets compris). */
+export function perimeterPoints(g: Surface, stepM: number, max: number): Position[] {
+  const points: Position[] = [];
+  for (const [outer = []] of polygonsOf(g)) {
+    for (let i = 0; i < outer.length - 1; i++) {
+      const a = outer[i]!;
+      const b = outer[i + 1]!;
+      const parts = Math.max(1, Math.ceil(pointDistanceM(a, b) / stepM));
+      for (let k = 0; k < parts; k++) {
+        const t = k / parts;
+        points.push([a[0]! + t * (b[0]! - a[0]!), a[1]! + t * (b[1]! - a[1]!)]);
+      }
+    }
+  }
+  if (points.length <= max) return points;
+  // Décimation régulière : on garde des points répartis sur tout le contour.
+  return Array.from({ length: max }, (_, i) => points[Math.floor((i * points.length) / max)]!);
 }

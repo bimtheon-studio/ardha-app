@@ -23,6 +23,7 @@ import { type ParcelRecord, ParcelsRepository } from '../geo/parcels.repository.
 import { Clock } from '../shared/clock.ts';
 import { DomainError } from '../shared/errors.ts';
 import { FileStore, type StoredFile } from '../shared/files.ts';
+import { AnalysesRepository } from './analyses.repository.ts';
 import { StudyJobs } from './studies.jobs.ts';
 import { type Executor, type NewStudyParcel, StudiesRepository, type StudyParcelRecord, type StudySummaryRecord } from './studies.repository.ts';
 
@@ -60,6 +61,7 @@ function fold(text: string | null | undefined): string {
 export class StudiesService {
   constructor(
     private readonly studies: StudiesRepository,
+    private readonly analyses: AnalysesRepository,
     private readonly parcels: ParcelsRepository,
     private readonly communes: CommunesRepository,
     private readonly jobs: StudyJobs,
@@ -86,7 +88,7 @@ export class StudiesService {
     };
   }
 
-  private toStudy(r: StudySummaryRecord, parcels: readonly StudyParcelRecord[]): Study {
+  private toStudy(r: StudySummaryRecord, parcels: readonly StudyParcelRecord[], risks: 'done' | 'todo'): Study {
     return {
       ...this.summary(r),
       parcels: parcels.map((p) => ({
@@ -107,7 +109,7 @@ export class StudiesService {
       nameIsProvisional: r.nameIsProvisional,
       addressPending: r.addressKey !== r.parcelsKey,
       thumbnailPending: r.thumbnailKey !== r.parcelsKey,
-      steps: studySteps({ parcelCount: parcels.length }),
+      steps: studySteps({ parcelCount: parcels.length, risks }),
     };
   }
 
@@ -121,6 +123,12 @@ export class StudiesService {
     const r = this.visible(actor, row);
     if (r.deletedAt) throw new DomainError('study-in-trash');
     return r;
+  }
+
+  /** L'étude, si l'acteur y a droit (et, avec `editable`, hors corbeille) ; sinon « introuvable ». */
+  async require(actor: Actor, id: string, options: { editable?: boolean } = {}): Promise<StudyRow> {
+    const row = await this.studies.get(id);
+    return options.editable ? this.editable(actor, row) : this.visible(actor, row);
   }
 
   private async communeName(code: string): Promise<string | null> {
@@ -146,7 +154,8 @@ export class StudiesService {
 
   async get(actor: Actor, id: string): Promise<Study> {
     const row = this.visible(actor, await this.studies.summary(id));
-    return this.toStudy(row, await this.studies.parcels(id));
+    const risks = (await this.analyses.statuses(id)).some((a) => a.kind === 'risks' && a.status === 'ready' && a.parcelsKey === row.parcelsKey);
+    return this.toStudy(row, await this.studies.parcels(id), risks ? 'done' : 'todo');
   }
 
   /** Crée l'étude à partir de parcelles chargées ; le nom est provisoire jusqu'à l'adresse (Q2). */

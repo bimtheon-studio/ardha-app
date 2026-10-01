@@ -23,6 +23,7 @@ import { SystemController } from './system.controller.ts';
 import { FilesModule } from '../shared/files.ts';
 import { StudiesModule } from '../studies/studies.module.ts';
 import { StudiesController } from './studies.controller.ts';
+import { RisksController } from './risks.controller.ts';
 
 @Module({})
 export class ApiModule implements NestModule {
@@ -47,7 +48,7 @@ export class ApiModule implements NestModule {
           }),
         }),
       ],
-      controllers: [AuthController, GeoController, StudiesController, SystemController],
+      controllers: [AuthController, GeoController, StudiesController, RisksController, SystemController],
       providers: [
         { provide: APP_GUARD, useClass: SessionGuard },
         { provide: APP_FILTER, useClass: ErrorFilter },

@@ -8,7 +8,9 @@ import { STUDIES_QUEUE } from '../shared/queues.ts';
 
 export const RESOLVE_ADDRESS_JOB = 'study:resolve-address';
 export const RENDER_THUMBNAIL_JOB = 'study:render-thumbnail';
-export type StudyJobName = typeof RESOLVE_ADDRESS_JOB | typeof RENDER_THUMBNAIL_JOB;
+/** Analyse des risques (F-04), à la demande. */
+export const ANALYZE_RISKS_JOB = 'study:analyze-risks';
+export type StudyJobName = typeof RESOLVE_ADDRESS_JOB | typeof RENDER_THUMBNAIL_JOB | typeof ANALYZE_RISKS_JOB;
 
 export interface StudyJob {
   studyId: string;

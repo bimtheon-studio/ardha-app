@@ -53,12 +53,15 @@ describe('parcelsKey', () => {
 });
 
 describe('studySteps', () => {
-  it('seules les parcelles sont faites en L2 ; les autres étapes attendent leur lot', () => {
+  it('parcelles faites ; les étapes non livrées attendent leur lot', () => {
     const steps = studySteps({ parcelCount: 2 });
     expect(steps.map((s) => s.key)).toEqual(['parcels', 'urbanism', 'risks', 'land', 'feasibility', 'report']);
     expect(steps[0]).toEqual({ key: 'parcels', label: 'Parcelles', state: 'done', lot: null });
     expect(steps.slice(1).every((s) => s.state === 'upcoming' && s.lot)).toBe(true);
     expect(studySteps({ parcelCount: 0 })[0]!.state).toBe('todo');
+    // Depuis L4, l'étape Risques est faite quand l'analyse est à jour.
+    expect(studySteps({ parcelCount: 1, risks: 'todo' })[2]).toEqual({ key: 'risks', label: 'Risques', state: 'todo', lot: null });
+    expect(studySteps({ parcelCount: 1, risks: 'done' })[2]!.state).toBe('done');
   });
 });
 

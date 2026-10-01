@@ -24,6 +24,7 @@ describe('documentOpenApi', () => {
       '/api/studies/{id}/duplicate',
       '/api/studies/{id}/parcels/{parcelId}',
       '/api/studies/{id}/restore',
+      '/api/studies/{id}/risks',
       '/api/studies/{id}/thumbnail',
       '/up',
     ]);

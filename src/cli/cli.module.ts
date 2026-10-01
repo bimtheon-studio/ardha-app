@@ -20,6 +20,7 @@ import { QueuesModule } from '../shared/queues.ts';
 import { RedisModule } from '../shared/redis.ts';
 import { GEO_COMMANDS } from './geo.commands.ts';
 import { STUDY_COMMANDS } from './study.commands.ts';
+import { RISK_COMMANDS } from './risk.commands.ts';
 import { FilesModule } from '../shared/files.ts';
 import { StudiesModule } from '../studies/studies.module.ts';
 
@@ -51,6 +52,7 @@ export class CliModule {
         ListUsersCommand,
         ...GEO_COMMANDS,
         ...STUDY_COMMANDS,
+        ...RISK_COMMANDS,
       ],
     };
   }
