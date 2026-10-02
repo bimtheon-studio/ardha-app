@@ -94,6 +94,46 @@ function Progress({ steps }: { steps: AnalysisStep[] }) {
   );
 }
 
+/**
+ * Calcul en cours, en compact : l'étape courante, la dernière trouvaille et une barre, sur une hauteur
+ * fixe (l'écran ne bouge pas d'une étape à l'autre, sur mobile surtout) ; le détail se déplie.
+ */
+function LiveProgress({ steps }: { steps: AnalysisStep[] }) {
+  const [open, setOpen] = useState(false);
+  const finished = steps.filter((s) => s.state !== 'pending' && s.state !== 'running').length;
+  const current = steps.find((s) => s.state === 'running') ?? steps.find((s) => s.state === 'pending');
+  const last = [...steps].reverse().find((s) => s.finishedAt && s.detail);
+  return (
+    <section className="space-y-2 border bg-card px-3 py-2 text-sm" aria-label="Calcul en cours">
+      {/* Une ligne, quelle que soit la largeur : l'étape en chiffres va à côté de la barre. */}
+      <div className="flex items-center justify-between gap-3 whitespace-nowrap">
+        <p className="eyebrow text-primary">Calcul en cours</p>
+        {steps.length > 0 && (
+          <button type="button" className="text-xs text-primary underline-offset-2 hover:underline" aria-expanded={open} onClick={() => setOpen(!open)}>
+            {open ? 'Masquer le détail' : `Voir les ${steps.length} étapes`}
+          </button>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="h-1.5 flex-1 overflow-hidden bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={finished} aria-label="Avancement du calcul">
+          <div className="h-full bg-primary transition-all duration-500" style={{ width: `${steps.length ? (finished / steps.length) * 100 : 0}%` }} />
+        </div>
+        <span className="text-xs whitespace-nowrap text-muted-foreground tabular-nums" data-testid="step-count">
+          {steps.length ? `${Math.min(finished + 1, steps.length)} / ${steps.length}` : '…'}
+        </span>
+      </div>
+      <p className="flex items-center gap-2 truncate">
+        <LoaderCircle className="size-4 shrink-0 animate-spin text-primary" aria-hidden />
+        <span className="truncate">{steps.length === 0 ? 'Préparation du calcul…' : (current?.label ?? 'Enregistrement de l’analyse')}</span>
+      </p>
+      <p className="truncate text-xs text-muted-foreground" data-testid="last-step">
+        {last ? `${last.label.split(' (')[0]} : ${last.detail}` : 'Premiers appels aux sources…'}
+      </p>
+      {open && <Progress steps={steps} />}
+    </section>
+  );
+}
+
 function Commune({ c }: { c: CommuneRisks }) {
   return (
     <div className="space-y-2 border p-3 text-sm">
@@ -348,8 +388,8 @@ export function RisksPage() {
   if (!study.data || !risks.data) return <Loading />;
   const s = study.data;
   const r = risks.data;
-  const result = r.result;
   const busy = r.status === 'queued' || r.status === 'running' || request.isPending;
+  const result = r.result;
   const riskLayers: RiskLayer[] = layers.data?.riskLayers ?? [];
   const basemap = layers.data && (layers.data.basemaps.find((b) => b.id === layers.data.defaultBasemap) ?? layers.data.basemaps[0]!);
 
@@ -392,11 +432,7 @@ export function RisksPage() {
           )}
         </div>
       )}
-      {busy && r.progress.length > 0 && (
-        <Section title="Calcul en cours">
-          <Progress steps={r.progress} />
-        </Section>
-      )}
+      {busy && <LiveProgress steps={r.progress} />}
       {(r.status === 'failed' || request.error) && (
         <p role="alert" className="text-sm text-destructive">
           {request.error?.message ?? r.error}
