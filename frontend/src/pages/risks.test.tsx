@@ -62,13 +62,14 @@ const study: Study = {
 };
 
 const result: NonNullable<StudyRisks['result']> = {
-  version: 2,
+  version: 3,
   center: [2.43, 48.8],
   radii: { nearbyM: 500, hydrantsM: 400 },
   communes: [
     {
       code: '94046',
       name: 'Maisons-Alfort',
+      asOf: '2026-09-25T08:00:00.000Z',
       radon: ok(1),
       seismic: ok(1),
       hazards: ok([{ code: '11', label: 'Inondation' }]),
@@ -94,7 +95,7 @@ const result: NonNullable<StudyRisks['result']> = {
       ]),
       catnat: ok({ count: 9, truncated: false, latest: [{ id: 'X', label: 'Inondations et/ou Coulées de Boue', start: '15/01/2018', published: null }] }),
     },
-    { code: '94080', name: null, radon: off, seismic: off, hazards: ok([]), plans: ok([]), catnat: ok({ count: 0, truncated: false, latest: [] }) },
+    { code: '94080', name: null, asOf: null, radon: off, seismic: off, hazards: ok([]), plans: ok([]), catnat: ok({ count: 0, truncated: false, latest: [] }) },
   ],
   parcels: [
     {
@@ -116,8 +117,8 @@ const result: NonNullable<StudyRisks['result']> = {
     { id: '94046000AY0097', label: 'AY 97', point: [2.43, 48.8], clay: off, flood: ok({ hazard: null, scenarios: [], reference: null }), elevation: ok(null), floodLevel: null },
   ],
   cavities: ok({ truncated: false, items: [{ id: 'C1', name: 'Carrière', type: 'naturelle', point: [2.43, 48.8], distanceM: 1500 }] }),
-  installations: ok({ count: 37, truncated: false, items: [{ id: '1', name: 'BIO SPRINGER', regime: 'Autorisation', seveso: 'Seveso seuil bas', point: [2.43, 48.8], distanceM: 392 }] }),
-  pollutedSites: ok({ count: 16, truncated: false, items: [{ id: 'S', kind: 'CASIAS', name: 'Ancien garage', url: 'https://fiche', distanceM: 330 }, { id: 'S2', kind: 'SIS', name: null, url: null, distanceM: 900 }] }),
+  installations: ok({ truncated: false, items: [{ id: '1', name: 'BIO SPRINGER', regime: 'Autorisation', seveso: 'Seveso seuil bas', point: [2.43, 48.8], distanceM: 392 }] }),
+  pollutedSites: ok({ truncated: false, items: [{ id: 'S', kind: 'CASIAS', name: 'Ancien garage', url: 'https://fiche', distanceM: 330 }, { id: 'S2', kind: 'SIS', name: null, url: null, distanceM: 900 }] }),
   hydrants: ok({ asOf: '2026-09-20T00:00:00.000Z', items: [{ id: 'node/1', point: [2.43, 48.8], type: 'pillar', flowRate: null, diameter: null, ref: null, distanceM: 111 }] }),
 };
 
@@ -216,7 +217,8 @@ describe('page des risques', () => {
 
     const nearby = screen.getByRole('region', { name: 'Alentours' });
     expect(nearby).toHaveTextContent('1, la plus proche à 1,5 km');
-    expect(nearby).toHaveTextContent('1 sur 37 dans la commune');
+    expect(nearby).toHaveTextContent('1, la plus proche à 392 m');
+    expect(communes).toHaveTextContent('Données Géorisques du 25 septembre 2026');
     expect(nearby).toHaveTextContent('Seveso seuil bas');
     expect(within(nearby).getByRole('link', { name: 'fiche' })).toHaveAttribute('href', 'https://fiche');
     expect(nearby).toHaveTextContent('1, la plus proche à 111 m');
@@ -308,7 +310,7 @@ describe('page des risques', () => {
       communes: [{ ...result.communes[0]!, catnat: ok({ count: 1, truncated: false, latest: [{ id: 'Y', label: 'Tempête', start: null, published: null }] }) }],
       parcels: [{ ...result.parcels[0]!, clay: ok(null), floodLevel: { level: 33.31, atLeast: false } }],
       cavities: ok({ truncated: false, items: [] }),
-      pollutedSites: ok({ count: 2, truncated: false, items: [] }),
+      pollutedSites: ok({ truncated: false, items: [] }),
       hydrants: ok({ asOf: '2026-09-20T00:00:00.000Z', items: [] }),
     };
     api({ [`GET /api/studies/${ID}/risks`]: { status: 200, body: { ...ready, result: calm, surcharges: [] } } });
@@ -317,7 +319,7 @@ describe('page des risques', () => {
     expect(screen.getByRole('region', { name: 'Par parcelle' })).toHaveTextContent('cote de crue indicative : 33,31 m NGF');
     const nearby = screen.getByRole('region', { name: 'Alentours' });
     expect(nearby).toHaveTextContent('Aucune.');
-    expect(nearby).toHaveTextContent('Aucun (2 dans la commune).');
+    expect(nearby).toHaveTextContent('Aucun.');
     expect(nearby).toHaveTextContent('Aucune connue.');
     expect(screen.getByRole('region', { name: 'Surcoûts indicatifs' })).toHaveTextContent('Aucun surcoût de construction lié aux risques connus.');
     expect(screen.getByRole('checkbox', { name: 'Zonage des PPR inondation' })).not.toBeChecked();

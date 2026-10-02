@@ -39,17 +39,32 @@ describe('Géorisques, réponses enregistrées', () => {
     expect(plans.every((p) => p.kind === 'PPRN')).toBe(true);
   });
 
-  it('Maisons-Alfort : CatNat, installations classées, sols pollués (pages lues en entier)', async () => {
+  it('Maisons-Alfort : CatNat (pages lues en entier)', async () => {
     const catnat = await g.catnat('94046');
     expect(catnat.items).toHaveLength(9);
     expect(catnat.truncated).toBe(false);
     expect(catnat.items[0]).toMatchObject({ libelle_risque_jo: 'Inondations et/ou Coulées de Boue', date_debut_evt: '23/07/1988' });
-    const icpe = await g.installations('94046');
-    expect(icpe.items).toHaveLength(37);
-    expect(icpe.items[0]).toMatchObject({ raisonSociale: 'SEMGEMA', regime: 'Autres régimes', longitude: 2.441967 });
-    const sites = await g.pollutedSites('94046');
-    expect(sites.items.filter((s) => s.kind === 'SIS')).toHaveLength(1);
-    expect(sites.items.find((s) => s.kind === 'SIS')).toMatchObject({ name: 'SAD', geometry: { type: 'MultiPolygon' } });
+  });
+
+  it('installations classées et sols pollués autour d’un point, par rayon (pas par commune)', async () => {
+    const http = new FakeHttp({
+      [`${GEORISQUES_BASE}/installations_classees`]: { json: { data: [{ raisonSociale: 'SEMGEMA', regime: 'Autres régimes', longitude: 2.441967, latitude: 48.802647 }] } },
+      [`${GEORISQUES_BASE}/ssp/conclusions_sis`]: { json: { data: [{ identifiant_ssp: 'S1', nom: 'SAD', geom: { type: 'MultiPolygon', coordinates: [] } }] } },
+      [`${GEORISQUES_BASE}/ssp/casias`]: { json: { data: [{ identifiant_ssp: 'C1', nom_etablissement: 'Garage' }, { identifiant_ssp: 'C2', nom_etablissement: 'Fonderie', geom: { type: 'Point', coordinates: [6.13, 45.91] } }] } },
+    });
+    const near = new Georisques(http);
+    expect((await near.installations(2.43, 48.8, 550)).items).toEqual([expect.objectContaining({ raisonSociale: 'SEMGEMA', regime: 'Autres régimes' })]);
+    expect((await near.pollutedSites(2.43, 48.8, 550)).items).toEqual([
+      { id: 'S1', kind: 'SIS', name: 'SAD', url: null, geometry: { type: 'MultiPolygon', coordinates: [] } },
+      { id: 'C1', kind: 'CASIAS', name: 'Garage', url: null, geometry: null },
+      // CASIAS en point (Annecy) : gardé, il comptait pour rien avant.
+      { id: 'C2', kind: 'CASIAS', name: 'Fonderie', url: null, geometry: { type: 'Point', coordinates: [6.13, 45.91] } },
+    ]);
+    for (const url of http.calls) {
+      expect(new URL(url).searchParams.get('latlon')).toBe('2.430000,48.800000');
+      expect(new URL(url).searchParams.get('rayon')).toBe('550');
+      expect(url).not.toContain('code_insee');
+    }
   });
 
   it('Annecy : sismicité 4, radon 2', async () => {

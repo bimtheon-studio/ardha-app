@@ -12,10 +12,11 @@ import { StudyDerivations } from './study-derivations.ts';
 import { RiskAnalyses } from './risk-analyses.ts';
 import { RiskAnalyzer } from './risk-analyzer.ts';
 import { HydrantCache } from './hydrant-cache.ts';
+import { CommuneRiskCache } from './commune-risk-cache.ts';
 
 @Module({
   imports: [SourcesModule, GeoModule, StudiesModule],
-  providers: [CadastreLoader, LookupHandlers, ReferenceSeed, StudyDerivations, RiskAnalyzer, RiskAnalyses, HydrantCache],
-  exports: [CadastreLoader, LookupHandlers, ReferenceSeed, StudyDerivations, RiskAnalyzer, RiskAnalyses, HydrantCache, SourcesModule],
+  providers: [CadastreLoader, LookupHandlers, ReferenceSeed, StudyDerivations, RiskAnalyzer, RiskAnalyses, HydrantCache, CommuneRiskCache],
+  exports: [CadastreLoader, LookupHandlers, ReferenceSeed, StudyDerivations, RiskAnalyzer, RiskAnalyses, HydrantCache, CommuneRiskCache, SourcesModule],
 })
 export class IngestionModule {}

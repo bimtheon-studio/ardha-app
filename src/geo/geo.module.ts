@@ -9,11 +9,12 @@ import { CadastreService } from './cadastre.service.ts';
 import { CommunesRepository } from './communes.repository.ts';
 import { ElevationService } from './elevation.service.ts';
 import { HydrantsRepository } from './hydrants.repository.ts';
+import { CommuneRisksRepository } from './commune-risks.repository.ts';
 import { Lookups } from './lookups.ts';
 import { ParcelsRepository } from './parcels.repository.ts';
 import { SourceStatesRepository } from './source-states.repository.ts';
 
-const providers = [CadastreService, ElevationService, HydrantsRepository, CommunesRepository, ParcelsRepository, SourceStatesRepository, Lookups, Clock];
+const providers = [CadastreService, ElevationService, HydrantsRepository, CommuneRisksRepository, CommunesRepository, ParcelsRepository, SourceStatesRepository, Lookups, Clock];
 
 const queues = BullModule.registerQueue({ name: CADASTRE_QUEUE }, { name: LOOKUPS_QUEUE });
 

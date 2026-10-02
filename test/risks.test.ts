@@ -75,16 +75,18 @@ describe('analyse des risques', () => {
       [`parcel-${AY96}`, 'done'],
       [`parcel-${AY97}`, 'done'],
       ['cavities', 'done'],
+      ['surroundings', 'done'],
       ['hydrants', 'done'],
     ]);
     expect(r.progress[0]).toMatchObject({
       label: 'Risques de la commune : Maisons-Alfort (Géorisques)',
-      detail: 'radon 1 · sismicité 1 · 3 PPR · 9 arrêtés CatNat · 37 installations classées · 16 sites pollués',
+      detail: 'radon 1 · sismicité 1 · 3 PPR · 9 arrêtés CatNat',
     });
     expect(r.progress[2]!.detail).toBe('argiles moyen · inondable, aléa moyen');
     expect(r.progress[4]!.detail).toBe('aucune cavité recensée à 500 m');
     // Bornes de toute la zone interrogée (cases de la grille), avant le filtre des 400 m.
-    expect(r.progress[5]!.detail).toMatch(/^\d+ bornes dans la zone ; \d+ cases? (en cache|interrogées?)/);
+    expect(r.progress[5]!.detail).toBe('3 installations classées dans le rayon · 29 sites pollués dans le rayon');
+    expect(r.progress[6]!.detail).toMatch(/^\d+ bornes dans la zone ; \d+ cases? (en cache|interrogées?)/);
     expect(r.progress.every((s) => s.startedAt && s.finishedAt && s.finishedAt >= s.startedAt)).toBe(true);
     expect(r.axes!.map((a) => [a.key, a.severity, a.state])).toEqual([
       ['flood', 'medium', 'Aléa moyen'],
@@ -106,7 +108,7 @@ describe('analyse des risques', () => {
     expect(ay96!.flood).toMatchObject({ status: 'ok', data: { hazard: 'moyen', reference: { height: 2, atLeast: true } } });
     expect(ay96!.elevation).toMatchObject({ status: 'ok', data: { min: 32.14, max: 32.55, points: 11 } });
     expect(ay96!.floodLevel).toEqual({ level: 34.31, atLeast: true });
-    expect(res.installations).toMatchObject({ status: 'ok', data: { count: 37 } });
+    expect(res.installations.status === 'ok' && res.installations.data.items).toHaveLength(3);
     expect(res.installations.status === 'ok' && res.installations.data.items.every((i) => i.distanceM <= 500)).toBe(true);
     expect(res.hydrants.status === 'ok' && res.hydrants.data.items[0]!.distanceM).toBe(111);
     expect(res.cavities).toEqual({ status: 'ok', data: { truncated: false, items: [] } });

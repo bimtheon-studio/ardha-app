@@ -7,11 +7,11 @@ const ok = <T>(data: T) => ({ status: 'ok' as const, data });
 const off = { status: 'unavailable' as const, error: 'HTTP 503' };
 
 function result(over: { communes?: Partial<RisksResult['communes'][number]>[]; parcels?: Partial<RisksResult['parcels'][number]>[] }): RisksResult {
-  const commune = { code: '94046', name: 'M', radon: ok(1), seismic: ok(1), hazards: ok([]), plans: ok([]), catnat: ok({ count: 0, truncated: false, latest: [] }) };
+  const commune = { code: '94046', name: 'M', asOf: null, radon: ok(1), seismic: ok(1), hazards: ok([]), plans: ok([]), catnat: ok({ count: 0, truncated: false, latest: [] }) };
   const parcel = { id: 'p', label: 'AB 1', point: [0, 0] as [number, number], clay: ok(null), flood: ok({ hazard: null, scenarios: [], reference: null }), elevation: ok(null), floodLevel: null };
-  const empty = ok({ count: 0, truncated: false, items: [] });
+  const empty = ok({ truncated: false, items: [] });
   return {
-    version: 2,
+    version: 3,
     center: [0, 0],
     radii: { nearbyM: 500, hydrantsM: 400 },
     communes: (over.communes ?? [{}]).map((c) => ({ ...commune, ...c })) as RisksResult['communes'],

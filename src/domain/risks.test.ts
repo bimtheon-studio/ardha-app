@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { rect } from './geometry.test.ts';
 import {
   type AxesInput,
-  cavityProbes,
   cellKey,
   clayLevel,
   elevationSamples,
@@ -17,6 +16,7 @@ import {
   referenceFloodHeight,
   riskAxes,
   riskSurcharges,
+  searchProbes,
   worstLevel,
 } from './risks.ts';
 
@@ -169,10 +169,14 @@ describe('hydrantCells, cavityProbes', () => {
     expect(hydrantCells([tours, rect(0.6843, 47.4021, 0.6845, 47.4022)])).toHaveLength(hydrantCells([tours]).length);
   });
 
-  it('un point de recherche des cavités par case occupée', () => {
+  it('un point de recherche par case occupée, au rayon élargi de l’étendue des parcelles', () => {
     const a = rect(2.4297, 48.7999, 2.43, 48.8001);
-    const b = rect(2.4301, 48.7999, 2.4303, 48.8001);
-    expect(cavityProbes([a, a, b])).toHaveLength(2);
-    expect(cavityProbes(Array.from({ length: 30 }, (_, i) => rect(2 + i * 0.02, 48, 2.001 + i * 0.02, 48.001)))).toHaveLength(20);
+    const b = rect(2.4294, 48.7999, 2.4296, 48.8001);
+    const probes = searchProbes([a, a, b]);
+    expect(probes).toHaveLength(1);
+    // 500 m, plus la distance du point au coin le plus éloigné (≈ 30 m), arrondi à 50 m.
+    expect(probes[0]!.radiusM).toBe(550);
+    expect(searchProbes([a, rect(2.4401, 48.8101, 2.4402, 48.8102)])).toHaveLength(2);
+    expect(searchProbes(Array.from({ length: 30 }, (_, i) => rect(2 + i * 0.02, 48, 2.001 + i * 0.02, 48.001)))).toHaveLength(20);
   });
 });

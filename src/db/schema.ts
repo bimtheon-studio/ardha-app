@@ -158,6 +158,23 @@ export const hydrant = pgTable(
   (t) => [index().on(t.cell), index('hydrants_point_index').using('gist', t.point)],
 );
 
+/**
+ * Données de référence : ce que Géorisques dit d'une commune (radon, sismicité, risques GASPAR, PPR,
+ * CatNat), une ligne par donnée, gardée 30 jours : la deuxième étude d'une commune ne rappelle pas
+ * la source, et une donnée connue sert quand elle se tait. Le résultat suit le contrat de l'analyse.
+ */
+export const communeRisk = pgTable(
+  'commune_risks',
+  {
+    communeCode: text().notNull(),
+    /** `radon`, `seismic`, `hazards`, `plans-v1`, `plans-v2`, `catnat`. */
+    part: text().notNull(),
+    data: jsonb().$type<unknown>().notNull(),
+    fetchedAt: timestampTz().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.communeCode, t.part] })],
+);
+
 export const sourceStatus = pgEnum('source_status', ['queued', 'loading', 'ready', 'failed']);
 
 /**
