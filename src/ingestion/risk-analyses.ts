@@ -2,7 +2,7 @@
 // la calcule sur les parcelles de l'étude, l'enregistre si elle vaut toujours pour les mêmes parcelles.
 import { Injectable } from '@nestjs/common';
 
-import { type AnalysisStep, RisksResult } from '../contracts/index.ts';
+import { type AnalysisStep, type RisksPartial, RisksResult } from '../contracts/index.ts';
 import { Clock } from '../shared/clock.ts';
 import { AnalysesRepository } from '../studies/analyses.repository.ts';
 import type { StudyJob } from '../studies/studies.jobs.ts';
@@ -29,9 +29,9 @@ export class RiskAnalyses {
     if (!study || study.parcelsKey !== job.parcelsKey) return 'stale';
     if (!(await this.analyses.markRunning(job.studyId, 'risks', job.parcelsKey, this.clock.now()))) return 'stale';
     try {
-      const persist = async (steps: AnalysisStep[]) => {
+      const persist = async (steps: AnalysisStep[], partial: RisksPartial) => {
         onProgress?.(steps);
-        await this.analyses.saveProgress(job.studyId, 'risks', job.parcelsKey, steps);
+        await this.analyses.saveProgress(job.studyId, 'risks', job.parcelsKey, steps, partial);
       };
       const result = RisksResult.parse(await this.analyzer.analyze(await this.studies.parcels(job.studyId), persist));
       return (await this.analyses.markReady(job.studyId, 'risks', job.parcelsKey, result, this.clock.now())) ? 'done' : 'stale';

@@ -169,6 +169,13 @@ rayon (0,1 à 0,4 s), étape à part. Au passage : les sites CASIAS en point (An
 Bornes incendie : gardées en base par case de 0,01° pendant 30 jours (DT-37) ; Overpass n'est plus
 appelé qu'une fois par case, et une case connue sert quand il sature (504, 429).
 
+Au fil de l'eau (02/10/2026, demande du porteur du produit : « le chargement des bornes est trop
+lent ») : les sources sont interrogées en même temps et chaque partie s'affiche dès qu'elle arrive ; la
+synthèse dès que communes et parcelles sont connues ; les bornes, souvent les dernières, disent
+« recherche en cours » sans retenir le reste (DT-39). Les cases de bornes à charger partent en une seule
+requête Overpass. Mesuré en direct : Maisons-Alfort AY96 + AY97 en 2,3 s (4 cases, 1,5 s) ; Annecy et
+Tours, synthèse à l'écran en 1,7 s, bornes à 3,7 s et 13,8 s.
+
 Constats : le TRI code la classe « plus de 2 m » par `ht_max = 10` (traité en classe ouverte, cote
 « au moins ») ; Overpass sature parfois (504) : l'axe le dit ; les tuiles WMS du BRGM sont lentes.
 
