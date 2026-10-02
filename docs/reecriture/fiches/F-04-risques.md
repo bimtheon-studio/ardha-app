@@ -154,6 +154,9 @@ Reprises du 02/10/2026 : alentours à 500 m (Tours : 51 cavités au lieu de 98) 
 PPRi Ruissellement urbain et PPRMT « Anciennes Carrières » **prescrits** (2001), Annecy : PPR multirisques
 approuvés le 29/01/2009 ; en v2 aussi, `code_insee` et `codeInsee` sont ignorés : il faut `codesInsee`.
 
+Bornes incendie : gardées en base par case de 0,01° pendant 30 jours (DT-37) ; Overpass n'est plus
+appelé qu'une fois par case, et une case connue sert quand il sature (504, 429).
+
 Constats : le TRI code la classe « plus de 2 m » par `ht_max = 10` (traité en classe ouverte, cote
 « au moins ») ; Overpass sature parfois (504) : l'axe le dit ; les tuiles WMS du BRGM sont lentes.
 

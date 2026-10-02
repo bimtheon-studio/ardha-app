@@ -137,6 +137,27 @@ export const parcel = pgTable(
   (t) => [index().on(t.communeCode), index('parcels_geometry_index').using('gist', t.geometry)],
 );
 
+/**
+ * Données de référence : bornes incendie d'OpenStreetMap (F-04, Q7), gardées par case de la grille
+ * (0,01°) pour 30 jours, l'état de chaque case dans `source_states` (source `osm-hydrants`) : deux
+ * études voisines ne refont pas l'appel à Overpass, et une case déjà connue sert quand il sature.
+ */
+export const hydrant = pgTable(
+  'hydrants',
+  {
+    /** `node/<id>` d'OpenStreetMap. */
+    id: text().primaryKey(),
+    /** Case de la grille (`2.42,48.79`) qui a apporté la borne. */
+    cell: text().notNull(),
+    point: point().notNull(),
+    type: text(),
+    flowRate: text(),
+    diameter: text(),
+    ref: text(),
+  },
+  (t) => [index().on(t.cell), index('hydrants_point_index').using('gist', t.point)],
+);
+
 export const sourceStatus = pgEnum('source_status', ['queued', 'loading', 'ready', 'failed']);
 
 /**

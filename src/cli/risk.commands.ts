@@ -70,7 +70,8 @@ export class RiskAnalyzeCommand extends InlineCommand {
   }
 
   async run([id]: string[], options: InlineOption & { force?: boolean }): Promise<void> {
-    let r = await this.risks.request(CLI, id!, options.force ?? options.inline ?? false);
+    // --inline : sans job pour le worker (qui calculerait en même temps, sur d'autres sources).
+    let r = await this.risks.request(CLI, id!, options.force ?? options.inline ?? false, { worker: !options.inline });
     if (options.inline) {
       await this.runner.run({ studyId: id!, parcelsKey: (await this.studies.get(id!))!.parcelsKey });
       r = await this.risks.get(CLI, id!);

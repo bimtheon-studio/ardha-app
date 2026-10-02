@@ -77,11 +77,14 @@ export class RisksService {
     };
   }
 
-  /** Demande l'analyse pour les parcelles actuelles ; sans effet si elle est à jour ou en cours, sauf `force`. */
-  async request(actor: Actor, id: string, force = false): Promise<StudyRisks> {
+  /**
+   * Demande l'analyse pour les parcelles actuelles ; sans effet si elle est à jour ou en cours, sauf
+   * `force`. `worker: false` (CLI `--inline`) : la demande est notée, l'appelant calcule lui-même.
+   */
+  async request(actor: Actor, id: string, force = false, options: { worker?: boolean } = {}): Promise<StudyRisks> {
     const study = await this.studies.require(actor, id, { editable: true });
     const { queued } = await this.analyses.request(id, 'risks', study.parcelsKey, this.clock.now(), force);
-    if (queued) await this.jobs.enqueue({ studyId: id, parcelsKey: study.parcelsKey, ...(force && { force }) }, [ANALYZE_RISKS_JOB]);
+    if (queued && options.worker !== false) await this.jobs.enqueue({ studyId: id, parcelsKey: study.parcelsKey, ...(force && { force }) }, [ANALYZE_RISKS_JOB]);
     return this.get(actor, id);
   }
 }

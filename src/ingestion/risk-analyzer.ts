@@ -29,7 +29,7 @@ import { CommunesRepository } from '../geo/communes.repository.ts';
 import { Elevation } from '../sources/elevation.ts';
 import { FloodHeights } from '../sources/flood-heights.ts';
 import { Georisques } from '../sources/georisques.ts';
-import { Hydrants } from '../sources/hydrants.ts';
+import { HydrantCache } from './hydrant-cache.ts';
 import type { StudyParcelRecord } from '../studies/studies.repository.ts';
 
 type Known<T> = { status: 'ok'; data: T } | { status: 'unavailable'; error: string };
@@ -48,7 +48,7 @@ export class RiskAnalyzer {
     private readonly georisques: Georisques,
     private readonly floodHeights: FloodHeights,
     private readonly elevation: Elevation,
-    private readonly hydrants: Hydrants,
+    private readonly hydrants: HydrantCache,
     private readonly communes: CommunesRepository,
   ) {}
 
@@ -209,7 +209,8 @@ export class RiskAnalyzer {
           ? {
               status: 'ok',
               data: {
-                items: hydrants.data
+                asOf: hydrants.data.asOf.toISOString(),
+                items: hydrants.data.items
                   .map((h) => ({ id: h.id, point: lonLat([h.lon, h.lat]), type: h.type, flowRate: h.flowRate, diameter: h.diameter, ref: h.ref, distanceM: Math.round(distanceToStudy([h.lon, h.lat])) }))
                   .filter((h) => h.distanceM <= HYDRANT_RADIUS_M)
                   .sort((a, b) => a.distanceM - b.distanceM),

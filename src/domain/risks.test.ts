@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { rect } from './geometry.test.ts';
 import {
   type AxesInput,
+  cellKey,
   clayLevel,
   elevationSamples,
   elevationStats,
@@ -145,5 +146,12 @@ describe('elevationSamples', () => {
     const many = elevationSamples(Array.from({ length: 50 }, () => big));
     expect(many.every((s) => s.length === 6)).toBe(true);
     expect(elevationSamples(Array.from({ length: 200 }, () => big))[0]).toHaveLength(2);
+  });
+});
+
+describe('cellKey', () => {
+  it('coin sud-ouest de la case, au centième', () => {
+    expect(cellKey([2.42, 48.79, 2.43, 48.8])).toBe('2.42,48.79');
+    expect(cellKey([-0.01, 43, 0, 43.01])).toBe('-0.01,43.00');
   });
 });

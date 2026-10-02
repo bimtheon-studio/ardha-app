@@ -19,7 +19,7 @@ function result(over: { communes?: Partial<RisksResult['communes'][number]>[]; p
     cavities: ok({ truncated: false, items: [] }),
     installations: empty,
     pollutedSites: empty,
-    hydrants: ok({ items: [] }),
+    hydrants: ok({ asOf: '2026-10-02T00:00:00.000Z', items: [] }),
   };
 }
 

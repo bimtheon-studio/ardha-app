@@ -1,0 +1,157 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62.11 87bfad18",
+  "osm3s": {
+    "timestamp_osm_base": "2026-10-02T05:47:06Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+
+{
+  "type": "node",
+  "id": 5014932661,
+  "lat": 45.9185325,
+  "lon": 6.1344588,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "623"
+  }
+},
+{
+  "type": "node",
+  "id": 5014932662,
+  "lat": 45.9186449,
+  "lon": 6.1350086,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "624"
+  }
+},
+{
+  "type": "node",
+  "id": 8740621725,
+  "lat": 45.9145047,
+  "lon": 6.1375654,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "green",
+    "fire_hydrant:type": "pillar",
+    "ref": "580",
+    "water_source": "main"
+  }
+},
+{
+  "type": "node",
+  "id": 9469397275,
+  "lat": 45.9102013,
+  "lon": 6.1377055,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "573"
+  }
+},
+{
+  "type": "node",
+  "id": 11919272909,
+  "lat": 45.9143778,
+  "lon": 6.1344923,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "585"
+  }
+},
+{
+  "type": "node",
+  "id": 11983082063,
+  "lat": 45.9133475,
+  "lon": 6.1351043,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "583"
+  }
+},
+{
+  "type": "node",
+  "id": 11983108346,
+  "lat": 45.9103089,
+  "lon": 6.1312431,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "599"
+  }
+},
+{
+  "type": "node",
+  "id": 12804169664,
+  "lat": 45.9154671,
+  "lon": 6.1334709,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "green",
+    "fire_hydrant:type": "pillar",
+    "ref": "587"
+  }
+},
+{
+  "type": "node",
+  "id": 13108402832,
+  "lat": 45.9154360,
+  "lon": 6.1323400,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "green",
+    "fire_hydrant:type": "pillar",
+    "ref": "605"
+  }
+},
+{
+  "type": "node",
+  "id": 13108434043,
+  "lat": 45.9164072,
+  "lon": 6.1314330,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "606"
+  }
+},
+{
+  "type": "node",
+  "id": 13108460312,
+  "lat": 45.9148115,
+  "lon": 6.1322906,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "604"
+  }
+},
+{
+  "type": "node",
+  "id": 13371145228,
+  "lat": 45.9164926,
+  "lon": 6.1334303,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "lane",
+    "fire_hydrant:type": "pillar",
+    "ref": "590"
+  }
+}
+
+  ]
+}

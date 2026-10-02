@@ -11,6 +11,7 @@ import { FLOOD_WMS, FloodHeights } from '../sources/flood-heights.ts';
 import { Georisques, GEORISQUES_BASE } from '../sources/georisques.ts';
 import { Hydrants, OVERPASS_URL } from '../sources/hydrants.ts';
 import type { StudyParcelRecord } from '../studies/studies.repository.ts';
+import type { HydrantCache } from './hydrant-cache.ts';
 import { frenchDateKey, RiskAnalyzer } from './risk-analyzer.ts';
 
 const parcel = (n: number, communeCode = '94046'): StudyParcelRecord => ({
@@ -28,7 +29,9 @@ const parcel = (n: number, communeCode = '94046'): StudyParcelRecord => ({
 
 function analyzer(http: FakeHttp, names: Record<string, string> = { '94046': 'Maisons-Alfort' }) {
   const communes = { byCode: async (code: string) => (names[code] ? { name: names[code] } : undefined) } as unknown as CommunesRepository;
-  return new RiskAnalyzer(new Georisques(http), new FloodHeights(http), new Elevation(http), new Hydrants(http), communes);
+  // Le cache des bornes est éprouvé à part (test/risks.test.ts) : ici, Overpass directement.
+  const hydrants = { inBbox: async (b: readonly [number, number, number, number]) => ({ items: await new Hydrants(http).inBbox(b), asOf: new Date('2026-10-02T00:00:00Z') }) } as unknown as HydrantCache;
+  return new RiskAnalyzer(new Georisques(http), new FloodHeights(http), new Elevation(http), hydrants, communes);
 }
 
 describe('RiskAnalyzer', () => {

@@ -263,6 +263,7 @@ function Nearby({ result }: { result: Result }) {
       </li>
       <li className="px-3 py-2">
         <p className="font-medium">Bornes incendie à moins de {meters(result.radii.hydrantsM)} (OpenStreetMap, indicatif)</p>
+        {result.hydrants.status === 'ok' && <p className="text-xs text-muted-foreground">Données OSM du {formatDate(result.hydrants.data.asOf)}</p>}
         <Value of={result.hydrants}>
           {(h) => (h.items.length === 0 ? <p className="text-muted-foreground">Aucune connue.</p> : <p>{h.items.length}, la plus proche à {meters(h.items[0]!.distanceM)}</p>)}
         </Value>
