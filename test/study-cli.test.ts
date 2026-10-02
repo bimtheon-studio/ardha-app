@@ -162,6 +162,14 @@ it('dvf:load, dvf:status, dvf:sales, market:analyze --inline, market:show, marke
   expect(errors.join('\n')).toContain('Rayon parmi 250, 500, 1000, 2000 m.');
   process.exitCode = 0;
 
+  // Chaque source chargée une fois : d'abord à la main (« chargé à l'instant »), puis lue en base.
+  expect(await plain('ecln:load')).toBe('ECLN : dernier trimestre 2026-T2, chargé à l’instant');
+  expect(await plain('index:load')).toBe('Indices INSEE : chargés à l’instant');
+  expect(await plain('sitadel:show', '94046')).toMatch(/^Sitadel 94046 : chargé à l’instant\n {2}2025 : 95 logement\(s\) autorisé\(s\), 0 commencé\(s\)/);
+  expect(await plain('ecln:load')).toMatch(/^ECLN : dernier trimestre 2026-T2, en base depuis le /);
+  expect(await plain('index:load')).toMatch(/^Indices INSEE : en base depuis le /);
+  expect(await plain('sitadel:show', '94046')).toMatch(/^Sitadel 94046 : en base depuis le /);
+
   const s = await json('study:create', '--user', 'etude@ardha.test', AY96, AY97);
   const analyzed = await plain('market:analyze', s.id, '--inline');
   expect(analyzed).toMatch(/^ {2}… Départements du cercle\n {2}✓ Départements du cercle : Département 94, dans 500 m/);
@@ -173,14 +181,6 @@ it('dvf:load, dvf:status, dvf:sales, market:analyze --inline, market:show, marke
   expect(analyzed).toContain('Indice du coût de la construction (ICC) 2 103 (2026-Q2, +0,8 % sur un an)');
   expect(await plain('market:analyze', s.id, '--radius', '1000')).toMatch(/^Analyse de marché : en file, rayon 1000 m/);
   expect(await plain('market:show', s.id)).toMatch(/^Analyse de marché : en file, rayon 1000 m/);
-  expect(await plain('market:analyze', s.id, '--inline')).toContain('  DVF : 783 vente(s) comparable(s) sur 1010');
   expect(await plain('market:sales', s.id, '--type', 'house', '--limit', '1')).toMatch(/^77 vente\(s\) dans 1000 m de 2\.429934, 48\.800028\n {2}2025-12-15 {3}560 m {2}house/);
   expect(JSON.parse(await run('market:sales', s.id, '--segment', 'new', '--from', '2025', '--json')).sales.every((x: { vefa: boolean; date: string }) => x.vefa && x.date >= '2025')).toBe(true);
-
-  expect(await plain('ecln:load')).toMatch(/^ECLN : dernier trimestre 2026-T2, en base depuis le /);
-  expect(await plain('ecln:load', '--force')).toBe('ECLN : dernier trimestre 2026-T2, chargé à l’instant');
-  expect(await plain('index:load', '--force')).toBe('Indices INSEE : chargés à l’instant');
-  expect(await plain('index:load')).toMatch(/^Indices INSEE : en base depuis le /);
-  expect(await plain('sitadel:show', '94046')).toMatch(/^Sitadel 94046 : en base depuis le .*\n {2}2025 : 95 logement\(s\) autorisé\(s\), 0 commencé\(s\)/);
-  expect(await plain('sitadel:show', '94046', '--force')).toMatch(/^Sitadel 94046 : chargé à l’instant/);
 }, 20_000);

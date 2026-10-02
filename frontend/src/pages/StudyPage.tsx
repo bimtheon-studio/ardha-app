@@ -18,7 +18,7 @@ import { useDuplicateStudy, useRestoreStudy, useStudy, useTrashStudy, useUpdateS
 const StudyMap = lazy(() => import('@/map/leaflet/StudyMap'));
 
 /** Écran de chaque étape livrée, sous `/studies/:id/`. */
-const STEP_LINKS: Partial<Record<Study['steps'][number]['key'], string>> = { parcels: 'map', risks: 'risks' };
+const STEP_LINKS: Partial<Record<Study['steps'][number]['key'], string>> = { parcels: 'map', risks: 'risks', land: 'market' };
 
 function Rename({ study, onDone }: { study: Study; onDone: () => void }) {
   const update = useUpdateStudy(study.id);
