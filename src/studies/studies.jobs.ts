@@ -10,7 +10,12 @@ export const RESOLVE_ADDRESS_JOB = 'study:resolve-address';
 export const RENDER_THUMBNAIL_JOB = 'study:render-thumbnail';
 /** Analyse des risques (F-04), à la demande. */
 export const ANALYZE_RISKS_JOB = 'study:analyze-risks';
-export type StudyJobName = typeof RESOLVE_ADDRESS_JOB | typeof RENDER_THUMBNAIL_JOB | typeof ANALYZE_RISKS_JOB;
+/** Analyse de marché (F-05), à la demande ; `parcelsKey` est alors l'empreinte du marché (parcelles et rayon). */
+export const ANALYZE_MARKET_JOB = 'study:analyze-market';
+export type StudyJobName = typeof RESOLVE_ADDRESS_JOB | typeof RENDER_THUMBNAIL_JOB | typeof ANALYZE_RISKS_JOB | typeof ANALYZE_MARKET_JOB;
+
+/** Job d'une analyse, par type. */
+export const ANALYSIS_JOBS = { risks: ANALYZE_RISKS_JOB, market: ANALYZE_MARKET_JOB } as const;
 
 export interface StudyJob {
   studyId: string;
@@ -20,7 +25,7 @@ export interface StudyJob {
 }
 
 export function studyJobId(name: StudyJobName, job: StudyJob, now = Date.now()): string {
-  const id = `${name.replace(':', '-')}-${job.studyId}-${job.parcelsKey}`;
+  const id = `${name.replace(':', '-')}-${job.studyId}-${job.parcelsKey.replace('@', '-')}`;
   return job.force ? `${id}-forced-${now}` : id;
 }
 

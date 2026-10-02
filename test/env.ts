@@ -32,6 +32,8 @@ export function testConfig(overrides: NodeJS.ProcessEnv = {}): Config {
     LOG_LEVEL: 'silent',
     // Tests identiques en local et en CI : la v1 de Géorisques, sauf test qui fournit son jeton.
     GEORISQUES_TOKEN: '',
+    // Millésimes DVF enregistrés : 2024 et 2025 (fixtures/http).
+    DVF_YEARS: '2',
     ...overrides,
   });
 }

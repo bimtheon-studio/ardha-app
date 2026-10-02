@@ -16,6 +16,7 @@ import {
   proposeStudyName,
   SELECTION_MAX,
   studySteps,
+  marketKey,
   TRASH_RETENTION_DAYS,
 } from '../domain/index.ts';
 import { CommunesRepository } from '../geo/communes.repository.ts';
@@ -88,7 +89,7 @@ export class StudiesService {
     };
   }
 
-  private toStudy(r: StudySummaryRecord, parcels: readonly StudyParcelRecord[], risks: 'done' | 'todo'): Study {
+  private toStudy(r: StudySummaryRecord, parcels: readonly StudyParcelRecord[], done: { risks: 'done' | 'todo'; market: 'done' | 'todo' }): Study {
     return {
       ...this.summary(r),
       parcels: parcels.map((p) => ({
@@ -109,7 +110,8 @@ export class StudiesService {
       nameIsProvisional: r.nameIsProvisional,
       addressPending: r.addressKey !== r.parcelsKey,
       thumbnailPending: r.thumbnailKey !== r.parcelsKey,
-      steps: studySteps({ parcelCount: parcels.length, risks }),
+      marketRadiusM: r.marketRadiusM,
+      steps: studySteps({ parcelCount: parcels.length, ...done }),
     };
   }
 
@@ -154,8 +156,9 @@ export class StudiesService {
 
   async get(actor: Actor, id: string): Promise<Study> {
     const row = this.visible(actor, await this.studies.summary(id));
-    const risks = (await this.analyses.statuses(id)).some((a) => a.kind === 'risks' && a.status === 'ready' && a.parcelsKey === row.parcelsKey);
-    return this.toStudy(row, await this.studies.parcels(id), risks ? 'done' : 'todo');
+    const statuses = await this.analyses.statuses(id);
+    const ready = (kind: 'risks' | 'market', key: string) => (statuses.some((a) => a.kind === kind && a.status === 'ready' && a.parcelsKey === key) ? 'done' : 'todo');
+    return this.toStudy(row, await this.studies.parcels(id), { risks: ready('risks', row.parcelsKey), market: ready('market', marketKey(row.parcelsKey, row.marketRadiusM)) });
   }
 
   /** Crée l'étude à partir de parcelles chargées ; le nom est provisoire jusqu'à l'adresse (Q2). */
@@ -259,6 +262,7 @@ export class StudiesService {
         chosenAddressId: source.chosenAddressId,
         addressKey: source.addressKey,
         thumbnailKey: thumbnail ? source.thumbnailKey : null,
+        marketRadiusM: source.marketRadiusM,
       },
       parcels,
     );

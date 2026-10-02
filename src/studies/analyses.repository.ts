@@ -3,7 +3,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, lt, or, sql } from 'drizzle-orm';
 
-import type { AnalysisStep, RisksResult } from '../contracts/index.ts';
+import type { AnalysisStep, MarketResult, RisksResult } from '../contracts/index.ts';
 import { DB, type Db } from '../db/db.ts';
 import { studyAnalysis, type StudyAnalysisRow } from '../db/schema.ts';
 
@@ -54,7 +54,7 @@ export class AnalysesRepository {
       .where(and(eq(studyAnalysis.studyId, studyId), eq(studyAnalysis.kind, kind), eq(studyAnalysis.parcelsKey, parcelsKey), eq(studyAnalysis.status, 'running')));
   }
 
-  async markReady(studyId: string, kind: AnalysisKind, parcelsKey: string, result: RisksResult, now: Date): Promise<boolean> {
+  async markReady(studyId: string, kind: AnalysisKind, parcelsKey: string, result: RisksResult | MarketResult, now: Date): Promise<boolean> {
     const r = await this.db
       .update(studyAnalysis)
       .set({ status: 'ready', result, error: null, computedAt: now })
