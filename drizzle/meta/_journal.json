@@ -57,6 +57,13 @@
       "when": 1790929750017,
       "tag": "0007_commune_risks",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790958779794,
+      "tag": "0008_analysis_partial",
+      "breakpoints": true
     }
   ]
 }

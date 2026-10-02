@@ -139,8 +139,8 @@ const progress: StudyRisks['progress'] = [
   { key: 'hydrants', label: 'Bornes incendie à moins de 400 m', state: 'pending', detail: null, startedAt: null, finishedAt: null },
 ];
 const finished = progress.map((p) => (p.state === 'running' || p.state === 'pending' ? { ...p, state: 'done' as const } : p));
-const ready: StudyRisks = { status: 'ready', stale: false, requestedAt: '2026-10-01T10:00:00Z', computedAt: '2026-10-01T10:01:00Z', error: null, result, axes, surcharges, sources, progress: finished };
-const none: StudyRisks = { status: 'none', stale: false, requestedAt: null, computedAt: null, error: null, result: null, axes: null, surcharges: null, sources, progress: [] };
+const ready: StudyRisks = { status: 'ready', stale: false, requestedAt: '2026-10-01T10:00:00Z', computedAt: '2026-10-01T10:01:00Z', error: null, result, partial: null, axes, surcharges, sources, progress: finished };
+const none: StudyRisks = { status: 'none', stale: false, requestedAt: null, computedAt: null, error: null, result: null, partial: null, axes: null, surcharges: null, sources, progress: [] };
 const LAYERS = {
   basemaps: [{ id: 'osm', label: 'OSM', url: 'https://osm/{z}/{x}/{y}', attribution: 'OSM', maxZoom: 19 }],
   defaultBasemap: 'absent',
@@ -188,7 +188,8 @@ describe('page des risques', () => {
     expect(live).toHaveTextContent('(en cours)');
     expect(calls.find((c) => c.key === `POST /api/studies/${ID}/risks`)?.body).toEqual({ force: false });
 
-    const synthesis = await screen.findByRole('region', { name: 'Synthèse' }, { timeout: 3000 });
+    await screen.findByRole('region', { name: 'Surcoûts indicatifs' }, { timeout: 3000 });
+    const synthesis = screen.getByRole('region', { name: 'Synthèse' });
     expect(within(synthesis).getAllByRole('listitem').map((li) => li.dataset.severity)).toEqual(['medium', 'unknown']);
     expect(synthesis).toHaveTextContent('Aléa moyen');
     expect(screen.getByText('Analyse du 1 octobre 2026')).toBeInTheDocument();
@@ -229,6 +230,33 @@ describe('page des risques', () => {
     expect(screen.queryByRole('region', { name: 'Calcul en cours' })).toBeNull();
     await waitFor(() => expect(mapProps?.hydrants).toEqual([{ id: 'node/1', point: [2.43, 48.8], label: 'Borne incendie · 111 m' }]));
     expect(mapProps!.cavities).toHaveLength(1);
+  });
+
+  it('pendant le calcul : chaque partie s’affiche dès qu’elle arrive, les bornes encore cherchées', async () => {
+    const { hydrants: _, parcels: __, ...early } = result;
+    const running: StudyRisks = { ...none, status: 'running', requestedAt: ready.requestedAt, progress };
+    let state: StudyRisks = { ...running, partial: early };
+    api({ [`GET /api/studies/${ID}/risks`]: () => ({ status: 200, body: state }) });
+    renderAt(`/studies/${ID}/risks`);
+    // Communes et alentours là ; parcelles, synthèse et bornes cherchées.
+    expect(await screen.findByRole('region', { name: 'Communes' })).toHaveTextContent('Maisons-Alfort');
+    expect(screen.getByRole('region', { name: 'Synthèse' })).toHaveTextContent('Synthèse dès que les communes et les parcelles sont connues');
+    expect(screen.getByRole('region', { name: 'Par parcelle' })).toHaveTextContent('Argiles, hauteurs d’eau et altitudes');
+    const nearby = screen.getByRole('region', { name: 'Alentours' });
+    expect(nearby).toHaveTextContent('BIO SPRINGER');
+    expect(nearby).toHaveTextContent('OpenStreetMap répond parfois lentement');
+    expect(mapProps?.cavities.map((c) => c.id)).toEqual(['C1']);
+    expect(mapProps?.hydrants).toEqual([]);
+    // Les parcelles arrivent, et la synthèse avec elles ; les bornes toujours cherchées.
+    state = { ...running, partial: { ...early, parcels: result.parcels }, axes, surcharges };
+    expect(await screen.findByRole('region', { name: 'Surcoûts indicatifs' }, { timeout: 3000 })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Synthèse' })).toHaveTextContent('Aléa moyen');
+    expect(screen.getByRole('region', { name: 'Par parcelle' })).toHaveTextContent('AY 96');
+    expect(screen.getAllByTestId('searching')).toHaveLength(1);
+    // Les bornes, enfin.
+    state = ready;
+    expect(await within(screen.getByRole('region', { name: 'Alentours' })).findByText('1, la plus proche à 111 m', {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(screen.queryByTestId('searching')).toBeNull();
   });
 
   it('couches de risques : cochées, retenues dans le navigateur ; sans stockage, pour la visite', async () => {

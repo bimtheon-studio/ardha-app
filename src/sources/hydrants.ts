@@ -32,9 +32,18 @@ export interface Hydrant {
 export class Hydrants {
   constructor(private readonly http: Http) {}
 
-  async inBbox([w, s, e, n]: Bbox): Promise<Hydrant[]> {
-    const box = [s, w, n, e].map((v) => v.toFixed(5)).join(',');
-    const query = `[out:json][timeout:15];node["emergency"="fire_hydrant"](${box});out body;`;
+  async inBbox(bbox: Bbox): Promise<Hydrant[]> {
+    return this.inBboxes([bbox]);
+  }
+
+  /**
+   * Bornes de plusieurs emprises en **une seule** requête : Overpass fait surtout attendre (3 à 5 s,
+   * autant pour une case que pour neuf, mesuré le 02/10/2026), pas calculer.
+   */
+  async inBboxes(bboxes: readonly Bbox[]): Promise<Hydrant[]> {
+    const nodes = bboxes.map(([w, s, e, n]) => `node["emergency"="fire_hydrant"](${[s, w, n, e].map((v) => v.toFixed(5)).join(',')});`);
+    // Une emprise : la requête d'avant, telle quelle (réponses enregistrées comprises).
+    const query = `[out:json][timeout:15];${nodes.length === 1 ? nodes[0] : `(${nodes.join('')});`}out body;`;
     const r = await this.http.get({ url: `${OVERPASS_URL}?${new URLSearchParams({ data: query })}`, timeoutMs: 20_000 });
     if (r.status !== 200) throw new SourceError(SOURCE, 'unavailable', `Overpass : HTTP ${r.status}`);
     let elements: unknown[];
