@@ -16,8 +16,15 @@ export function newSecrets(): Secrets {
   return { postgres: randomSecret(), minio: randomSecret() };
 }
 
-function randomSecret(): string {
-  return randomBytes(18).toString('base64url');
+/**
+ * 24 caractères de [A-Za-z0-9_-], jamais en tête un `-` ni un `_` : un mot de passe qui commence par
+ * un tiret passe pour une option (`mc alias set … -abc` a fait échouer la CI une fois sur 64).
+ */
+export function randomSecret(): string {
+  for (;;) {
+    const secret = randomBytes(18).toString('base64url');
+    if (/^[A-Za-z0-9]/.test(secret)) return secret;
+  }
 }
 
 /** Relit les secrets d'un `.env.local` existant, pour ne pas les changer sous un volume déjà initialisé. */
