@@ -59,7 +59,7 @@ export class RisksService {
   async get(actor: Actor, id: string): Promise<StudyRisks> {
     const study = await this.studies.require(actor, id);
     const row = await this.analyses.get(id, 'risks');
-    if (!row) return { status: 'none', stale: false, requestedAt: null, computedAt: null, error: null, result: null, axes: null, surcharges: null, sources: RISK_SOURCES };
+    if (!row) return { status: 'none', stale: false, requestedAt: null, computedAt: null, error: null, result: null, axes: null, surcharges: null, sources: RISK_SOURCES, progress: [] };
     // Un résultat d'une ancienne version du schéma ne se lit plus : il est à refaire.
     const parsed = RisksResult.safeParse(row.result);
     const result = parsed.success ? parsed.data : null;
@@ -74,6 +74,7 @@ export class RisksService {
       axes: input && riskAxes(input),
       surcharges: input && riskSurcharges(input),
       sources: RISK_SOURCES,
+      progress: row.progress,
     };
   }
 

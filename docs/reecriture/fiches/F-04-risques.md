@@ -154,6 +154,12 @@ Reprises du 02/10/2026 : alentours à 500 m (Tours : 51 cavités au lieu de 98) 
 PPRi Ruissellement urbain et PPRMT « Anciennes Carrières » **prescrits** (2001), Annecy : PPR multirisques
 approuvés le 29/01/2009 ; en v2 aussi, `code_insee` et `codeInsee` sont ignorés : il faut `codesInsee`.
 
+Déroulé du calcul (02/10/2026, demande du porteur du produit) : chaque étape (commune, altitudes, parcelle,
+cavités, bornes) est enregistrée au fil de l'analyse avec un commentaire (« radon 1 · 3 PPR · 9 arrêtés
+CatNat », « 4 cases en cache », « sans réponse : PPR ») ; la page le montre pendant le calcul, puis replié ;
+la CLI l'affiche en direct. Bornes et cavités sont cherchées autour de chaque parcelle (une étude
+Tours + Annecy interrogeait toute l'emprise qui les sépare : corrigé).
+
 Bornes incendie : gardées en base par case de 0,01° pendant 30 jours (DT-37) ; Overpass n'est plus
 appelé qu'une fois par case, et une case connue sert quand il sature (504, 429).
 

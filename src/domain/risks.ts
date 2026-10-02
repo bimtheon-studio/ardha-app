@@ -1,4 +1,5 @@
-import { interiorPoint, perimeterPoints, type Position, type Surface } from './geometry.ts';
+import { gridCells } from './bbox.ts';
+import { bboxOf, type Bbox, expandBbox, interiorPoint, perimeterPoints, type Position, type Surface } from './geometry.ts';
 
 // Risques d'une étude (F-04) : aléa inondation des cartes TRI, classes d'argiles, de radon et de
 // sismicité, synthèse des quatre axes. Repris de l'ancien code (`usePPRIFloodZone.ts:120-126`,
@@ -288,4 +289,30 @@ const PERIMETER_STEP_M = 15;
 export function elevationSamples(parcels: readonly Surface[]): Position[][] {
   const perParcel = Math.min(ELEVATION_PER_PARCEL, Math.max(2, Math.floor(ELEVATION_TOTAL / Math.max(1, parcels.length))));
   return parcels.map((g) => [interiorPoint(g), ...perimeterPoints(g, PERIMETER_STEP_M, ELEVATION_PER_PARCEL - 1)].slice(0, perParcel));
+}
+
+/** Au-delà, l'étude est trop dispersée pour interroger Overpass case par case. */
+export const MAX_HYDRANT_CELLS = 64;
+/** Points d'interrogation des cavités au plus. */
+export const MAX_CAVITY_PROBES = 20;
+
+/**
+ * Cases de la grille autour de chaque parcelle (élargie du rayon des bornes), sans doublon : une
+ * étude aux parcelles éloignées (Tours et Annecy) n'interroge pas tout ce qui les sépare.
+ */
+export function hydrantCells(parcels: readonly Surface[], radiusM = HYDRANT_RADIUS_M): Bbox[] {
+  const cells = new Map<string, Bbox>();
+  for (const g of parcels) for (const c of gridCells(expandBbox(bboxOf(g), radiusM))) cells.set(cellKey(c), c);
+  return [...cells.values()];
+}
+
+/** Points où chercher les cavités : un par case de la grille occupée par des parcelles (leur point intérieur). */
+export function cavityProbes(parcels: readonly Surface[]): Position[] {
+  const probes = new Map<string, Position>();
+  for (const g of parcels) {
+    const p = interiorPoint(g);
+    const key = cellKey([Math.floor(p[0]! * 100) / 100, Math.floor(p[1]! * 100) / 100]);
+    if (!probes.has(key)) probes.set(key, p);
+  }
+  return [...probes.values()].slice(0, MAX_CAVITY_PROBES);
 }
