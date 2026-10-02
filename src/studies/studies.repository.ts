@@ -40,6 +40,7 @@ export interface NewStudy {
   chosenAddressId?: string | null;
   addressKey?: string | null;
   thumbnailKey?: string | null;
+  marketRadiusM?: number;
 }
 
 const parcelColumns = sql`parcel_id AS id, position, commune_code AS "communeCode", prefix, section, number, contenance, area,

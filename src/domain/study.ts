@@ -96,13 +96,14 @@ const STEPS: readonly { key: StepKey; label: string; lot: string | null }[] = [
 
 /**
  * Étapes de l'étude (F-02, Q4) : pas de statut saisi, chaque étape se déduit de ce qui existe. Une
- * étape livrée reçoit son état (`risks` depuis L4 : faite quand l'analyse est à jour) ; les autres
+ * étape livrée reçoit son état (`risks` depuis L4, `land` depuis L5 : faite quand l'analyse est à jour) ; les autres
  * restent « à venir ».
  */
-export function studySteps(study: { parcelCount: number; risks?: 'done' | 'todo' }): StudyStep[] {
+export function studySteps(study: { parcelCount: number; risks?: 'done' | 'todo'; market?: 'done' | 'todo' }): StudyStep[] {
   return STEPS.map((s) => {
     if (s.key === 'parcels') return { ...s, state: study.parcelCount > 0 ? 'done' : 'todo', lot: null };
     if (s.key === 'risks' && study.risks) return { ...s, state: study.risks, lot: null };
+    if (s.key === 'land' && study.market) return { ...s, state: study.market, lot: null };
     return { ...s, state: 'upcoming' };
   });
 }

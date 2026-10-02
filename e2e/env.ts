@@ -28,6 +28,8 @@ export function e2eEnv(): { api: number; web: number; env: NodeJS.ProcessEnv } {
       QUEUE_PREFIX: 'ardha:e2e',
       ARDHA_SOURCES: 'recorded',
       GEORISQUES_TOKEN: '',
+    // Millésimes DVF enregistrés : 2024 et 2025 (fixtures/http).
+    DVF_YEARS: '2',
       LOG_LEVEL: 'warn',
       // Le relais du front (vite preview), puis l'IP simulée par chaque test (e2e/helpers.ts).
       TRUST_PROXY: '2',

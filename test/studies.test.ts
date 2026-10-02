@@ -85,7 +85,7 @@ describe('créer une étude', () => {
       ['parcels', 'done'],
       ['urbanism', 'upcoming'],
       ['risks', 'todo'],
-      ['land', 'upcoming'],
+      ['land', 'todo'],
       ['feasibility', 'upcoming'],
       ['report', 'upcoming'],
     ]);

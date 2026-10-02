@@ -23,6 +23,8 @@ describe('documentOpenApi', () => {
       '/api/studies',
       '/api/studies/{id}',
       '/api/studies/{id}/duplicate',
+      '/api/studies/{id}/market',
+      '/api/studies/{id}/market/sales',
       '/api/studies/{id}/parcels/{parcelId}',
       '/api/studies/{id}/restore',
       '/api/studies/{id}/risks',

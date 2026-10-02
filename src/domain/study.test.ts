@@ -62,6 +62,8 @@ describe('studySteps', () => {
     // Depuis L4, l'étape Risques est faite quand l'analyse est à jour.
     expect(studySteps({ parcelCount: 1, risks: 'todo' })[2]).toEqual({ key: 'risks', label: 'Risques', state: 'todo', lot: null });
     expect(studySteps({ parcelCount: 1, risks: 'done' })[2]!.state).toBe('done');
+    // Depuis L5, l'étape Foncier et marché aussi.
+    expect(studySteps({ parcelCount: 1, market: 'todo' })[3]).toEqual({ key: 'land', label: 'Foncier et marché', state: 'todo', lot: null });
   });
 });
 

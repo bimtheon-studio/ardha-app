@@ -6,6 +6,7 @@ import { sql } from 'drizzle-orm';
 import {
   boolean,
   customType,
+  date,
   doublePrecision,
   index,
   integer,
@@ -20,7 +21,9 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import type { Address } from '../contracts/geo.ts';
+import type { MarketResult } from '../contracts/market.ts';
 import type { AnalysisStep, RisksResult } from '../contracts/risks.ts';
+import type { DvfLocal } from '../domain/dvf.ts';
 
 const id = () => uuid().primaryKey().default(sql`uuidv7()`);
 const timestampTz = () => timestamp({ withTimezone: true, mode: 'date' });
@@ -175,6 +178,94 @@ export const communeRisk = pgTable(
   (t) => [primaryKey({ columns: [t.communeCode, t.part] })],
 );
 
+/**
+ * Données de référence : les ventes DVF (geo-DVF d'Etalab, F-05 Q1), une ligne par mutation
+ * dédoublonnée. Chargées par département et par millésime (état dans `source_states`, source `dvf`,
+ * périmètre `94/2025`) ; un rechargement remplace les lignes de son département et de son millésime,
+ * un millésime sorti de la fenêtre de 5 ans reste en base.
+ */
+export const dvfMutation = pgTable(
+  'dvf_mutations',
+  {
+    /** `id_mutation` de geo-DVF (`2025-1223897`). */
+    id: text().primaryKey(),
+    /** Millésime du fichier. */
+    year: integer().notNull(),
+    departmentCode: text().notNull(),
+    communeCode: text().notNull(),
+    date: date({ mode: 'string' }).notNull(),
+    nature: text().notNull(),
+    vefa: boolean().notNull(),
+    price: doublePrecision().notNull(),
+    propertyType: text().notNull(),
+    dwellingCount: integer().notNull(),
+    builtArea: doublePrecision(),
+    landArea: doublePrecision(),
+    rooms: integer(),
+    /** Ce que la vente apporte aux prix (Q3) : maison, appartement, terrain, ou rien. */
+    category: text(),
+    pricePerSqm: doublePrecision(),
+    parcelIds: text().array().notNull(),
+    address: text(),
+    postcode: text(),
+    point: point(),
+    locals: jsonb().$type<DvfLocal[]>().notNull(),
+    cultures: text().array().notNull(),
+  },
+  (t) => [index().on(t.departmentCode, t.year), index('dvf_mutations_point_index').using('gist', t.point)],
+);
+
+/** Données de référence : l'ECLN du SDES (F-05 Q6), par département, trimestre et type de logement. */
+export const newBuildPrice = pgTable(
+  'new_build_prices',
+  {
+    departmentCode: text().notNull(),
+    /** `2026-T2`. */
+    quarter: text().notNull(),
+    /** `collective`, `individual`, `all`. */
+    housingType: text().notNull(),
+    listed: integer(),
+    reservations: integer(),
+    cancellations: integer(),
+    stock: integer(),
+    monthsToSell: doublePrecision(),
+    pricePerSqm: doublePrecision(),
+    averagePrice: doublePrecision(),
+  },
+  (t) => [primaryKey({ columns: [t.departmentCode, t.quarter, t.housingType] })],
+);
+
+/** Données de référence : les séries INSEE du catalogue (F-05 Q8), une ligne par observation. */
+export const indexValue = pgTable(
+  'index_values',
+  {
+    /** Identifiant BDM (`000008630`). */
+    series: text().notNull(),
+    /** `2026-Q2` ou `2026-07`. */
+    period: text().notNull(),
+    value: doublePrecision().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.series, t.period] })],
+);
+
+/**
+ * Données de référence : Sitadel (F-05 Q7), logements autorisés et commencés par commune, année et
+ * type ; état par commune dans `source_states` (source `sitadel`), relu au bout de 30 jours.
+ */
+export const housingPermit = pgTable(
+  'housing_permits',
+  {
+    communeCode: text().notNull(),
+    year: integer().notNull(),
+    housingType: text().notNull(),
+    authorizedUnits: integer(),
+    startedUnits: integer(),
+    authorizedArea: integer(),
+    startedArea: integer(),
+  },
+  (t) => [primaryKey({ columns: [t.communeCode, t.year, t.housingType] })],
+);
+
 export const sourceStatus = pgEnum('source_status', ['queued', 'loading', 'ready', 'failed']);
 
 /**
@@ -228,6 +319,8 @@ export const study = pgTable(
     parcelsKey: text().notNull(),
     addressKey: text(),
     thumbnailKey: text(),
+    /** Rayon des ventes comparables, en mètres (F-05 Q2). */
+    marketRadiusM: integer().notNull().default(500),
     /** Dans la corbeille depuis (Q9). */
     deletedAt: timestampTz(),
     createdAt: timestampTz().notNull().defaultNow(),
@@ -264,7 +357,7 @@ export const studyParcel = pgTable(
   (t) => [primaryKey({ columns: [t.studyId, t.parcelId] })],
 );
 
-export const analysisKind = pgEnum('analysis_kind', ['risks']);
+export const analysisKind = pgEnum('analysis_kind', ['risks', 'market']);
 export const analysisStatus = pgEnum('analysis_status', ['queued', 'running', 'ready', 'failed']);
 
 /**
@@ -283,7 +376,7 @@ export const studyAnalysis = pgTable(
     status: analysisStatus().notNull(),
     /** Empreinte des parcelles pour laquelle l'analyse est demandée, puis calculée. */
     parcelsKey: text().notNull(),
-    result: jsonb().$type<RisksResult>(),
+    result: jsonb().$type<RisksResult | MarketResult>(),
     /** Déroulé du calcul, mis à jour à chaque étape (visible pendant le calcul). */
     progress: jsonb().$type<AnalysisStep[]>().notNull().default([]),
     error: text(),

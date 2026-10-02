@@ -69,6 +69,8 @@ export const Study = StudySummary.extend({
   /** Adresse ou vignette à recalculer pour les parcelles actuelles. */
   addressPending: z.boolean(),
   thumbnailPending: z.boolean(),
+  /** Rayon des ventes comparables (F-05 Q2). */
+  marketRadiusM: z.number().int(),
   steps: z.array(StudyStep),
 });
 export type Study = z.infer<typeof Study>;

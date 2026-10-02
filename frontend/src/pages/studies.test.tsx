@@ -91,6 +91,7 @@ function study(over: Partial<Study> = {}): Study {
     nameIsProvisional: false,
     addressPending: false,
     thumbnailPending: false,
+    marketRadiusM: 500,
     steps: [
       { key: 'parcels', label: 'Parcelles', state: 'done', lot: null },
       { key: 'urbanism', label: 'Urbanisme', state: 'upcoming', lot: 'L3' },
