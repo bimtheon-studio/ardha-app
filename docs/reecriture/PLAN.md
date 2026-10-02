@@ -382,6 +382,8 @@ Les arbitrages fonctionnels, rendus le 01/10/2026, sont dans [F-01](fiches/F-01-
 | DT-36 | **Géorisques v2** par un jeton personnel du porteur du produit (`GEORISQUES_TOKEN`, worker seul, jamais dans git), en-tête `Authorization`, **repli v1** sans jeton ; tests et e2e en v1 | v2 seule | F-04 Q12 : états et dates des PPR, PPR miniers ; aucune dépendance au jeton pour tester |
 | DT-37 | **Bornes incendie en base** (`hydrants`), par case de la grille de 0,01°, état par case dans `source_states` (`osm-hydrants`), rechargées au bout de 30 jours ; une case connue sert même vieille quand Overpass sature, l'analyse cite la date | cache Redis ; appel à chaque analyse | Overpass répond souvent 504 et 429 (constaté les 01 et 02/10/2026) ; deux études voisines partagent leurs cases ; données de référence en base (PLAN §4) |
 | DT-38 | **Données communales de Géorisques gardées 30 jours** (`commune_risks`, une ligne par commune et par donnée ; donnée ancienne servie si la source se tait) ; installations classées, SIS et CASIAS **par rayon autour des parcelles**, plus par commune ; étape à part dans le déroulé | appel à chaque analyse ; recherche par commune | mesuré le 02/10/2026 sur 13 communes : CASIAS par commune 6,2 s en moyenne (jusqu'à 11 s, 2 093 sites à Bordeaux, liste tronquée) contre 0,1 à 0,4 s par rayon ; la commune revient en 0 s depuis la base |
+| DT-39 | **DVF en base par département, à la demande** (`dvf_mutations`, une ligne par mutation dédoublonnée, remplacée par département et millésime, millésimes passés gardés), depuis geo-DVF d'Etalab ; version = date du fichier lue dans l'index | toute la France d'un coup ; par commune ; Cerema | F-05 Q1, arbitré le 02/10/2026 ; Cerema en 503 depuis le 27/09 ; 1 à 2 Mo par département et par an contre 93 Mo pour la France |
+| DT-40 | **Prix de marché = médiane des ventes simples sur 12 mois** dans un rayon fixe autour des parcelles (250 m à 2 km, gardé dans l'étude), tendance sur 12 mois glissants ; pas de rayon adaptatif ni de projection en L5 | régression pondérée mêlée à l'INSEE, projections à 5 ans | F-05 Q2 à Q5 ; les deux séries INSEE de l'ancien code étaient fausses (coût du travail, balance commerciale) |
 
 ## 12. Questions ouvertes
 
@@ -401,6 +403,8 @@ vers des comptes pas encore recréés) ; aucune migration ne les a réinjectées
 
 ## Journal
 
+- **02/10/2026** — F-05 (foncier et marché) scannée et arbitrée (Q1 à Q10) ; DT-39, DT-40 ;
+  feuille de route de L5 écrite.
 - **02/10/2026** — L2, L4 et le lot des secrets once fusionnés dans `master` (PR #3, #4, #5).
   **L3 mis de côté** par le porteur du produit : les données PLU viendront de plusieurs sources et
   méthodes d'extraction, à décider plus tard ; on n'attend plus l'extracteur voisin. **L5 lancé**
