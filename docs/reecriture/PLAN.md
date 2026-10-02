@@ -380,6 +380,7 @@ Les arbitrages fonctionnels, rendus le 01/10/2026, sont dans [F-01](fiches/F-01-
 | DT-34 | Chaque donnée d'une analyse porte son état **`ok` / `unavailable`** ; une source muette ne fait pas échouer l'analyse | échec global, ou silence | F-04 Q4 : l'ancien code concluait « aucun risque » sur une panne |
 | DT-35 | Couches de risques en **tuiles WMS chargées par le navigateur** (Géorisques, BRGM), comme les fonds de carte, sans GetFeatureInfo | proxy par le worker | D-08 étendu, F-04 Q8, arbitré le 02/10/2026 ; les données, elles, passent par le worker |
 | DT-36 | **Géorisques v2** par un jeton personnel du porteur du produit (`GEORISQUES_TOKEN`, worker seul, jamais dans git), en-tête `Authorization`, **repli v1** sans jeton ; tests et e2e en v1 | v2 seule | F-04 Q12 : états et dates des PPR, PPR miniers ; aucune dépendance au jeton pour tester |
+| DT-37 | **Bornes incendie en base** (`hydrants`), par case de la grille de 0,01°, état par case dans `source_states` (`osm-hydrants`), rechargées au bout de 30 jours ; une case connue sert même vieille quand Overpass sature, l'analyse cite la date | cache Redis ; appel à chaque analyse | Overpass répond souvent 504 et 429 (constaté les 01 et 02/10/2026) ; deux études voisines partagent leurs cases ; données de référence en base (PLAN §4) |
 
 ## 12. Questions ouvertes
 

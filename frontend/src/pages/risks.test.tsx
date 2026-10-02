@@ -118,7 +118,7 @@ const result: NonNullable<StudyRisks['result']> = {
   cavities: ok({ truncated: false, items: [{ id: 'C1', name: 'Carrière', type: 'naturelle', point: [2.43, 48.8], distanceM: 1500 }] }),
   installations: ok({ count: 37, truncated: false, items: [{ id: '1', name: 'BIO SPRINGER', regime: 'Autorisation', seveso: 'Seveso seuil bas', point: [2.43, 48.8], distanceM: 392 }] }),
   pollutedSites: ok({ count: 16, truncated: false, items: [{ id: 'S', kind: 'CASIAS', name: 'Ancien garage', url: 'https://fiche', distanceM: 330 }, { id: 'S2', kind: 'SIS', name: null, url: null, distanceM: 900 }] }),
-  hydrants: ok({ items: [{ id: 'node/1', point: [2.43, 48.8], type: 'pillar', flowRate: null, diameter: null, ref: null, distanceM: 111 }] }),
+  hydrants: ok({ asOf: '2026-09-20T00:00:00.000Z', items: [{ id: 'node/1', point: [2.43, 48.8], type: 'pillar', flowRate: null, diameter: null, ref: null, distanceM: 111 }] }),
 };
 
 const axes: StudyRisks['axes'] = [
@@ -198,6 +198,7 @@ describe('page des risques', () => {
     expect(nearby).toHaveTextContent('Seveso seuil bas');
     expect(within(nearby).getByRole('link', { name: 'fiche' })).toHaveAttribute('href', 'https://fiche');
     expect(nearby).toHaveTextContent('1, la plus proche à 111 m');
+    expect(nearby).toHaveTextContent('Données OSM du 20 septembre 2026');
     expect(screen.getByRole('region', { name: 'Sources' })).toHaveTextContent('Géorisques · Licence ouverte 2.0');
     await waitFor(() => expect(mapProps?.hydrants).toEqual([{ id: 'node/1', point: [2.43, 48.8], label: 'Borne incendie · 111 m' }]));
     expect(mapProps!.cavities).toHaveLength(1);
@@ -269,7 +270,7 @@ describe('page des risques', () => {
       parcels: [{ ...result.parcels[0]!, clay: ok(null), floodLevel: { level: 33.31, atLeast: false } }],
       cavities: ok({ truncated: false, items: [] }),
       pollutedSites: ok({ count: 2, truncated: false, items: [] }),
-      hydrants: ok({ items: [] }),
+      hydrants: ok({ asOf: '2026-09-20T00:00:00.000Z', items: [] }),
     };
     api({ [`GET /api/studies/${ID}/risks`]: { status: 200, body: { ...ready, result: calm, surcharges: [] } } });
     renderAt(`/studies/${ID}/risks`);

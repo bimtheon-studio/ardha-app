@@ -204,6 +204,14 @@ export function elevationStats(zs: readonly number[]): { min: number; max: numbe
   return { min: round(min), max: round(max), mean: round(zs.reduce((t, z) => t + z, 0) / zs.length), range: round(max - min) };
 }
 
+/** Les bornes d'une case de la grille se rechargent au bout de 30 jours (OpenStreetMap bouge lentement). */
+export const HYDRANTS_FRESHNESS_DAYS = 30;
+
+/** Clé d'une case de la grille : son coin sud-ouest, « 2.42,48.79 ». */
+export function cellKey([w, s]: readonly number[]): string {
+  return `${w!.toFixed(2)},${s!.toFixed(2)}`;
+}
+
 /** Rayon de recherche des bornes incendie autour de l'emprise, indicatif (F-04, Q7). */
 export const HYDRANT_RADIUS_M = 400;
 /** Rayon de recherche des cavités, installations et sols pollués autour de l'emprise (F-04, Q10, arbitré le 02/10/2026). */

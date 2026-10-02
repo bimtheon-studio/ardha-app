@@ -108,6 +108,8 @@ export const RisksResult = z.object({
   ),
   hydrants: known(
     z.object({
+      /** Date des bornes connues les plus anciennes (cases de 30 jours au plus, ou plus en cas de panne d'Overpass). */
+      asOf: z.iso.datetime(),
       items: z.array(
         z.object({ id: z.string(), point: lonLat, type: z.string().nullable(), flowRate: z.string().nullable(), diameter: z.string().nullable(), ref: z.string().nullable(), ...near }),
       ),

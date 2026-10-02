@@ -7,7 +7,9 @@ import type { Study, StudyRisks } from '../src/contracts/index.ts';
 import { AnalysesRepository } from '../src/studies/analyses.repository.ts';
 import { vi } from 'vitest';
 
+import { HydrantCache } from '../src/ingestion/hydrant-cache.ts';
 import { RiskAnalyses } from '../src/ingestion/risk-analyses.ts';
+import { Hydrants } from '../src/sources/hydrants.ts';
 import { RiskAnalyzer } from '../src/ingestion/risk-analyzer.ts';
 import { MaintenanceProcessor, RECONCILE_JOB } from '../src/worker/maintenance.ts';
 import { seedParcels } from './reference.ts';
@@ -118,7 +120,8 @@ describe('analyse des risques', () => {
     // Le PPR inondation de la commune reste connu.
     expect(axes.flood).toMatchObject({ state: 'PPR inondation sur la commune', severity: 'medium' });
     expect(r.result!.parcels[0]!.clay.status).toBe('unavailable');
-    expect(r.result!.hydrants.status).toBe('unavailable');
+    // Les bornes, elles, viennent des cases déjà chargées pour l'étude voisine (cache, 30 jours).
+    expect(r.result!.hydrants.status).toBe('ok');
     expect(r.result!.parcels[0]!.floodLevel).toBeNull();
   });
 
@@ -132,7 +135,7 @@ describe('analyse des risques', () => {
       ['seismic', 'low'],
       ['flood', 'none'],
     ]);
-    expect(r.result!.hydrants).toEqual({ status: 'ok', data: { items: [] } });
+    expect(r.result!.hydrants).toMatchObject({ status: 'ok', data: { items: [] } });
   });
 
   it('réservée à l’auteur ; pas dans la corbeille ; recalcul forcé ; échec affiché', async () => {
@@ -211,5 +214,34 @@ describe('altitudes d’une sélection (Q6)', () => {
     expect((await get('/api/parcels/elevation?ids=x')).status).toBe(400);
     expect((await get('/api/parcels/elevation?ids=94046000ZZ9999')).status).toBe(404);
     expect((await http().get(`/api/parcels/elevation?ids=${AY96}`)).status).toBe(401);
+  });
+});
+
+describe('cache des bornes incendie', () => {
+  it('cases gardées 30 jours en base : pas de nouvel appel ; case vieille et Overpass en panne : les bornes connues servent', async () => {
+    const cache = t.worker!.get(HydrantCache);
+    const overpass = t.worker!.get(Hydrants);
+    const spy = vi.spyOn(overpass, 'inBbox');
+    // Emprise AY96 + AY97 élargie de 400 m (celle de l'analyse) : cases enregistrées.
+    const bbox = [2.4243, 48.7963, 2.4357, 48.8038] as const;
+    await t.pool.query(`DELETE FROM source_states WHERE source = 'osm-hydrants'`);
+    const first = await cache.inBbox(bbox);
+    const calls = spy.mock.calls.length;
+    expect(calls).toBeGreaterThan(0);
+    expect(first.items.length).toBeGreaterThan(0);
+    // Une seconde étude voisine : tout vient de la base.
+    expect((await cache.inBbox(bbox)).items).toEqual(first.items);
+    expect(spy.mock.calls.length).toBe(calls);
+
+    // 31 jours plus tard, Overpass sature : les bornes connues restent, datées.
+    t.clock.advance(31 * 24 * 3600 * 1000);
+    spy.mockRejectedValue(new Error('Overpass : HTTP 429'));
+    const stale = await cache.inBbox(bbox);
+    expect(stale.items).toEqual(first.items);
+    expect(stale.asOf.getTime()).toBeLessThan(t.clock.now().getTime() - 30 * 24 * 3600 * 1000);
+    // Une case jamais chargée, elle, ne peut rien servir.
+    await expect(cache.inBbox([10.001, 45.001, 10.002, 45.002])).rejects.toThrow('HTTP 429');
+    t.clock.advance(-31 * 24 * 3600 * 1000);
+    spy.mockRestore();
   });
 });

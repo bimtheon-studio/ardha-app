@@ -1,0 +1,297 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62.11 87bfad18",
+  "osm3s": {
+    "timestamp_osm_base": "2026-10-02T05:50:04Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+
+{
+  "type": "node",
+  "id": 2094231314,
+  "lat": 47.4080461,
+  "lon": 0.6891371,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "TN 029"
+  }
+},
+{
+  "type": "node",
+  "id": 2143903969,
+  "lat": 47.4086643,
+  "lon": 0.6863263,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "TN 003"
+  }
+},
+{
+  "type": "node",
+  "id": 2313693605,
+  "lat": 47.4019817,
+  "lon": 0.6865836,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "TN 006",
+    "source": "survey"
+  }
+},
+{
+  "type": "node",
+  "id": 3180325792,
+  "lat": 47.4014438,
+  "lon": 0.6852957,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "TN 007",
+    "source": "Survey; Orthophoto Tour(s)plus 2013"
+  }
+},
+{
+  "type": "node",
+  "id": 4013090389,
+  "lat": 47.4017854,
+  "lon": 0.6891198,
+  "tags": {
+    "colour": "red",
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "TN 326"
+  }
+},
+{
+  "type": "node",
+  "id": 4027926989,
+  "lat": 47.4063729,
+  "lon": 0.6862756,
+  "tags": {
+    "colour": "red",
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "TN 004"
+  }
+},
+{
+  "type": "node",
+  "id": 4087777489,
+  "lat": 47.4021034,
+  "lon": 0.6889287,
+  "tags": {
+    "colour": "red",
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "TN 023"
+  }
+},
+{
+  "type": "node",
+  "id": 4682889796,
+  "lat": 47.4064996,
+  "lon": 0.6890072,
+  "tags": {
+    "colour": "red",
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "mapillary": "493611665331236",
+    "ref": "TN 027",
+    "source:geometry": "Mapillary 2018-08-16",
+    "survey:date": "2018-08-16"
+  }
+},
+{
+  "type": "node",
+  "id": 5535755023,
+  "lat": 47.4089084,
+  "lon": 0.6817933,
+  "tags": {
+    "colour": "red",
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "TN 010"
+  }
+},
+{
+  "type": "node",
+  "id": 6802024672,
+  "lat": 47.4011100,
+  "lon": 0.6833683,
+  "tags": {
+    "colour": "red",
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "TN 013",
+    "water_source": "main"
+  }
+},
+{
+  "type": "node",
+  "id": 6802024673,
+  "lat": 47.4033882,
+  "lon": 0.6837020,
+  "tags": {
+    "colour": "red",
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "TN 008",
+    "water_source": "main"
+  }
+},
+{
+  "type": "node",
+  "id": 6802024674,
+  "lat": 47.4065668,
+  "lon": 0.6824121,
+  "tags": {
+    "colour": "red",
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref:signed": "no",
+    "water_source": "main"
+  }
+},
+{
+  "type": "node",
+  "id": 6802024677,
+  "lat": 47.4093734,
+  "lon": 0.6816174,
+  "tags": {
+    "colour": "red",
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "TN 361",
+    "water_source": "main"
+  }
+},
+{
+  "type": "node",
+  "id": 6802024678,
+  "lat": 47.4085769,
+  "lon": 0.6810381,
+  "tags": {
+    "colour": "red",
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "TN 011",
+    "water_source": "main"
+  }
+},
+{
+  "type": "node",
+  "id": 7370926555,
+  "lat": 47.4087564,
+  "lon": 0.6839485,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "TN 0?2"
+  }
+},
+{
+  "type": "node",
+  "id": 7401983178,
+  "lat": 47.4055841,
+  "lon": 0.6809026,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "green",
+    "fire_hydrant:type": "pillar",
+    "noref": "yes",
+    "water_source": "main"
+  }
+},
+{
+  "type": "node",
+  "id": 9654898845,
+  "lat": 47.4031770,
+  "lon": 0.6833920,
+  "tags": {
+    "colour": "red",
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "TN 012"
+  }
+},
+{
+  "type": "node",
+  "id": 10210209175,
+  "lat": 47.4096266,
+  "lon": 0.6880868,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "TN 015"
+  }
+},
+{
+  "type": "node",
+  "id": 12593641850,
+  "lat": 47.4041846,
+  "lon": 0.6891459,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "fixme": "confirmer sur place"
+  }
+},
+{
+  "type": "node",
+  "id": 12593701575,
+  "lat": 47.4046110,
+  "lon": 0.6866033,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "TN 005"
+  }
+},
+{
+  "type": "node",
+  "id": 12807265558,
+  "lat": 47.4074681,
+  "lon": 0.6840698,
+  "tags": {
+    "colour": "red",
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar",
+    "ref": "TN 374"
+  }
+},
+{
+  "type": "node",
+  "id": 12888440739,
+  "lat": 47.4078121,
+  "lon": 0.6871817,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:type": "pillar"
+  }
+}
+
+  ]
+}
