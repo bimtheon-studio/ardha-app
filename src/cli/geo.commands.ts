@@ -28,18 +28,18 @@ import { CadastreLoader } from '../ingestion/cadastre-loader.ts';
 import { LookupHandlers } from '../ingestion/lookup-handlers.ts';
 import { LiveHttp, RecordingHttp } from '../sources/http.ts';
 
-interface JsonOption {
+export interface JsonOption {
   json?: boolean;
 }
-interface InlineOption extends JsonOption {
+export interface InlineOption extends JsonOption {
   inline?: boolean;
 }
 
-function print(json: boolean | undefined, value: unknown, text: () => string): void {
+export function print(json: boolean | undefined, value: unknown, text: () => string): void {
   console.log(json ? JSON.stringify(value, null, 2) : text());
 }
 
-function frenchDate(iso: string | null): string {
+export function frenchDate(iso: string | null): string {
   return iso ? new Date(iso).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'short', timeStyle: 'short' }) : '—';
 }
 
@@ -82,14 +82,14 @@ function numberArg(value: string | undefined, name: string): number {
   return n;
 }
 
-abstract class JsonCommand extends CommandRunner {
+export abstract class JsonCommand extends CommandRunner {
   @Option({ flags: '--json', description: 'Sortie JSON' })
   parseJson(): boolean {
     return true;
   }
 }
 
-abstract class InlineCommand extends JsonCommand {
+export abstract class InlineCommand extends JsonCommand {
   @Option({ flags: '--inline', description: 'Appelle la source depuis la CLI, sans passer par le worker' })
   parseInline(): boolean {
     return true;

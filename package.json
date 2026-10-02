@@ -32,6 +32,7 @@
     "test:perf": "node tools/test-perf/cli.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1143.0",
     "@nestjs/bullmq": "12.0.0",
     "@nestjs/common": "12.1.1",
     "@nestjs/core": "12.1.1",
@@ -49,6 +50,7 @@
     "pino-http": "11.0.0",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
+    "sharp": "0.35.5",
     "zod": "4.6.5"
   },
   "devDependencies": {

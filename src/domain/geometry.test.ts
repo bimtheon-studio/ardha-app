@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { areaM2, bboxOf, containsPoint, distanceM, type MultiPolygon, type Polygon, unionBbox } from './geometry.ts';
+import { areaM2, bboxOf, containsPoint, distanceM, distanceToPointM, interiorPoint, type MultiPolygon, perimeterPoints, pointDistanceM, type Polygon, unionBbox } from './geometry.ts';
 
 /** Rectangle `[ouest, sud, est, nord]` en degrés. */
 export function rect(w: number, s: number, e: number, n: number): Polygon {
@@ -72,5 +72,46 @@ describe('distanceM', () => {
   it('tient un segment dégénéré (deux sommets confondus)', () => {
     const degenerate: Polygon = { type: 'Polygon', coordinates: [[[2.442, 48.8], [2.442, 48.8], [2.443, 48.8], [2.443, 48.801], [2.442, 48.8]]] };
     expect(distanceM(square, degenerate)).toBeGreaterThan(70);
+  });
+});
+
+describe('distanceToPointM', () => {
+  it('0 dedans, distance au bord le plus proche dehors, trous compris', () => {
+    expect(distanceToPointM(square, [2.4405, 48.8005])).toBe(0);
+    // 0,0001° de longitude à 48,8° ≈ 7,34 m.
+    expect(distanceToPointM(square, [2.4411, 48.8005])).toBeCloseTo(7.34, 1);
+    const holed: Polygon = { type: 'Polygon', coordinates: [square.coordinates[0]!, rect(2.4402, 48.8002, 2.4408, 48.8008).coordinates[0]!] };
+    expect(distanceToPointM(holed, [2.4405, 48.8005])).toBeGreaterThan(20);
+  });
+});
+
+describe('interiorPoint, perimeterPoints, pointDistanceM', () => {
+  it('le centre de la boîte quand il est dedans ; sinon un point bien à l’intérieur (parcelle en L, en U)', () => {
+    expect(interiorPoint(square)).toEqual([2.4405, 48.8005]);
+    const l: Polygon = { type: 'Polygon', coordinates: [[[0, 0], [10, 0], [10, 2], [2, 2], [2, 10], [0, 10], [0, 0]]] };
+    const p = interiorPoint(l);
+    expect(containsPoint(l, p)).toBe(true);
+    const u: Polygon = { type: 'Polygon', coordinates: [[[0, 0], [9, 0], [9, 9], [6, 9], [6, 3], [3, 3], [3, 9], [0, 9], [0, 0]]] };
+    expect(containsPoint(u, interiorPoint(u))).toBe(true);
+    // Multipolygone : dans le plus grand morceau.
+    const multi: MultiPolygon = { type: 'MultiPolygon', coordinates: [rect(0, 0, 1, 1).coordinates, rect(5, 5, 9, 9).coordinates] };
+    expect(interiorPoint(multi)).toEqual([7, 7]);
+    expect(interiorPoint({ type: 'MultiPolygon', coordinates: [multi.coordinates[1]!, multi.coordinates[0]!] })).toEqual([7, 7]);
+    // Anneau dégénéré : le centre de la boîte, faute de mieux.
+    expect(interiorPoint({ type: 'Polygon', coordinates: [[[0, 0], [1, 1], [0, 0]]] })).toEqual([0.5, 0.5]);
+  });
+
+  it('points du périmètre tous les ~15 m, décimés régulièrement au-delà du plafond', () => {
+    // Carré d'environ 73 × 111 m : ≈ 368 m de tour.
+    const points = perimeterPoints(square, 15, 100);
+    expect(points.length).toBeGreaterThan(22);
+    expect(points.length).toBeLessThan(30);
+    expect(points[0]).toEqual([2.44, 48.8]);
+    expect(perimeterPoints(square, 1, 20)).toHaveLength(20);
+    expect(perimeterPoints({ type: 'MultiPolygon', coordinates: [[]] }, 15, 10)).toEqual([]);
+  });
+
+  it('distance entre deux points', () => {
+    expect(pointDistanceM([2.44, 48.8], [2.441, 48.8])).toBeCloseTo(73.4, 0);
   });
 });

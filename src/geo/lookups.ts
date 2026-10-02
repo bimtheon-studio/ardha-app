@@ -19,6 +19,8 @@ export interface LookupJobs {
   'address:search': { input: { q: string; limit: number }; output: Address[] };
   'address:reverse': { input: { lon: number; lat: number }; output: Address | null };
   'commune:locate': { input: { lon: number; lat: number }; output: CommuneRef | null };
+  /** Altitudes IGN de points `[lon, lat]` (F-04, Q6) ; `z` nul hors couverture. */
+  'elevation:points': { input: { points: [number, number][] }; output: { lon: number; lat: number; z: number | null }[] };
 }
 export type LookupName = keyof LookupJobs;
 

@@ -1,0 +1,5 @@
+{
+  "url": "https://data.geopf.fr/altimetrie/1.0/calcul/alti/rest/elevation.json?lon=2.429831%7C2.429976%7C2.429959%7C2.429947%7C2.429938%7C2.429849%7C2.429691%7C2.429685%7C2.429806%7C2.429911%7C2.429947&lat=48.799990%7C48.799996%7C48.800008%7C48.800017%7C48.800023%7C48.800086%7C48.800008%7C48.799981%7C48.799895%7C48.799957%7C48.799978&resource=ign_rge_alti_wld&zonly=false",
+  "status": 200,
+  "contentType": "application/json"
+}

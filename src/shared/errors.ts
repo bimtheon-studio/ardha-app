@@ -10,6 +10,11 @@ export const ERRORS = {
   'unknown-user': { status: 404, message: 'Aucun compte avec cette adresse e-mail.' },
   'unknown-commune': { status: 404, message: 'Commune inconnue.' },
   'unknown-parcel': { status: 404, message: 'Parcelle inconnue.' },
+  'unknown-study': { status: 404, message: 'Étude introuvable.' },
+  'study-in-trash': { status: 409, message: 'Cette étude est dans la corbeille : restaurez-la pour la modifier.' },
+  'study-needs-parcel': { status: 400, message: 'Une étude garde au moins une parcelle.' },
+  'study-limit-reached': { status: 400, message: 'Une étude compte au plus 50 parcelles.' },
+  'unknown-address': { status: 400, message: 'Cette adresse n’est pas rattachée aux parcelles de l’étude.' },
   'area-too-large': { status: 400, message: 'Zone trop étendue : rapprochez-vous pour afficher les parcelles.' },
   'lookup-unavailable': {
     status: 503,

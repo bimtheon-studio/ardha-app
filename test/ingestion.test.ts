@@ -126,7 +126,7 @@ describe('réconciliation', () => {
     await states.markLoading(CADASTRE_SOURCE, '37261', old);
     await pool.query(`UPDATE source_states SET updated_at = $1 WHERE scope = '37261'`, [old]);
     const result = await worker.get(MaintenanceProcessor).process({ name: RECONCILE_JOB } as never);
-    expect(result).toEqual(['37023', '37261']);
+    expect(result).toEqual({ communes: ['37023', '37261'], studies: [], analyses: [] });
     expect(await queue.getJob(loadJobId('37023'))).toBeDefined();
     expect(await queue.getJob(loadJobId('94046'))).toBeUndefined();
     await queue.obliterate({ force: true });

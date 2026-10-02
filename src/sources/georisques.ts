@@ -1,0 +1,284 @@
+// Géorisques, API v1 (`www.georisques.gouv.fr/api/v1`, sans clé) : risques communaux (radon,
+// sismicité, GASPAR, PPR, CatNat), installations classées, sols pollués, cavités, argiles (F-04).
+// Pièges vérifiés le 01/10/2026 (et par l'audit de l'ancienne équipe) : `gaspar/pprn` et
+// `gaspar/pprt` prennent `codeInsee` (`code_insee` est ignoré et renvoie toute la France) ;
+// `latlon` est « longitude,latitude » ; le lien `next` pointe vers un hôte interne, on pagine
+// soi-même.
+import { z } from 'zod';
+
+import { type Http, SourceError } from './http.ts';
+
+export const GEORISQUES_BASE = 'https://www.georisques.gouv.fr/api/v1';
+export const GEORISQUES_V2 = 'https://www.georisques.gouv.fr/api/v2';
+/** Fiches détaillées lues au plus par commune (v2 : une requête par PPR). */
+const MAX_PLAN_DETAILS = 20;
+const SOURCE = 'georisques';
+/** Pages lues au plus (100 éléments chacune) : au-delà, la liste est dite tronquée. */
+const MAX_PAGES = 5;
+
+const Page = z.object({ data: z.array(z.unknown()), total_pages: z.number().default(1) });
+const SpringPage = z.object({ content: z.array(z.unknown()), totalPages: z.number().default(1) });
+
+const nullableString = z.string().nullish().transform((v) => v ?? null);
+const nullableNumber = z.number().nullish().transform((v) => v ?? null);
+
+const Radon = z.object({ classe_potentiel: z.coerce.number() });
+const Seismic = z.object({ code_zone: z.coerce.number() });
+const Hazards = z.object({ risques_detail: z.array(z.object({ num_risque: z.string(), libelle_risque_long: z.string() })).default([]) });
+const Plan = z.object({
+  idGaspar: z.string(),
+  libPpr: z.string(),
+  modeleProcedure: nullableString,
+  dateModification: nullableString,
+  zonageReglementaire: z
+    .object({ listTypeReg: z.array(z.object({ code: z.string(), libelle: z.string(), nom: nullableString, codeZone: nullableString })).nullish() })
+    .nullish(),
+});
+const CatNat = z.object({
+  code_national_catnat: z.string(),
+  libelle_risque_jo: z.string(),
+  date_debut_evt: nullableString,
+  date_fin_evt: nullableString,
+  date_publication_jo: nullableString,
+});
+const Installation = z.object({
+  raisonSociale: z.string(),
+  regime: nullableString,
+  statutSeveso: nullableString,
+  longitude: nullableNumber,
+  latitude: nullableNumber,
+  codeAIOT: nullableString,
+});
+// Un site est un polygone (SIS, certains CASIAS) ou un point (beaucoup de CASIAS, Annecy par exemple).
+const SiteGeometry = z.discriminatedUnion('type', [
+  z.object({ type: z.enum(['Polygon', 'MultiPolygon']), coordinates: z.array(z.unknown()) }),
+  z.object({ type: z.literal('Point'), coordinates: z.tuple([z.number(), z.number()]) }),
+]);
+const PollutedSite = z.object({
+  identifiant_ssp: z.string(),
+  nom: nullableString,
+  nom_etablissement: nullableString,
+  fiche_risque: nullableString,
+  geom: SiteGeometry.nullish(),
+});
+const Cavity = z.object({ identifiant: z.string(), nom: nullableString, type: nullableString, longitude: z.number(), latitude: z.number() });
+const Clay = z.object({ codeExposition: z.string().nullish() });
+
+export interface Listing<T> {
+  items: T[];
+  /** Vrai quand la source avait plus d'éléments que les pages lues. */
+  truncated: boolean;
+}
+
+export interface PlanInfo {
+  id: string;
+  kind: 'PPRN' | 'PPRT' | 'PPRM';
+  label: string;
+  model: string | null;
+  /** « 27/02/2025 », tel que publié. */
+  modifiedAt: string | null;
+  zones: { code: string | null; label: string; name: string | null }[];
+  /** v2 seulement (nuls en v1) : état pour la commune, dates « JJ/MM/AAAA », aléas, page de la préfecture. */
+  state: 'approved' | 'prescribed' | 'repealed' | null;
+  approvedAt: string | null;
+  prescribedAt: string | null;
+  hazards: string[];
+  prefectureUrl: string | null;
+}
+
+const Hazard = z.object({
+  libelle: z.string(),
+  dateApprobation: nullableString,
+  datePrescription: nullableString,
+  dateAbrog: nullableString,
+  dateAnnulation: nullableString,
+  dateDeprescription: nullableString,
+});
+const PlanDetails = z.object({
+  communes: z.array(z.object({ codeInsee: z.string(), lienPpr: nullableString, aleas: z.array(Hazard).nullish() })).default([]),
+});
+
+/** État d'un PPR pour une commune, d'après les dates de ses aléas (v2). */
+export function planState(hazards: readonly z.output<typeof Hazard>[]): Pick<PlanInfo, 'state' | 'approvedAt' | 'prescribedAt'> {
+  const first = (pick: (h: z.output<typeof Hazard>) => string | null) => hazards.map(pick).find((d): d is string => d !== null) ?? null;
+  const approvedAt = first((h) => h.dateApprobation);
+  const prescribedAt = first((h) => h.datePrescription);
+  const ended = hazards.length > 0 && hazards.every((h) => h.dateAbrog || h.dateAnnulation || h.dateDeprescription);
+  return { state: ended ? 'repealed' : approvedAt ? 'approved' : prescribedAt ? 'prescribed' : null, approvedAt, prescribedAt };
+}
+
+export interface PollutedSiteInfo {
+  id: string;
+  kind: 'SIS' | 'CASIAS';
+  name: string | null;
+  url: string | null;
+  geometry: { type: 'Polygon' | 'MultiPolygon'; coordinates: unknown[] } | { type: 'Point'; coordinates: [number, number] } | null;
+}
+
+/** Paramètres d'une recherche autour d'un point : « longitude,latitude » et rayon en mètres. */
+function near(lon: number, lat: number, radiusM: number): Record<string, string> {
+  return { latlon: `${lon.toFixed(6)},${lat.toFixed(6)}`, rayon: String(radiusM) };
+}
+
+function parse<S extends z.ZodType>(schema: S, items: readonly unknown[]): z.output<S>[] {
+  return items.flatMap((raw) => {
+    const r = schema.safeParse(raw);
+    return r.success ? [r.data] : [];
+  });
+}
+
+export class Georisques {
+  /** `token` : jeton de l'API v2 ; sans lui, les PPR se lisent en v1 (sans état ni dates). */
+  constructor(
+    private readonly http: Http,
+    private readonly token?: string,
+  ) {}
+
+  /** Version de l'API qui sert les PPR : leur forme diffère (états et dates en v2). */
+  get plansVersion(): 'v1' | 'v2' {
+    return this.token ? 'v2' : 'v1';
+  }
+
+  private async json(path: string, params: Record<string, string>, v2 = false): Promise<unknown> {
+    const url = `${v2 ? GEORISQUES_V2 : GEORISQUES_BASE}/${path}?${new URLSearchParams(params)}`;
+    const r = await this.http.get({ url, timeoutMs: 10_000, ...(v2 && { headers: { Authorization: `Bearer ${this.token}` } }) });
+    if (r.status !== 200) throw new SourceError(SOURCE, 'unavailable', `Géorisques ${path} : HTTP ${r.status}`);
+    try {
+      return JSON.parse(r.body.toString('utf8'));
+    } catch {
+      throw new SourceError(SOURCE, 'invalid', `Géorisques ${path} : réponse illisible`);
+    }
+  }
+
+  /** Liste paginée « data / total_pages » (format v1 courant). */
+  private async list(path: string, params: Record<string, string>): Promise<Listing<unknown>> {
+    const items: unknown[] = [];
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      const p = Page.safeParse(await this.json(path, { ...params, page: String(page), page_size: '100' }));
+      if (!p.success) throw new SourceError(SOURCE, 'invalid', `Géorisques ${path} : réponse inattendue`);
+      items.push(...p.data.data);
+      if (page >= p.data.total_pages) return { items, truncated: false };
+    }
+    return { items, truncated: true };
+  }
+
+  /** Classe de potentiel radon de la commune (1 à 3), `null` si inconnue. */
+  async radon(code: string): Promise<number | null> {
+    return parse(Radon, (await this.list('radon', { code_insee: code })).items)[0]?.classe_potentiel ?? null;
+  }
+
+  /** Zone de sismicité (1 à 5), `null` si inconnue. */
+  async seismic(code: string): Promise<number | null> {
+    return parse(Seismic, (await this.list('zonage_sismique', { code_insee: code })).items)[0]?.code_zone ?? null;
+  }
+
+  /** Risques recensés par la base GASPAR sur la commune. */
+  async hazards(code: string): Promise<{ code: string; label: string }[]> {
+    const rows = parse(Hazards, (await this.list('gaspar/risques', { code_insee: code })).items);
+    return rows.flatMap((r) => r.risques_detail.map((d) => ({ code: d.num_risque, label: d.libelle_risque_long })));
+  }
+
+  /** PPR de la commune, avec leurs zones réglementaires ; en v2, aussi miniers, avec état et dates. */
+  async plans(code: string): Promise<PlanInfo[]> {
+    return this.token ? this.plansV2(code) : this.plansV1(code);
+  }
+
+  private async plansV2(code: string): Promise<PlanInfo[]> {
+    const plans: PlanInfo[] = [];
+    for (const kind of ['PPRN', 'PPRT', 'PPRM'] as const) {
+      const path = `gaspar/${kind.toLowerCase()}`;
+      // v2 : `codesInsee` (ni `code_insee` ni `codeInsee`, ignorés : toute la France revient).
+      const page = SpringPage.safeParse(await this.json(path, { codesInsee: code, pageNumber: '0', pageSize: '100' }, true));
+      if (!page.success) throw new SourceError(SOURCE, 'invalid', `Géorisques v2 ${kind} : réponse inattendue`);
+      for (const p of parse(Plan, page.data.content)) {
+        // Le détail porte l'état et les dates par commune ; on s'en passe au-delà du plafond.
+        const details = plans.length < MAX_PLAN_DETAILS ? PlanDetails.safeParse(await this.json(`${path}/${encodeURIComponent(p.idGaspar)}`, {}, true)) : null;
+        const commune = details?.success ? details.data.communes.find((c) => c.codeInsee === code) : undefined;
+        const hazards = commune?.aleas ?? [];
+        plans.push({
+          ...this.planBase(p, kind),
+          ...planState(hazards),
+          hazards: [...new Set(hazards.map((h) => h.libelle))],
+          prefectureUrl: commune?.lienPpr ?? null,
+        });
+      }
+    }
+    return plans;
+  }
+
+  private planBase(p: z.output<typeof Plan>, kind: PlanInfo['kind']) {
+    return {
+      id: p.idGaspar,
+      kind,
+      label: p.libPpr,
+      model: p.modeleProcedure,
+      modifiedAt: p.dateModification,
+      zones: (p.zonageReglementaire?.listTypeReg ?? []).map((z) => ({ code: z.codeZone, label: z.libelle, name: z.nom })),
+    };
+  }
+
+  private async plansV1(code: string): Promise<PlanInfo[]> {
+    const plans: PlanInfo[] = [];
+    for (const kind of ['PPRN', 'PPRT'] as const) {
+      const page = SpringPage.safeParse(await this.json(`gaspar/${kind.toLowerCase()}`, { codeInsee: code, page: '1', page_size: '50' }));
+      if (!page.success) throw new SourceError(SOURCE, 'invalid', `Géorisques ${kind} : réponse inattendue`);
+      for (const p of parse(Plan, page.data.content)) {
+        plans.push({ ...this.planBase(p, kind), state: null, approvedAt: null, prescribedAt: null, hazards: [], prefectureUrl: null });
+      }
+    }
+    return plans;
+  }
+
+  /** Arrêtés de catastrophe naturelle de la commune. */
+  async catnat(code: string): Promise<Listing<z.output<typeof CatNat>>> {
+    const r = await this.list('gaspar/catnat', { code_insee: code });
+    return { items: parse(CatNat, r.items), truncated: r.truncated };
+  }
+
+  /**
+   * Installations classées à moins de `radiusM` mètres d'un point. Par rayon et non par commune :
+   * une grande ville en compte des centaines, dont seules quelques-unes sont voisines.
+   */
+  async installations(lon: number, lat: number, radiusM: number): Promise<Listing<z.output<typeof Installation>>> {
+    const r = await this.list('installations_classees', near(lon, lat, radiusM));
+    return { items: parse(Installation, r.items), truncated: r.truncated };
+  }
+
+  /**
+   * Secteurs d'information sur les sols (SIS) et anciens sites industriels (CASIAS) à moins de
+   * `radiusM` mètres d'un point. CASIAS par commune est lent (5 à 11 s dans une grande ville, plus de
+   * 2 000 sites à Bordeaux, mesuré le 02/10/2026) ; par rayon de 500 m, 0,1 à 1 s.
+   */
+  async pollutedSites(lon: number, lat: number, radiusM: number): Promise<Listing<PollutedSiteInfo>> {
+    const [sis, casias] = await Promise.all([this.list('ssp/conclusions_sis', near(lon, lat, radiusM)), this.list('ssp/casias', near(lon, lat, radiusM))]);
+    const map = (kind: PollutedSiteInfo['kind']) => (s: z.output<typeof PollutedSite>) => ({
+      id: s.identifiant_ssp,
+      kind,
+      name: s.nom ?? s.nom_etablissement,
+      url: s.fiche_risque,
+      geometry: s.geom ?? null,
+    });
+    return { items: [...parse(PollutedSite, sis.items).map(map('SIS')), ...parse(PollutedSite, casias.items).map(map('CASIAS'))], truncated: sis.truncated || casias.truncated };
+  }
+
+  /** Cavités souterraines à moins de `radiusM` mètres d'un point. */
+  async cavities(lon: number, lat: number, radiusM: number): Promise<Listing<z.output<typeof Cavity>>> {
+    const r = await this.list('cavites', near(lon, lat, radiusM));
+    return { items: parse(Cavity, r.items), truncated: r.truncated };
+  }
+
+  /** Exposition au retrait-gonflement des argiles en un point : `'1'`, `'2'`, `'3'`, ou `null` hors zone. */
+  async clay(lon: number, lat: number): Promise<string | null> {
+    const url = `${GEORISQUES_BASE}/rga?${new URLSearchParams({ latlon: `${lon.toFixed(6)},${lat.toFixed(6)}` })}`;
+    const r = await this.http.get({ url, timeoutMs: 8_000 });
+    if (r.status !== 200) throw new SourceError(SOURCE, 'unavailable', `Géorisques rga : HTTP ${r.status}`);
+    const text = r.body.toString('utf8').trim();
+    // Hors zone d'exposition, la réponse est vide.
+    if (text === '' || text === '{}') return null;
+    try {
+      return Clay.parse(JSON.parse(text)).codeExposition ?? null;
+    } catch {
+      throw new SourceError(SOURCE, 'invalid', 'Géorisques rga : réponse illisible');
+    }
+  }
+}

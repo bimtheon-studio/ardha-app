@@ -52,6 +52,7 @@ const LAYERS = {
   ],
   defaultBasemap: 'osm',
   parcelsMinZoom: 16,
+  riskLayers: [],
 };
 
 function commune(status: Commune['cadastre']['status'], extra: Partial<Commune['cadastre']> = {}): Commune {
@@ -66,6 +67,8 @@ function commune(status: Commune['cadastre']['status'], extra: Partial<Commune['
 const ADDRESS = {
   id: '94046_7120_00009',
   label: '9 Rue Pasteur 94700 Maisons-Alfort',
+  name: '9 Rue Pasteur',
+  street: 'Rue Pasteur',
   context: '94, Val-de-Marne, Île-de-France',
   kind: 'housenumber',
   lon: 2.43,
@@ -83,6 +86,8 @@ function api(overrides: Record<string, unknown> = {}) {
     'GET /api/auth/me': { status: 200, body: alice },
     'GET /api/map/layers': { status: 200, body: LAYERS },
     'GET /api/communes/locate': { status: 200, body: { commune: { code: '94046', name: 'Maisons-Alfort' } } },
+    'GET /api/studies': { status: 200, body: { studies: [] } },
+    'GET /api/parcels/elevation': { status: 200, body: { overall: { min: 31.9, max: 32.6, mean: 32.2, range: 0.7, points: 23 }, parcels: [], source: 'IGN' } },
     'GET /api/communes/94046': { status: 200, body: commune('ready') },
     'POST /api/communes/94046/cadastre': { status: 202, body: commune('ready') },
     'GET /api/parcels': (_, url) => {
@@ -322,7 +327,8 @@ describe('carte : fond', () => {
   it('l’accueil mène à la carte', async () => {
     api();
     renderAt('/');
-    await userEvent.click(await screen.findByRole('link', { name: 'Choisir des parcelles' }));
+    await screen.findByText('Aucune étude pour l’instant');
+    await userEvent.click(screen.getAllByRole('link', { name: 'Nouvelle étude' })[0]!);
     expect(await screen.findByTestId('map')).toBeInTheDocument();
   });
 });

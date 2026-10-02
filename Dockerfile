@@ -51,6 +51,8 @@ ENV NODE_ENV=production \
     API_HOST=0.0.0.0 \
     API_PORT=80 \
     TRUST_PROXY=1 \
+    FILES_DRIVER=disk \
+    FILES_DIR=/storage/files \
     FRONTEND_DIR=/app/frontend/dist
 USER node
 EXPOSE 80

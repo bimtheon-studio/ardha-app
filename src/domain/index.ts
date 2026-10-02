@@ -7,3 +7,7 @@ export * from './commune.ts';
 export * from './geometry.ts';
 export * from './parcel-id.ts';
 export * from './selection.ts';
+export * from './addresses.ts';
+export * from './study.ts';
+export * from './tiles.ts';
+export * from './risks.ts';

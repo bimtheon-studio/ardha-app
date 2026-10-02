@@ -1,0 +1,5 @@
+{
+  "url": "https://www.georisques.gouv.fr/api/v2/gaspar/pprn?codesInsee=94046&pageNumber=0&pageSize=100",
+  "status": 200,
+  "contentType": "application/json"
+}

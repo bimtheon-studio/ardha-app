@@ -20,6 +20,10 @@ export const Address = z.object({
   /** Identifiant BAN. */
   id: z.string(),
   label: z.string(),
+  /** Sans code postal ni commune : « 2 Rue Étienne Dolet », « Rue Pasteur », « Les Fourches ». */
+  name: z.string(),
+  /** Voie, sans le numéro ; nulle pour un lieu-dit ou une commune. */
+  street: z.string().nullable(),
   /** « 94, Val-de-Marne, Île-de-France ». */
   context: z.string(),
   kind: z.enum(['housenumber', 'street', 'locality', 'municipality']),
@@ -116,8 +120,30 @@ export const Basemap = z.object({
 });
 export type Basemap = z.infer<typeof Basemap>;
 
-export const MapLayers = z.object({ basemaps: z.array(Basemap), defaultBasemap: z.string(), parcelsMinZoom: z.number().int() });
+/** Couche de risques en WMS, affichée par-dessus le fond (F-04, Q8). */
+export const RiskLayer = z.object({
+  id: z.string(),
+  label: z.string(),
+  /** Adresse du service WMS. */
+  url: z.string(),
+  /** Couches WMS, séparées par des virgules. */
+  layers: z.string(),
+  attribution: z.string(),
+});
+export type RiskLayer = z.infer<typeof RiskLayer>;
+
+export const MapLayers = z.object({ basemaps: z.array(Basemap), defaultBasemap: z.string(), parcelsMinZoom: z.number().int(), riskLayers: z.array(RiskLayer) });
 export type MapLayers = z.infer<typeof MapLayers>;
+
+const ElevationStats = z.object({ min: z.number(), max: z.number(), mean: z.number(), range: z.number(), points: z.number().int() });
+
+/** Altitudes d'une sélection de parcelles (F-04, Q6) : par parcelle et en tout, m NGF. */
+export const SelectionElevation = z.object({
+  overall: ElevationStats.nullable(),
+  parcels: z.array(z.object({ id: z.string(), stats: ElevationStats.nullable() })),
+  source: z.string(),
+});
+export type SelectionElevation = z.infer<typeof SelectionElevation>;
 
 export const geoRoutes = {
   addressSearch: route({
@@ -177,6 +203,21 @@ export const geoRoutes = {
     body: undefined,
     query: ParcelsQuery,
     response: Parcels,
+    status: 200,
+    authenticated: true,
+  }),
+  parcelsElevation: route({
+    method: 'GET',
+    path: '/api/parcels/elevation',
+    summary: 'Altitudes de parcelles (IGN, par le worker) : min, max, moyenne, dénivelé',
+    body: undefined,
+    query: z.object({
+      ids: z
+        .string()
+        .refine((t) => t.split(',').every(isParcelId), 'Identifiant de parcelle invalide.')
+        .refine((t) => t.split(',').length <= SELECTION_MAX, `Au plus ${SELECTION_MAX} parcelles.`),
+    }),
+    response: SelectionElevation,
     status: 200,
     authenticated: true,
   }),

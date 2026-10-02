@@ -37,8 +37,11 @@ export function Shell() {
           <Link to="/" className="text-lg font-extrabold tracking-tight text-primary">
             Ardha
           </Link>
+          <NavLink end to="/" className={({ isActive }) => `text-sm ${isActive ? 'font-semibold text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+            Études
+          </NavLink>
           <NavLink to="/map" className={({ isActive }) => `text-sm ${isActive ? 'font-semibold text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-            Carte
+            Nouvelle étude
           </NavLink>
         </nav>
         <DropdownMenu>

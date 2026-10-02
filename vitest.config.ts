@@ -36,10 +36,10 @@ export default defineConfig({
       // jamais ne les baisse ; la CI échoue en dessous. Au moins 90 % sur le domaine.
       thresholds: {
         autoUpdate: process.env.CI ? false : (threshold: number) => Math.floor(threshold),
-        lines: 97,
-        functions: 95,
-        branches: 89,
-        statements: 97,
+        lines: 98,
+        functions: 97,
+        branches: 90,
+        statements: 98,
         'src/domain/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
         'src/contracts/**': { lines: 100, functions: 100, branches: 100, statements: 100 },
       },

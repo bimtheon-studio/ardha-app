@@ -13,6 +13,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { IMAGE } from './build-image.ts';
 
 const ROOT = new URL('../..', import.meta.url).pathname;
+/** Migrations du dépôt, d'après le journal de drizzle-kit. */
+const MIGRATIONS = (JSON.parse(readFileSync(path.join(ROOT, 'drizzle/meta/_journal.json'), 'utf8')) as { entries: unknown[] }).entries.length;
 const ID = `ardha-envtest-${process.pid}`;
 const DOMAIN = 'test.local';
 const home = mkdtempSync(path.join(tmpdir(), 'ardha-env-'));
@@ -122,7 +124,7 @@ describe('ardha-env', () => {
   it('create production : base et rôle à son nom, sans droits de superutilisateur ; migrée, pas semée', () => {
     expect(ok('create', 'production', '--image', IMAGE)).toMatch(/Environnement production prêt : https:\/\/ardha\.test\.local/);
     expect(sql('postgres', `SELECT rolsuper FROM pg_roles WHERE rolname = 'ardha_production'`)).toBe('f');
-    expect(sql('ardha_production', 'SELECT count(*) FROM drizzle.__drizzle_migrations')).toBe('3');
+    expect(sql('ardha_production', 'SELECT count(*) FROM drizzle.__drizzle_migrations')).toBe(String(MIGRATIONS));
     expect(sql('ardha_production', 'SELECT count(*) FROM communes')).toBe('0');
     expect(statSync(path.join(home, 'envs/production.env')).mode & 0o777).toBe(0o600);
     expect(calls().at(-1)).toBe(
@@ -269,6 +271,22 @@ describe('ardha-env', () => {
     expect(secrets).toMatch(/^REGISTRY_PASSWORD=ghp_second$/m);
     expect(statSync(path.join(home, 'secrets.env')).mode & 0o777).toBe(0o600);
     expect(ci('registry --username x').err).toMatch(/commande refusée à la CI/);
+  });
+
+  it('app-secret : secret de l’application dans secrets.env (entrée standard), passé à chaque déploiement ; nom connu seulement ; pas pour la CI', () => {
+    const set = (name: string, value: string) => spawnSync(path.join(ROOT, 'deploy/server/ardha-env'), ['app-secret', name], { env, encoding: 'utf8', input: value });
+    expect(set('AUTRE', 'x\n').stderr).toMatch(/secret inconnu « AUTRE »/);
+    expect(set('GEORISQUES_TOKEN', '').stderr).toMatch(/valeur vide/);
+    expect(set('GEORISQUES_TOKEN', 'a b\n').stderr).toMatch(/valeur inattendue/);
+    expect(set('GEORISQUES_TOKEN', 'eyJ.premier_-1\n').status).toBe(0);
+    expect(set('GEORISQUES_TOKEN', 'eyJ.second\n').stdout).toMatch(/Secret GEORISQUES_TOKEN enregistré/);
+    const secrets = readFileSync(path.join(home, 'secrets.env'), 'utf8');
+    expect(secrets.match(/^APP_GEORISQUES_TOKEN=/gm)).toHaveLength(1);
+    expect(secrets).toMatch(/^APP_GEORISQUES_TOKEN=eyJ\.second$/m);
+    expect(statSync(path.join(home, 'secrets.env')).mode & 0o777).toBe(0o600);
+    expect(ci('app-secret GEORISQUES_TOKEN').err).toMatch(/commande refusée à la CI/);
+    ok('update', 'production', '--image', IMAGE);
+    expect(calls().at(-1)).toMatch(/--env LOG_LEVEL=… --env GEORISQUES_TOKEN=…/);
   });
 
   it('un déploiement en échec ne laisse rien', () => {

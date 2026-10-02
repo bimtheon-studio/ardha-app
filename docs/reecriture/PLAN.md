@@ -191,7 +191,7 @@ un devis. La vélocité se mesure sur L1, puis on projette. Feuilles de route d�
 |---|---|---|---|
 | **L0 · Socle** ([feuille de route](lots/L0-socle.md)) | compte, connexion ; stack de dev par worktree | — | 265 + infra |
 | **L1 · Carte et parcellaire** ([feuille de route](lots/L1-carte-parcellaire.md)) | adresse, cadastre, sélection de parcelles | L0 | 1 306 + partagé |
-| **L2 · Étude** | enregistrer, rouvrir, consulter sur mobile | L1 | 1 818 |
+| **L2 · Étude** ([feuille de route](lots/L2-etude.md)) | enregistrer, rouvrir, consulter sur mobile | L1 | 1 818 |
 | **L3 · Chaîne PLU et urbanisme** | zone, règles vérifiées et citations, documents, OAP | L1, extracteur voisin | 5 563 + 20 functions (6 623) |
 | **L4 · Risques** | Géorisques, argiles, altimétrie, PPRI, poteaux incendie | L2 | 1 611 |
 | **L5 · Foncier et marché** | DVF, prix du neuf, Sitadel, indices | L2 | 1 862 + 5 functions (1 608) |
@@ -372,6 +372,16 @@ Les arbitrages fonctionnels, rendus le 01/10/2026, sont dans [F-01](fiches/F-01-
 | DT-26 | **e2e Playwright** sur une stack jetable (`e2e/stack.ts` : base `ardha_e2e`, sources enregistrées, tuiles interceptées), ports e2e décalés par worktree (17000, 18000), Chromium du système ou de Playwright | e2e contre la stack de dev | reproductible, sans Internet, en parallèle d'une stack de dev ; 12 s tout compris |
 | DT-27 | **Lint obligatoire en pre-commit** : hook versionné `tools/hooks/pre-commit` (`core.hooksPath`, posé par `prepare` à l'installation), fichiers indexés seulement, tout le dépôt si la configuration change | husky, lint-staged | consigne du porteur du produit (01/10/2026) ; aucune dépendance de plus ; ~2 s par commit |
 | DT-28 | **Perf des tests suivie** : `pnpm test:perf` (durée par suite, fichiers et tests les plus lents), journal `docs/reecriture/PERF-TESTS.md` ; front testé sous **happy-dom** | jsdom | consigne du porteur du produit (01/10/2026) : la base de tests va grossir vite ; happy-dom : front 5,1 → 4,3 s |
+| DT-29 | **Étude** : `studies` + `study_parcels` (copie de la géométrie, de la contenance et du millésime ; pas de clé vers `parcels`) ; écritures **commutatives** (ajouter ou retirer *une* parcelle, sous `FOR UPDATE`) plutôt qu'une version d'étude | une colonne `version` et des conflits 409 | deux onglets ne s'écrasent pas, sans écran de conflit ; la référence se remplace à chaque millésime, la copie reste (PLAN §4) |
+| DT-30 | Ce que le worker déduit d'une étude (adresse, vignette) vaut pour une **empreinte des parcelles** (`parcels_key`, FNV-1a des IDU triés) : jobId par empreinte, écriture seulement si l'empreinte n'a pas bougé, réconciliation des études « en retard » | un état `pending/ready` par calcul | aucun calcul périmé n'écrase un plus récent ; l'état reste dans Postgres, Redis se reconstruit (PLAN §3) |
+| DT-31 | **Magasin de fichiers** à deux implémentations (`src/shared/files.ts`) : disque (`/storage`, production) et S3 (`@aws-sdk/client-s3`, MinIO en local et en test) | S3 seul ; fichiers en base | F-02 Q11 (porteur du produit, 01/10/2026) : rien de plus à installer ni à sauvegarder sous once ; S3 par configuration le jour venu |
+| DT-32 | **Vignette** composée par le worker avec **sharp** 0.35 (tuiles assemblées + contours en SVG, PNG en palette, 480 × 300, ≈ 20 Ko), cadrage Web Mercator dans le domaine (`frameBbox`) | canvas dans Node ; tuile brute comme avant | D-08 ; binaires précompilés, sans dépendance système dans l'image |
+| DT-33 | **Analyses d'étude** dans `study_analyses` (une par étude et par type, pour une empreinte de parcelles ; résultat jsonb validé par un schéma zod versionné, relu à chaque lecture ; synthèse recalculée à la lecture) | une table par analyse ; synthèse figée | PLAN §4 (`etude_analyse`) ; servira à L3, L5, L7 ; une règle corrigée s'applique sans refaire l'analyse |
+| DT-34 | Chaque donnée d'une analyse porte son état **`ok` / `unavailable`** ; une source muette ne fait pas échouer l'analyse | échec global, ou silence | F-04 Q4 : l'ancien code concluait « aucun risque » sur une panne |
+| DT-35 | Couches de risques en **tuiles WMS chargées par le navigateur** (Géorisques, BRGM), comme les fonds de carte, sans GetFeatureInfo | proxy par le worker | D-08 étendu, F-04 Q8, arbitré le 02/10/2026 ; les données, elles, passent par le worker |
+| DT-36 | **Géorisques v2** par un jeton personnel du porteur du produit (`GEORISQUES_TOKEN`, worker seul, jamais dans git), en-tête `Authorization`, **repli v1** sans jeton ; tests et e2e en v1 | v2 seule | F-04 Q12 : états et dates des PPR, PPR miniers ; aucune dépendance au jeton pour tester |
+| DT-37 | **Bornes incendie en base** (`hydrants`), par case de la grille de 0,01°, état par case dans `source_states` (`osm-hydrants`), rechargées au bout de 30 jours ; une case connue sert même vieille quand Overpass sature, l'analyse cite la date | cache Redis ; appel à chaque analyse | Overpass répond souvent 504 et 429 (constaté les 01 et 02/10/2026) ; deux études voisines partagent leurs cases ; données de référence en base (PLAN §4) |
+| DT-38 | **Données communales de Géorisques gardées 30 jours** (`commune_risks`, une ligne par commune et par donnée ; donnée ancienne servie si la source se tait) ; installations classées, SIS et CASIAS **par rayon autour des parcelles**, plus par commune ; étape à part dans le déroulé | appel à chaque analyse ; recherche par commune | mesuré le 02/10/2026 sur 13 communes : CASIAS par commune 6,2 s en moyenne (jusqu'à 11 s, 2 093 sites à Bordeaux, liste tronquée) contre 0,1 à 0,4 s par rayon ; la commune revient en 0 s depuis la base |
 
 ## 12. Questions ouvertes
 
@@ -379,7 +389,7 @@ Les arbitrages fonctionnels, rendus le 01/10/2026, sont dans [F-01](fiches/F-01-
 |---|---|
 | Propriété | À quel nom ouvrir le dépôt, le cloud, le domaine, le compte LLM, Sentry ? |
 | ~~Hébergeur~~ | ~~Lequel ?~~ Tranché le 01/10/2026 : once (D-13) |
-| Fichiers sous once | S3 (MinIO à côté de Postgres) ou fichiers dans `/storage`, sauvegardés par once ? À trancher au premier fichier stocké (L3, PDF d'urbanisme) |
+| ~~Fichiers sous once~~ | Tranché le 01/10/2026 (F-02, Q11) : magasin de fichiers disque (`/storage`) en production, S3 (MinIO) en local et en test ; S3 en production par configuration plus tard |
 | LLM | Garder Azure OpenAI sur un compte propre, ou changer ? |
 | Extracteur voisin | Caler le format de sortie de `plui-extract` sur `reglement_segment` (conditionne L3) |
 | Fonds de carte | Quel taux d'erreurs de tuiles déclenche le proxy ? À fixer après quelques semaines de mesure |
@@ -390,6 +400,24 @@ vers des comptes pas encore recréés) ; aucune migration ne les a réinjectées
 été supprimée le 27/09. Sans conséquence pour la réécriture, qui repart de zéro.
 
 ## Journal
+
+- **02/10/2026** — arbitrages F-04 Q1 à Q14 rendus (Q6 altitudes aussi sur la carte, Q9 surcoûts dès
+  L4, Q10 alentours à 500 m, Q12 jeton Géorisques v2) et repris ; DT-36.
+
+- **02/10/2026 (nuit)** — **L4 codé et recetté en local** sur `l4-risks` (partie de `l2-study`) :
+  analyse des risques par le worker (Géorisques v1, TRI, altimétrie IGN, OSM), page Risques de
+  l'étude, CLI `risk:*` ; DT-33 à DT-35. **Arbitrages F-04 Q1 à Q14 provisoires**, à confirmer.
+  L2 : CI réparée (nombre de migrations, fusion de `master`), environnement de PR déployé.
+
+- **01/10/2026** — **L2 codé et recetté en local** sur `l2-study` (F-02) : études en base, API,
+  worker (adresse, vignette), CLI `study:*`, accueil, page de l'étude, corbeille, carte de l'étude ;
+  DT-29 à DT-32. Tests : 333 back, 70 front, 11 e2e, 37 s en tout (machine chargée).
+
+- **01/10/2026** — **L2 lancé** sur la branche `l2-study` ; arbitrages F-02 Q1 à Q12 rendus :
+  enregistrement automatique après « Créer l'étude », nom proposé puis stable, adresse calculée par
+  le worker, statut remplacé par les étapes, corbeille de 30 jours, duplication, pages uniques pour
+  le mobile, vignette OSM composée par le worker, fichiers sur disque (`/storage`) en production et
+  S3 en local. Feuille de route : [`lots/L2-etude.md`](lots/L2-etude.md).
 
 - **01/10/2026** — **hébergement : once** (D-13), après étude de Clever Cloud ; branche `staging`
   abandonnée au profit d'un environnement éphémère par PR (D-11 amendée). Feuille de route :

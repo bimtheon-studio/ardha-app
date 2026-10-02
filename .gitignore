@@ -9,3 +9,4 @@ docker-compose.override.yaml
 .idea/
 /playwright-report/
 /test-results/
+/.files/

@@ -3,9 +3,11 @@
 import type { SelectionSummary } from '@domain';
 import { formatArea } from '@domain';
 import { AlertTriangle, LocateFixed, MapPin, Trash2, X } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
 
+import { ElevationSummary } from './ElevationSummary';
 import type { SelectedParcel } from './selection';
 
 interface Props {
@@ -16,12 +18,15 @@ interface Props {
   refusal: string | null;
   communeNames: ReadonlyMap<string, string>;
   onRemove: (id: string) => void;
-  onClear: () => void;
+  /** Absent sur la carte d'une étude : elle garde toujours une parcelle. */
+  onClear?: () => void;
   onRecenter: () => void;
   onDismissRefusal: () => void;
+  /** Sous la sélection : « Créer l'étude ». */
+  children?: ReactNode;
 }
 
-export function SelectionPanel({ selection, summary, pending, unknown, refusal, communeNames, onRemove, onClear, onRecenter, onDismissRefusal }: Props) {
+export function SelectionPanel({ selection, summary, pending, unknown, refusal, communeNames, onRemove, onClear, onRecenter, onDismissRefusal, children }: Props) {
   return (
     <section aria-labelledby="selection-title" className="space-y-3">
       <h2 id="selection-title" className="eyebrow text-primary">
@@ -70,6 +75,7 @@ export function SelectionPanel({ selection, summary, pending, unknown, refusal, 
               {formatArea(summary.area)}
             </dd>
           </dl>
+          <ElevationSummary ids={selection.map((p) => p.id)} />
           {summary.withoutContenance > 0 && (
             <p className="text-xs text-muted-foreground">{summary.withoutContenance} parcelle(s) sans contenance cadastrale, hors du total.</p>
           )}
@@ -83,10 +89,13 @@ export function SelectionPanel({ selection, summary, pending, unknown, refusal, 
             <Button type="button" variant="outline" size="sm" onClick={onRecenter}>
               <LocateFixed /> Recentrer
             </Button>
-            <Button type="button" variant="ghost" size="sm" onClick={onClear}>
-              <Trash2 /> Tout effacer
-            </Button>
+            {onClear && (
+              <Button type="button" variant="ghost" size="sm" onClick={onClear}>
+                <Trash2 /> Tout effacer
+              </Button>
+            )}
           </div>
+          {children}
         </>
       )}
       {unknown.length > 0 && <p className="text-xs text-muted-foreground">Parcelle(s) introuvable(s) : {unknown.join(', ')}.</p>}

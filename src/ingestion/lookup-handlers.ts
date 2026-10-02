@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 
 import type { LookupJobs, LookupName } from '../geo/lookups.ts';
 import { Communes } from '../sources/communes.ts';
+import { Elevation } from '../sources/elevation.ts';
 import { Geocoding } from '../sources/geocoding.ts';
 
 @Injectable()
@@ -10,6 +11,7 @@ export class LookupHandlers {
   constructor(
     private readonly geocoding: Geocoding,
     private readonly communes: Communes,
+    private readonly elevation: Elevation,
   ) {}
 
   handle<N extends LookupName>(name: N, input: LookupJobs[N]['input']): Promise<LookupJobs[N]['output']>;
@@ -26,6 +28,10 @@ export class LookupHandlers {
       case 'commune:locate': {
         const { lon, lat } = input as LookupJobs['commune:locate']['input'];
         return this.communes.locate(lon, lat);
+      }
+      case 'elevation:points': {
+        const { points } = input as LookupJobs['elevation:points']['input'];
+        return this.elevation.points(points);
       }
       default:
         throw new Error(`Recherche inconnue : ${String(name)}`);

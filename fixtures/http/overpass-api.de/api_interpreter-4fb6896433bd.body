@@ -1,0 +1,99 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62.11 87bfad18",
+  "osm3s": {
+    "timestamp_osm_base": "2026-10-02T05:48:04Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+
+{
+  "type": "node",
+  "id": 4387107312,
+  "lat": 45.9252641,
+  "lon": 6.1334789,
+  "tags": {
+    "emergency": "fire_hydrant"
+  }
+},
+{
+  "type": "node",
+  "id": 4387215812,
+  "lat": 45.9259627,
+  "lon": 6.1322858,
+  "tags": {
+    "emergency": "fire_hydrant"
+  }
+},
+{
+  "type": "node",
+  "id": 4387245310,
+  "lat": 45.9208308,
+  "lon": 6.1391263,
+  "tags": {
+    "emergency": "fire_hydrant"
+  }
+},
+{
+  "type": "node",
+  "id": 4387251105,
+  "lat": 45.9235635,
+  "lon": 6.1362861,
+  "tags": {
+    "emergency": "fire_hydrant"
+  }
+},
+{
+  "type": "node",
+  "id": 4975023966,
+  "lat": 45.9273079,
+  "lon": 6.1314829,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:type": "pillar"
+  }
+},
+{
+  "type": "node",
+  "id": 4988391128,
+  "lat": 45.9226612,
+  "lon": 6.1338667,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:type": "pillar"
+  }
+},
+{
+  "type": "node",
+  "id": 4989824868,
+  "lat": 45.9218449,
+  "lon": 6.1325034,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:type": "pillar"
+  }
+},
+{
+  "type": "node",
+  "id": 5002904252,
+  "lat": 45.9235232,
+  "lon": 6.1399318,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:type": "pillar"
+  }
+},
+{
+  "type": "node",
+  "id": 5002904255,
+  "lat": 45.9238889,
+  "lon": 6.1384486,
+  "tags": {
+    "emergency": "fire_hydrant",
+    "fire_hydrant:position": "sidewalk",
+    "fire_hydrant:type": "pillar"
+  }
+}
+
+  ]
+}

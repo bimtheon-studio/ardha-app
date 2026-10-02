@@ -20,6 +20,8 @@ describe('Geocoding', () => {
     expect(a).toEqual({
       id: '94046_7120_00009',
       label: '9 Rue Pasteur 94700 Maisons-Alfort',
+      name: '9 Rue Pasteur',
+      street: 'Rue Pasteur',
       context: '94, Val-de-Marne, Île-de-France',
       kind: 'housenumber',
       lon: expect.closeTo(2.43, 2),
@@ -35,7 +37,7 @@ describe('Geocoding', () => {
     const feature = { geometry: { coordinates: [1, 2] }, properties: { id: 'x', label: 'L', type: 'street', citycode: '37023', city: 'B' } };
     const http = new FakeHttp({ [`${GEOCODING_BASE}/search`]: { json: { features: [feature, { geometry: null }] } } });
     expect(await new Geocoding(http).search('rue', 5)).toEqual([
-      { id: 'x', label: 'L', context: '', kind: 'street', lon: 1, lat: 2, communeCode: '37023', city: 'B', postcode: null, score: 0 },
+      { id: 'x', label: 'L', name: 'L', street: 'L', context: '', kind: 'street', lon: 1, lat: 2, communeCode: '37023', city: 'B', postcode: null, score: 0 },
     ]);
     expect(http.calls[0]).toBe(`${GEOCODING_BASE}/search?q=rue&limit=5&index=address`);
     await expect(new Geocoding(new FakeHttp({ [GEOCODING_BASE]: { status: 500 } })).search('rue', 5)).rejects.toThrow('Géocodage : HTTP 500');

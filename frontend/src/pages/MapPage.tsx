@@ -1,12 +1,16 @@
 // Carte et parcellaire (F-01) : chercher une adresse, voir le cadastre, sélectionner des parcelles
 // contiguës. Le panneau est à gauche sur ordinateur, sous la carte sur mobile (Q10).
+// Deux usages : `/map`, une sélection libre (dans l'URL) dont on crée une étude ; `/studies/:id/map`,
+// la sélection d'une étude, enregistrée à chaque clic (F-02, Q1 et Q8).
 import type { Address } from '@contracts';
 import { type Bbox, bboxOf, gridCells, unionBbox } from '@domain';
 import { useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { ArrowLeft, Check, FilePlus2, LoaderCircle } from 'lucide-react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 
 import { Loading } from '@/components/Loading';
+import { Button } from '@/components/ui/button';
 import { AddressSearch } from '@/map/AddressSearch';
 import { useCommune, useLoadCadastre, useLocate, useMapLayers, useParcelsInCells } from '@/map/api';
 import { BasemapSwitch } from '@/map/BasemapSwitch';
@@ -15,6 +19,8 @@ import type { Target, Viewport } from '@/map/leaflet/MapView';
 import { SelectionPanel } from '@/map/SelectionPanel';
 import { useSelection } from '@/map/selection';
 import { FRANCE, formatView, parseView } from '@/map/url-state';
+import { useCreateStudy } from '@/studies/api';
+import { useStudySelection } from '@/studies/selection';
 
 const MapView = lazy(() => import('@/map/leaflet/MapView'));
 
@@ -31,6 +37,7 @@ function readMuted(): boolean {
 }
 
 export function MapPage() {
+  const studyId = useParams().id ?? null;
   const layers = useMapLayers();
   const [params, setParams] = useSearchParams();
   const [initialView] = useState(() => parseView(params.get('at')) ?? FRANCE);
@@ -50,8 +57,21 @@ export function MapPage() {
   }, [closeEnough, viewport]);
 
   const parcels = useParcelsInCells(cells);
-  const sel = useSelection(parcels.features);
+  const free = useSelection(parcels.features);
+  const ofStudy = useStudySelection(studyId);
+  const sel = studyId ? ofStudy : free;
+  const study = ofStudy.study.data;
   const selectedIds = useMemo(() => new Set(sel.ids), [sel.ids]);
+  const create = useCreateStudy();
+  const navigate = useNavigate();
+
+  // Carte d'une étude ouverte sans position : cadrée sur ses parcelles, une fois.
+  const [framed, setFramed] = useState(params.has('at'));
+  if (study && !framed) {
+    setFramed(true);
+    // Une étude a toujours au moins une parcelle : l'emprise existe.
+    setTarget({ key: -1, bounds: unionBbox(study.parcels.map((p) => bboxOf(p.geometry)))! });
+  }
 
   // La commune au centre de la vue ; son cadastre se charge de lui-même s'il manque (Q3).
   const located = useLocate(closeEnough ? viewport.center : null);
@@ -103,7 +123,7 @@ export function MapPage() {
 
   function recenter() {
     const bounds = unionBbox(sel.selection.map((p) => bboxOf(p.geometry)));
-    if (bounds) setTarget({ key: Date.now(), bounds });
+    if (bounds) setTarget({ key: -1, bounds });
   }
 
   function chooseMuted(m: boolean) {
@@ -134,10 +154,31 @@ export function MapPage() {
   return (
     <div className="flex h-[calc(100dvh-3.5rem)] flex-col md:flex-row">
       <aside className="order-2 max-h-[45dvh] space-y-6 overflow-y-auto border-t bg-card p-4 md:order-1 md:max-h-none md:w-[360px] md:shrink-0 md:border-t-0 md:border-r">
-        <div className="space-y-1">
-          <p className="eyebrow text-primary">Carte et parcellaire</p>
-          <h1 className="text-xl">Choisir des parcelles</h1>
-        </div>
+        {studyId ? (
+          <div className="space-y-2">
+            <Link to={`/studies/${studyId}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="size-4" /> Retour à l’étude
+            </Link>
+            <p className="eyebrow text-primary">Parcelles de l’étude</p>
+            <h1 className="text-xl">{study?.name ?? 'Chargement…'}</h1>
+            <p role="status" className="flex items-center gap-1 text-sm text-muted-foreground">
+              {ofStudy.saving ? (
+                <>
+                  <LoaderCircle className="size-4 animate-spin" /> Enregistrement…
+                </>
+              ) : (
+                <>
+                  <Check className="size-4" /> Chaque clic est enregistré.
+                </>
+              )}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <p className="eyebrow text-primary">Nouvelle étude</p>
+            <h1 className="text-xl">Choisir des parcelles</h1>
+          </div>
+        )}
         <AddressSearch onChoose={chooseAddress} />
         <CommuneStatus
           commune={commune.data}
@@ -152,10 +193,34 @@ export function MapPage() {
           refusal={sel.refusal}
           communeNames={communeNames}
           onRemove={sel.remove}
-          onClear={sel.clear}
+          {...(!studyId && { onClear: free.clear })}
           onRecenter={recenter}
           onDismissRefusal={sel.dismissRefusal}
-        />
+        >
+          {studyId ? (
+            <Button asChild className="w-full">
+              <Link to={`/studies/${studyId}`}>
+                <Check /> Terminer
+              </Link>
+            </Button>
+          ) : (
+            <div className="space-y-2">
+              <Button
+                type="button"
+                className="w-full"
+                disabled={create.isPending}
+                onClick={() => create.mutate(free.ids, { onSuccess: (s) => void navigate(`/studies/${s.id}`) })}
+              >
+                <FilePlus2 /> {create.isPending ? 'Création…' : 'Créer l’étude'}
+              </Button>
+              {create.error && (
+                <p role="alert" className="text-sm text-destructive">
+                  {create.error.message}
+                </p>
+              )}
+            </div>
+          )}
+        </SelectionPanel>
         <BasemapSwitch basemaps={layers.data.basemaps} value={basemap.id} muted={muted} onChange={setBasemapId} onMutedChange={chooseMuted} />
       </aside>
       <div className="relative order-1 min-h-[55dvh] flex-1 md:order-2">

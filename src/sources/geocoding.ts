@@ -13,6 +13,8 @@ const Feature = z.object({
   properties: z.object({
     id: z.string(),
     label: z.string(),
+    name: z.string().optional(),
+    street: z.string().optional(),
     context: z.string().default(''),
     type: z.enum(['housenumber', 'street', 'locality', 'municipality']),
     citycode: z.string(),
@@ -27,9 +29,12 @@ function toAddress(raw: unknown): Address | null {
   const r = Feature.safeParse(raw);
   if (!r.success) return null;
   const { geometry, properties: p } = r.data;
+  const name = p.name ?? p.label;
   return {
     id: p.id,
     label: p.label,
+    name,
+    street: p.street ?? (p.type === 'street' ? name : null),
     context: p.context,
     kind: p.type,
     lon: geometry.coordinates[0],
@@ -58,7 +63,12 @@ export class Geocoding {
   }
 
   async reverse(lon: number, lat: number): Promise<Address | null> {
-    const params = new URLSearchParams({ lon: lon.toFixed(6), lat: lat.toFixed(6), limit: '1', index: 'address' });
-    return (await this.read(`${GEOCODING_BASE}/reverse?${params}`))[0] ?? null;
+    return (await this.reverseAll(lon, lat, 1))[0] ?? null;
+  }
+
+  /** Les adresses les plus proches d'un point, de la plus proche à la plus lointaine (F-02, Q3). */
+  reverseAll(lon: number, lat: number, limit = 15): Promise<Address[]> {
+    const params = new URLSearchParams({ lon: lon.toFixed(6), lat: lat.toFixed(6), limit: String(limit), index: 'address' });
+    return this.read(`${GEOCODING_BASE}/reverse?${params}`);
   }
 }

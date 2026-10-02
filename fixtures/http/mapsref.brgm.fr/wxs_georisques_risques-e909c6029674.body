@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<msGMLOutput 
+	 xmlns:gml="http://www.opengis.net/gml"
+	 xmlns:xlink="http://www.w3.org/1999/xlink"
+	 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<ISO_HT_01_02MOY_layer>
+	<gml:name>Hauteurs d'eau - Aléa débordement de cours d'eau moyen ou centennal</gml:name>
+		<ISO_HT_01_02MOY_feature>
+			<gml:boundedBy>
+				<gml:Box srsName="EPSG:4326">
+					<gml:coordinates>2.426719,48.800200 2.430986,48.802633</gml:coordinates>
+				</gml:Box>
+			</gml:boundedBy>
+			<id>3971238</id>
+			<id_zone>ZCH_3</id_zone>
+			<id_s_inond>SIN_2</id_s_inond>
+			<typ_inond>01</typ_inond>
+			<typ_inond2></typ_inond2>
+			<scenario>02Moy</scenario>
+			<datentree>2013-11-22</datentree>
+			<datsortie></datsortie>
+			<ht_min>2</ht_min>
+			<ht_max>10</ht_max>
+			<est_ref>t</est_ref>
+			<cours_deau>SEINE ET MARNE</cours_deau>
+			<id_tri>FRH_TRI_METROPOLEFRANCILIENNE</id_tri>
+		</ISO_HT_01_02MOY_feature>
+		<ISO_HT_01_02MOY_feature>
+			<gml:boundedBy>
+				<gml:Box srsName="EPSG:4326">
+					<gml:coordinates>2.426719,48.800200 2.430986,48.802633</gml:coordinates>
+				</gml:Box>
+			</gml:boundedBy>
+			<id>3000027</id>
+			<id_zone>ZCH_3</id_zone>
+			<id_s_inond>SIN_2</id_s_inond>
+			<typ_inond>01</typ_inond>
+			<typ_inond2></typ_inond2>
+			<scenario>02Moy</scenario>
+			<datentree>2013-11-22</datentree>
+			<datsortie></datsortie>
+			<ht_min>2</ht_min>
+			<ht_max>10</ht_max>
+			<est_ref>t</est_ref>
+			<cours_deau>SEINE ET MARNE</cours_deau>
+			<id_tri>FRH_TRI_METROPOLEFRANCILIENNE</id_tri>
+		</ISO_HT_01_02MOY_feature>
+		<ISO_HT_01_02MOY_feature>
+			<gml:boundedBy>
+				<gml:Box srsName="EPSG:4326">
+					<gml:coordinates>2.416904,48.776237 2.444327,48.814678</gml:coordinates>
+				</gml:Box>
+			</gml:boundedBy>
+			<id>3971236</id>
+			<id_zone>ZCH_1</id_zone>
+			<id_s_inond>SIN_2</id_s_inond>
+			<typ_inond>01</typ_inond>
+			<typ_inond2></typ_inond2>
+			<scenario>02Moy</scenario>
+			<datentree>2013-11-22</datentree>
+			<datsortie></datsortie>
+			<ht_min>0</ht_min>
+			<ht_max>1</ht_max>
+			<est_ref>t</est_ref>
+			<cours_deau>SEINE ET MARNE</cours_deau>
+			<id_tri>FRH_TRI_METROPOLEFRANCILIENNE</id_tri>
+		</ISO_HT_01_02MOY_feature>
+		<ISO_HT_01_02MOY_feature>
+			<gml:boundedBy>
+				<gml:Box srsName="EPSG:4326">
+					<gml:coordinates>2.416904,48.776237 2.444327,48.814678</gml:coordinates>
+				</gml:Box>
+			</gml:boundedBy>
+			<id>3000018</id>
+			<id_zone>ZCH_1</id_zone>
+			<id_s_inond>SIN_2</id_s_inond>
+			<typ_inond>01</typ_inond>
+			<typ_inond2></typ_inond2>
+			<scenario>02Moy</scenario>
+			<datentree>2013-11-22</datentree>
+			<datsortie></datsortie>
+			<ht_min>0</ht_min>
+			<ht_max>1</ht_max>
+			<est_ref>t</est_ref>
+			<cours_deau>SEINE ET MARNE</cours_deau>
+			<id_tri>FRH_TRI_METROPOLEFRANCILIENNE</id_tri>
+		</ISO_HT_01_02MOY_feature>
+		<ISO_HT_01_02MOY_feature>
+			<gml:boundedBy>
+				<gml:Box srsName="EPSG:4326">
+					<gml:coordinates>2.426552,48.785805 2.443734,48.803751</gml:coordinates>
+				</gml:Box>
+			</gml:boundedBy>
+			<id>3971237</id>
+			<id_zone>ZCH_2</id_zone>
+			<id_s_inond>SIN_2</id_s_inond>
+			<typ_inond>01</typ_inond>
+			<typ_inond2></typ_inond2>
+			<scenario>02Moy</scenario>
+			<datentree>2013-11-22</datentree>
+			<datsortie></datsortie>
+			<ht_min>1</ht_min>
+			<ht_max>2</ht_max>
+			<est_ref>t</est_ref>
+			<cours_deau>SEINE ET MARNE</cours_deau>
+			<id_tri>FRH_TRI_METROPOLEFRANCILIENNE</id_tri>
+		</ISO_HT_01_02MOY_feature>
+		<ISO_HT_01_02MOY_feature>
+			<gml:boundedBy>
+				<gml:Box srsName="EPSG:4326">
+					<gml:coordinates>2.426552,48.785805 2.443734,48.803751</gml:coordinates>
+				</gml:Box>
+			</gml:boundedBy>
+			<id>3000029</id>
+			<id_zone>ZCH_2</id_zone>
+			<id_s_inond>SIN_2</id_s_inond>
+			<typ_inond>01</typ_inond>
+			<typ_inond2></typ_inond2>
+			<scenario>02Moy</scenario>
+			<datentree>2013-11-22</datentree>
+			<datsortie></datsortie>
+			<ht_min>1</ht_min>
+			<ht_max>2</ht_max>
+			<est_ref>t</est_ref>
+			<cours_deau>SEINE ET MARNE</cours_deau>
+			<id_tri>FRH_TRI_METROPOLEFRANCILIENNE</id_tri>
+		</ISO_HT_01_02MOY_feature>
+		<ISO_HT_01_02MOY_feature>
+			<gml:boundedBy>
+				<gml:Box srsName="EPSG:4326">
+					<gml:coordinates>2.428262,48.776808 2.440939,48.800590</gml:coordinates>
+				</gml:Box>
+			</gml:boundedBy>
+			<id>3971238</id>
+			<id_zone>ZCH_3</id_zone>
+			<id_s_inond>SIN_2</id_s_inond>
+			<typ_inond>01</typ_inond>
+			<typ_inond2></typ_inond2>
+			<scenario>02Moy</scenario>
+			<datentree>2013-11-22</datentree>
+			<datsortie></datsortie>
+			<ht_min>2</ht_min>
+			<ht_max>10</ht_max>
+			<est_ref>t</est_ref>
+			<cours_deau>SEINE ET MARNE</cours_deau>
+			<id_tri>FRH_TRI_METROPOLEFRANCILIENNE</id_tri>
+		</ISO_HT_01_02MOY_feature>
+		<ISO_HT_01_02MOY_feature>
+			<gml:boundedBy>
+				<gml:Box srsName="EPSG:4326">
+					<gml:coordinates>2.428262,48.776808 2.440939,48.800590</gml:coordinates>
+				</gml:Box>
+			</gml:boundedBy>
+			<id>3000027</id>
+			<id_zone>ZCH_3</id_zone>
+			<id_s_inond>SIN_2</id_s_inond>
+			<typ_inond>01</typ_inond>
+			<typ_inond2></typ_inond2>
+			<scenario>02Moy</scenario>
+			<datentree>2013-11-22</datentree>
+			<datsortie></datsortie>
+			<ht_min>2</ht_min>
+			<ht_max>10</ht_max>
+			<est_ref>t</est_ref>
+			<cours_deau>SEINE ET MARNE</cours_deau>
+			<id_tri>FRH_TRI_METROPOLEFRANCILIENNE</id_tri>
+		</ISO_HT_01_02MOY_feature>
+	</ISO_HT_01_02MOY_layer>
+	<ISO_HT_01_04FAI_layer>
+	<gml:name>Hauteurs d'eau - Aléa débordement de cours d'eau rare ou millénial</gml:name>
+		<ISO_HT_01_04FAI_feature>
+			<gml:boundedBy>
+				<gml:Box srsName="EPSG:4326">
+					<gml:coordinates>2.429194,48.800205 2.430173,48.800586</gml:coordinates>
+				</gml:Box>
+			</gml:boundedBy>
+			<id>3000017</id>
+			<id_zone>ZCH_27</id_zone>
+			<id_s_inond>SIN_8</id_s_inond>
+			<typ_inond>01</typ_inond>
+			<typ_inond2></typ_inond2>
+			<scenario>04Fai</scenario>
+			<datentree></datentree>
+			<datsortie></datsortie>
+			<ht_min>1</ht_min>
+			<ht_max>2</ht_max>
+			<est_ref>t</est_ref>
+			<cours_deau>SEINE MARNE OISE</cours_deau>
+			<id_tri>FRH_TRI_METROPOLEFRANCILIENNE</id_tri>
+		</ISO_HT_01_04FAI_feature>
+		<ISO_HT_01_04FAI_feature>
+			<gml:boundedBy>
+				<gml:Box srsName="EPSG:4326">
+					<gml:coordinates>2.429194,48.800205 2.430173,48.800586</gml:coordinates>
+				</gml:Box>
+			</gml:boundedBy>
+			<id>3971243</id>
+			<id_zone>ZCH_6</id_zone>
+			<id_s_inond>SIN_1</id_s_inond>
+			<typ_inond>01</typ_inond>
+			<typ_inond2></typ_inond2>
+			<scenario>04Fai</scenario>
+			<datentree></datentree>
+			<datsortie></datsortie>
+			<ht_min>1</ht_min>
+			<ht_max>2</ht_max>
+			<est_ref>t</est_ref>
+			<cours_deau>SEINE ET MARNE</cours_deau>
+			<id_tri>FRH_TRI_METROPOLEFRANCILIENNE</id_tri>
+		</ISO_HT_01_04FAI_feature>
+		<ISO_HT_01_04FAI_feature>
+			<gml:boundedBy>
+				<gml:Box srsName="EPSG:4326">
+					<gml:coordinates>2.429455,48.800205 2.429658,48.800251</gml:coordinates>
+				</gml:Box>
+			</gml:boundedBy>
+			<id>3000020</id>
+			<id_zone>ZCH_28</id_zone>
+			<id_s_inond>SIN_8</id_s_inond>
+			<typ_inond>01</typ_inond>
+			<typ_inond2></typ_inond2>
+			<scenario>04Fai</scenario>
+			<datentree></datentree>
+			<datsortie></datsortie>
+			<ht_min>2</ht_min>
+			<ht_max>3</ht_max>
+			<est_ref>t</est_ref>
+			<cours_deau>SEINE MARNE OISE</cours_deau>
+			<id_tri>FRH_TRI_METROPOLEFRANCILIENNE</id_tri>
+		</ISO_HT_01_04FAI_feature>
+		<ISO_HT_01_04FAI_feature>
+			<gml:boundedBy>
+				<gml:Box srsName="EPSG:4326">
+					<gml:coordinates>2.430051,48.800397 2.430146,48.800433</gml:coordinates>
+				</gml:Box>
+			</gml:boundedBy>
+			<id>3000020</id>
+			<id_zone>ZCH_28</id_zone>
+			<id_s_inond>SIN_8</id_s_inond>
+			<typ_inond>01</typ_inond>
+			<typ_inond2></typ_inond2>
+			<scenario>04Fai</scenario>
+			<datentree></datentree>
+			<datsortie></datsortie>
+			<ht_min>2</ht_min>
+			<ht_max>3</ht_max>
+			<est_ref>t</est_ref>
+			<cours_deau>SEINE MARNE OISE</cours_deau>
+			<id_tri>FRH_TRI_METROPOLEFRANCILIENNE</id_tri>
+		</ISO_HT_01_04FAI_feature>
+		<ISO_HT_01_04FAI_feature>
+			<gml:boundedBy>
+				<gml:Box srsName="EPSG:4326">
+					<gml:coordinates>2.412240,48.726242 2.462976,48.803427</gml:coordinates>
+				</gml:Box>
+			</gml:boundedBy>
+			<id>3000019</id>
+			<id_zone>ZCH_29</id_zone>
+			<id_s_inond>SIN_8</id_s_inond>
+			<typ_inond>01</typ_inond>
+			<typ_inond2></typ_inond2>
+			<scenario>04Fai</scenario>
+			<datentree></datentree>
+			<datsortie></datsortie>
+			<ht_min>3</ht_min>
+			<ht_max>4</ht_max>
+			<est_ref>t</est_ref>
+			<cours_deau>SEINE MARNE OISE</cours_deau>
+			<id_tri>FRH_TRI_METROPOLEFRANCILIENNE</id_tri>
+		</ISO_HT_01_04FAI_feature>
+		<ISO_HT_01_04FAI_feature>
+			<gml:boundedBy>
+				<gml:Box srsName="EPSG:4326">
+					<gml:coordinates>2.412240,48.726242 2.462976,48.803427</gml:coordinates>
+				</gml:Box>
+			</gml:boundedBy>
+			<id>3971245</id>
+			<id_zone>ZCH_8</id_zone>
+			<id_s_inond>SIN_1</id_s_inond>
+			<typ_inond>01</typ_inond>
+			<typ_inond2></typ_inond2>
+			<scenario>04Fai</scenario>
+			<datentree></datentree>
+			<datsortie></datsortie>
+			<ht_min>3</ht_min>
+			<ht_max>4</ht_max>
+			<est_ref>t</est_ref>
+			<cours_deau>SEINE ET MARNE</cours_deau>
+			<id_tri>FRH_TRI_METROPOLEFRANCILIENNE</id_tri>
+		</ISO_HT_01_04FAI_feature>
+	</ISO_HT_01_04FAI_layer>
+</msGMLOutput>

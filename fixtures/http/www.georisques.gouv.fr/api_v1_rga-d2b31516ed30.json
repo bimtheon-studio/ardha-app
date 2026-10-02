@@ -1,0 +1,5 @@
+{
+  "url": "https://www.georisques.gouv.fr/api/v1/rga?latlon=2.429831%2C48.799990",
+  "status": 200,
+  "contentType": "application/json"
+}
