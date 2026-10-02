@@ -2,7 +2,7 @@
 // sources directement (une commune, un point) pour déboguer. `--inline` calcule dans la CLI.
 import { Command, Option } from 'nest-commander';
 
-import type { StudyRisks } from '../contracts/index.ts';
+import type { AnalysisStep, StudyRisks } from '../contracts/index.ts';
 import { clayLevel, floodClassLabel, FLOOD_SCENARIO_LABELS, FLOOD_TYPE_LABELS, floodHazard, floodScenarios } from '../domain/index.ts';
 import { RiskAnalyses } from '../ingestion/risk-analyses.ts';
 import { ElevationService } from '../geo/elevation.service.ts';
@@ -23,11 +23,20 @@ function value<T>(k: { status: 'ok'; data: T } | { status: 'unavailable'; error:
   return k.status === 'ok' ? show(k.data) : `indisponible (${k.error})`;
 }
 
+const STEP_MARK = { pending: '·', running: '…', done: '✓', partial: '≈', unavailable: '✗' } as const;
+
+/** « ✓ Altitudes de 23 points (IGN) : 23 altitudes reçues (0,4 s) ». */
+export function describeStep(st: AnalysisStep): string {
+  const seconds = st.startedAt && st.finishedAt ? ` (${((Date.parse(st.finishedAt) - Date.parse(st.startedAt)) / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} s)` : '';
+  return `  ${STEP_MARK[st.state]} ${st.label}${st.detail ? ` : ${st.detail}` : ''}${seconds}`;
+}
+
 export function describeRisks(r: StudyRisks): string {
   const lines = [`Analyse : ${STATUS[r.status]}${r.stale ? ', périmée (parcelles modifiées)' : ''}${r.computedAt ? `, calculée le ${frenchDate(r.computedAt)}` : ''}`];
   if (r.error) lines.push(`  erreur : ${r.error}`);
   for (const a of r.axes ?? []) lines.push(`  ${SEVERITY[a.severity]} ${a.label} : ${a.state}${a.detail ? ` — ${a.detail}` : ''}`);
   for (const c of r.surcharges ?? []) lines.push(`  surcoût : ${c.label} +${c.perM2} €/m² (${c.basis})${c.sourced ? '' : ' — non sourcé'}`);
+  if (r.progress.length > 0 && r.status !== 'ready') lines.push('  Déroulé :', ...r.progress.map(describeStep));
   const res = r.result;
   if (!res) return lines.join('\n');
   for (const c of res.communes) {
@@ -73,7 +82,17 @@ export class RiskAnalyzeCommand extends InlineCommand {
     // --inline : sans job pour le worker (qui calculerait en même temps, sur d'autres sources).
     let r = await this.risks.request(CLI, id!, options.force ?? options.inline ?? false, { worker: !options.inline });
     if (options.inline) {
-      await this.runner.run({ studyId: id!, parcelsKey: (await this.studies.get(id!))!.parcelsKey });
+      // Le déroulé s'affiche au fil du calcul (sauf en JSON).
+      const shown = new Set<string>();
+      const live = (steps: AnalysisStep[]) => {
+        for (const st of steps) {
+          const mark = `${st.key}:${st.state}`;
+          if (options.json || shown.has(mark) || st.state === 'pending') continue;
+          shown.add(mark);
+          console.log(describeStep(st));
+        }
+      };
+      await this.runner.run({ studyId: id!, parcelsKey: (await this.studies.get(id!))!.parcelsKey }, true, live);
       r = await this.risks.get(CLI, id!);
     }
     print(options.json, r, () => describeRisks(r));

@@ -1,0 +1,1 @@
+ALTER TABLE "study_analyses" ADD COLUMN "progress" jsonb DEFAULT '[]'::jsonb NOT NULL;

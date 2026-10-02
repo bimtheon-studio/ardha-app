@@ -3,9 +3,9 @@
 // sols pollués, bornes incendie), carte avec couches, sources. L'analyse se lance d'elle-même à la
 // première ouverture (Q1), se recalcule à la demande quand les parcelles ont changé ; une source muette
 // est dite « indisponible » (Q4).
-import type { CommuneRisks, RiskLayer, StudyRisks } from '@contracts';
+import type { AnalysisStep, CommuneRisks, RiskLayer, StudyRisks } from '@contracts';
 import { FLOOD_SCENARIO_LABELS, FLOOD_TYPE_LABELS, floodClassLabel } from '@domain';
-import { AlertTriangle, ArrowLeft, ExternalLink, LoaderCircle, RefreshCw } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, Circle, CircleX, ExternalLink, LoaderCircle, RefreshCw } from 'lucide-react';
 import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 
@@ -61,6 +61,38 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 const meters = (m: number) => (m < 1000 ? `${m} m` : `${(m / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km`);
+
+const STEP_ICON: Record<AnalysisStep['state'], ReactNode> = {
+  pending: <Circle className="size-4 text-muted-foreground" aria-hidden />,
+  running: <LoaderCircle className="size-4 animate-spin text-primary" aria-hidden />,
+  done: <Check className="size-4 text-primary" aria-hidden />,
+  partial: <AlertTriangle className="size-4 text-orange-700" aria-hidden />,
+  unavailable: <CircleX className="size-4 text-destructive" aria-hidden />,
+};
+const STEP_STATE: Record<AnalysisStep['state'], string> = { pending: 'à venir', running: 'en cours', done: 'fait', partial: 'en partie', unavailable: 'indisponible' };
+
+const seconds = (st: AnalysisStep) =>
+  st.startedAt && st.finishedAt ? `${((Date.parse(st.finishedAt) - Date.parse(st.startedAt)) / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} s` : null;
+
+/** Déroulé du calcul : chaque étape, son état, ce qu'elle a trouvé (ou pourquoi la source manque). */
+function Progress({ steps }: { steps: AnalysisStep[] }) {
+  return (
+    <ol className="divide-y border text-sm" aria-label="Déroulé de l’analyse">
+      {steps.map((st) => (
+        <li key={st.key} className="flex items-start gap-3 px-3 py-2" data-state={st.state}>
+          <span className="mt-0.5">{STEP_ICON[st.state]}</span>
+          <div className="min-w-0 flex-1">
+            <p className={st.state === 'pending' ? 'text-muted-foreground' : ''}>
+              {st.label} <span className="sr-only">({STEP_STATE[st.state]})</span>
+            </p>
+            {st.detail && <p className="text-xs text-muted-foreground">{st.detail}</p>}
+          </div>
+          {seconds(st) && <span className="text-xs whitespace-nowrap text-muted-foreground tabular-nums">{seconds(st)}</span>}
+        </li>
+      ))}
+    </ol>
+  );
+}
 
 function Commune({ c }: { c: CommuneRisks }) {
   return (
@@ -360,6 +392,11 @@ export function RisksPage() {
           )}
         </div>
       )}
+      {busy && r.progress.length > 0 && (
+        <Section title="Calcul en cours">
+          <Progress steps={r.progress} />
+        </Section>
+      )}
       {(r.status === 'failed' || request.error) && (
         <p role="alert" className="text-sm text-destructive">
           {request.error?.message ?? r.error}
@@ -423,6 +460,17 @@ export function RisksPage() {
             </>
           )}
           {!result && !busy && r.status !== 'failed' && <p className="text-sm text-muted-foreground">Aucune analyse pour l’instant.</p>}
+          {!busy && r.progress.length > 0 && (
+            <details className="text-sm">
+              <summary className="cursor-pointer text-muted-foreground">
+                Déroulé de l’analyse ({r.progress.length} étapes
+                {r.progress.some((s) => s.state === 'partial' || s.state === 'unavailable') ? ', dont certaines sans réponse' : ''})
+              </summary>
+              <div className="mt-2">
+                <Progress steps={r.progress} />
+              </div>
+            </details>
+          )}
         </div>
 
         <div className="min-w-0 space-y-3">

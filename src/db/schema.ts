@@ -20,7 +20,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import type { Address } from '../contracts/geo.ts';
-import type { RisksResult } from '../contracts/risks.ts';
+import type { AnalysisStep, RisksResult } from '../contracts/risks.ts';
 
 const id = () => uuid().primaryKey().default(sql`uuidv7()`);
 const timestampTz = () => timestamp({ withTimezone: true, mode: 'date' });
@@ -267,6 +267,8 @@ export const studyAnalysis = pgTable(
     /** Empreinte des parcelles pour laquelle l'analyse est demandée, puis calculée. */
     parcelsKey: text().notNull(),
     result: jsonb().$type<RisksResult>(),
+    /** Déroulé du calcul, mis à jour à chaque étape (visible pendant le calcul). */
+    progress: jsonb().$type<AnalysisStep[]>().notNull().default([]),
     error: text(),
     attempts: integer().notNull().default(0),
     requestedAt: timestampTz().notNull().defaultNow(),

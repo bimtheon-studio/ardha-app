@@ -126,6 +126,21 @@ export const RiskAxis = z.object({
   detail: z.string().nullable(),
 });
 
+/**
+ * Une étape du calcul, enregistrée au fil de l'analyse : ce que le worker interroge, où il en est, ce
+ * qu'il a trouvé. `partial` : une partie des sources de l'étape n'a pas répondu.
+ */
+export const AnalysisStep = z.object({
+  key: z.string(),
+  label: z.string(),
+  state: z.enum(['pending', 'running', 'done', 'partial', 'unavailable']),
+  /** Ce qui a été trouvé, ou pourquoi la source manque. */
+  detail: z.string().nullable(),
+  startedAt: z.iso.datetime().nullable(),
+  finishedAt: z.iso.datetime().nullable(),
+});
+export type AnalysisStep = z.infer<typeof AnalysisStep>;
+
 export const RiskSource = z.object({ key: z.string(), label: z.string(), url: z.string(), licence: z.string() });
 
 export const StudyRisks = z.object({
@@ -146,6 +161,8 @@ export const StudyRisks = z.object({
     )
     .nullable(),
   sources: z.array(RiskSource),
+  /** Déroulé du dernier calcul (en cours ou fini), étape par étape. */
+  progress: z.array(AnalysisStep),
 });
 export type StudyRisks = z.infer<typeof StudyRisks>;
 

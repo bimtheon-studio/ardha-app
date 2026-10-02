@@ -130,8 +130,16 @@ const surcharges: StudyRisks['surcharges'] = [
   { key: 'flood', label: 'Adaptation à l’inondation', perM2: 150, basis: 'Parcelle en zone inondable (TRI), aléa moyen', source: 'Forfait non sourcé', sourced: false },
   { key: 'seismic', label: 'Dispositions parasismiques', perM2: 27, basis: 'Zone 3', source: 'Eurocode 8', sourced: true },
 ];
-const ready: StudyRisks = { status: 'ready', stale: false, requestedAt: '2026-10-01T10:00:00Z', computedAt: '2026-10-01T10:01:00Z', error: null, result, axes, surcharges, sources };
-const none: StudyRisks = { status: 'none', stale: false, requestedAt: null, computedAt: null, error: null, result: null, axes: null, surcharges: null, sources };
+const progress: StudyRisks['progress'] = [
+  { key: 'commune-94046', label: 'Risques de la commune : Maisons-Alfort (Géorisques)', state: 'done', detail: 'radon 1 · 3 PPR', startedAt: '2026-10-01T10:00:00.000Z', finishedAt: '2026-10-01T10:00:01.200Z' },
+  { key: 'elevation', label: 'Altitudes de 23 points (IGN)', state: 'running', detail: null, startedAt: '2026-10-01T10:00:01.200Z', finishedAt: null },
+  { key: 'parcel-AY96', label: 'Argiles et hauteurs d’eau, parcelle AY 96', state: 'partial', detail: 'argiles moyen · sans réponse : hauteurs d’eau', startedAt: null, finishedAt: null },
+  { key: 'cavities', label: 'Cavités à moins de 500 m', state: 'unavailable', detail: 'sources muettes : cavités', startedAt: null, finishedAt: null },
+  { key: 'hydrants', label: 'Bornes incendie à moins de 400 m', state: 'pending', detail: null, startedAt: null, finishedAt: null },
+];
+const finished = progress.map((p) => (p.state === 'running' || p.state === 'pending' ? { ...p, state: 'done' as const } : p));
+const ready: StudyRisks = { status: 'ready', stale: false, requestedAt: '2026-10-01T10:00:00Z', computedAt: '2026-10-01T10:01:00Z', error: null, result, axes, surcharges, sources, progress: finished };
+const none: StudyRisks = { status: 'none', stale: false, requestedAt: null, computedAt: null, error: null, result: null, axes: null, surcharges: null, sources, progress: [] };
 const LAYERS = {
   basemaps: [{ id: 'osm', label: 'OSM', url: 'https://osm/{z}/{x}/{y}', attribution: 'OSM', maxZoom: 19 }],
   defaultBasemap: 'absent',
@@ -158,11 +166,17 @@ describe('page des risques', () => {
       [`GET /api/studies/${ID}/risks`]: () => ({ status: 200, body: state }),
       [`POST /api/studies/${ID}/risks`]: () => {
         state = ready;
-        return { status: 202, body: { ...none, status: 'queued' } };
+        return { status: 202, body: { ...none, status: 'running', progress } };
       },
     });
     renderAt(`/studies/${ID}/risks`);
     expect(await screen.findByText('Analyse en cours…')).toBeInTheDocument();
+    // Pendant le calcul : le déroulé, étape par étape, avec ce que chacune a trouvé.
+    const live = screen.getByRole('list', { name: 'Déroulé de l’analyse' });
+    expect(within(live).getAllByRole('listitem').map((li) => li.dataset.state)).toEqual(['done', 'running', 'partial', 'unavailable', 'pending']);
+    expect(live).toHaveTextContent('radon 1 · 3 PPR');
+    expect(live).toHaveTextContent('1,2 s');
+    expect(live).toHaveTextContent('(en cours)');
     expect(calls.find((c) => c.key === `POST /api/studies/${ID}/risks`)?.body).toEqual({ force: false });
 
     const synthesis = await screen.findByRole('region', { name: 'Synthèse' }, { timeout: 3000 });
@@ -200,6 +214,9 @@ describe('page des risques', () => {
     expect(nearby).toHaveTextContent('1, la plus proche à 111 m');
     expect(nearby).toHaveTextContent('Données OSM du 20 septembre 2026');
     expect(screen.getByRole('region', { name: 'Sources' })).toHaveTextContent('Géorisques · Licence ouverte 2.0');
+    // Calcul fini : le déroulé reste consultable, replié.
+    expect(screen.getByText(/Déroulé de l’analyse \(5 étapes, dont certaines sans réponse\)/)).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Calcul en cours' })).toBeNull();
     await waitFor(() => expect(mapProps?.hydrants).toEqual([{ id: 'node/1', point: [2.43, 48.8], label: 'Borne incendie · 111 m' }]));
     expect(mapProps!.cavities).toHaveLength(1);
   });

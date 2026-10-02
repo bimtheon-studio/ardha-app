@@ -7,6 +7,7 @@ import type { Study, StudyRisks } from '../src/contracts/index.ts';
 import { AnalysesRepository } from '../src/studies/analyses.repository.ts';
 import { vi } from 'vitest';
 
+import { gridCells } from '../src/domain/index.ts';
 import { HydrantCache } from '../src/ingestion/hydrant-cache.ts';
 import { RiskAnalyses } from '../src/ingestion/risk-analyses.ts';
 import { Hydrants } from '../src/sources/hydrants.ts';
@@ -67,6 +68,24 @@ describe('analyse des risques', () => {
 
     const r = await analyzed(id);
     expect(r).toMatchObject({ status: 'ready', stale: false, error: null });
+    // Déroulé enregistré : chaque étape finie, avec ce qu'elle a trouvé.
+    expect(r.progress.map((s) => [s.key, s.state])).toEqual([
+      ['commune-94046', 'done'],
+      ['elevation', 'done'],
+      [`parcel-${AY96}`, 'done'],
+      [`parcel-${AY97}`, 'done'],
+      ['cavities', 'done'],
+      ['hydrants', 'done'],
+    ]);
+    expect(r.progress[0]).toMatchObject({
+      label: 'Risques de la commune : Maisons-Alfort (Géorisques)',
+      detail: 'radon 1 · sismicité 1 · 3 PPR · 9 arrêtés CatNat · 37 installations classées · 16 sites pollués',
+    });
+    expect(r.progress[2]!.detail).toBe('argiles moyen · inondable, aléa moyen');
+    expect(r.progress[4]!.detail).toBe('aucune cavité recensée à 500 m');
+    // Bornes de toute la zone interrogée (cases de la grille), avant le filtre des 400 m.
+    expect(r.progress[5]!.detail).toMatch(/^\d+ bornes dans la zone ; \d+ cases? (en cache|interrogées?)/);
+    expect(r.progress.every((s) => s.startedAt && s.finishedAt && s.finishedAt >= s.startedAt)).toBe(true);
     expect(r.axes!.map((a) => [a.key, a.severity, a.state])).toEqual([
       ['flood', 'medium', 'Aléa moyen'],
       ['clay', 'medium', 'Exposition moyen'],
@@ -225,22 +244,24 @@ describe('cache des bornes incendie', () => {
     // Emprise AY96 + AY97 élargie de 400 m (celle de l'analyse) : cases enregistrées.
     const bbox = [2.4243, 48.7963, 2.4357, 48.8038] as const;
     await t.pool.query(`DELETE FROM source_states WHERE source = 'osm-hydrants'`);
-    const first = await cache.inBbox(bbox);
+    const first = await cache.inCells(gridCells(bbox));
     const calls = spy.mock.calls.length;
     expect(calls).toBeGreaterThan(0);
     expect(first.items.length).toBeGreaterThan(0);
     // Une seconde étude voisine : tout vient de la base.
-    expect((await cache.inBbox(bbox)).items).toEqual(first.items);
+    expect((await cache.inCells(gridCells(bbox))).items).toEqual(first.items);
     expect(spy.mock.calls.length).toBe(calls);
 
     // 31 jours plus tard, Overpass sature : les bornes connues restent, datées.
     t.clock.advance(31 * 24 * 3600 * 1000);
     spy.mockRejectedValue(new Error('Overpass : HTTP 429'));
-    const stale = await cache.inBbox(bbox);
+    const stale = await cache.inCells(gridCells(bbox));
     expect(stale.items).toEqual(first.items);
     expect(stale.asOf.getTime()).toBeLessThan(t.clock.now().getTime() - 30 * 24 * 3600 * 1000);
     // Une case jamais chargée, elle, ne peut rien servir.
-    await expect(cache.inBbox([10.001, 45.001, 10.002, 45.002])).rejects.toThrow('HTTP 429');
+    await expect(cache.inCells(gridCells([10.001, 45.001, 10.002, 45.002]))).rejects.toThrow('HTTP 429');
+    // Une étude trop dispersée ne part pas interroger des centaines de cases.
+    await expect(cache.inCells(gridCells([0, 45, 1, 46]))).rejects.toThrow(/Étude trop dispersée pour les bornes : 10000 cases/);
     t.clock.advance(-31 * 24 * 3600 * 1000);
     spy.mockRestore();
   });

@@ -5,7 +5,8 @@
 // cavités, installations, sols pollués, bornes incendie.
 import { Injectable, Logger } from '@nestjs/common';
 
-import { RISKS_VERSION, type RisksResult } from '../contracts/index.ts';
+import { type AnalysisStep, RISKS_VERSION, type RisksResult } from '../contracts/index.ts';
+import { AnalysisProgress, type StepOutcome } from './analysis-progress.ts';
 import {
   bboxOf,
   clayLevel,
@@ -13,7 +14,8 @@ import {
   distanceToPointM,
   elevationSamples,
   elevationStats,
-  expandBbox,
+  cavityProbes,
+  hydrantCells,
   floodHazard,
   floodScenarios,
   HYDRANT_RADIUS_M,
@@ -62,33 +64,60 @@ export class RiskAnalyzer {
     }
   }
 
-  async analyze(parcels: readonly StudyParcelRecord[]): Promise<RisksResult> {
+  /** `persist` reçoit le déroulé à chaque étape (enregistré par l'appelant, vu pendant le calcul). */
+  async analyze(parcels: readonly StudyParcelRecord[], persist: (steps: AnalysisStep[]) => Promise<void> = async () => {}): Promise<RisksResult> {
     const geometries = parcels.map((p) => p.geometry);
     const box = unionBbox(geometries.map(bboxOf))!;
     const center: Position = [(box[0] + box[2]) / 2, (box[1] + box[3]) / 2];
     const distanceToStudy = (p: Position) => Math.min(...geometries.map((g) => distanceToPointM(g, p)));
     const codes = [...new Set(parcels.map((p) => p.communeCode))];
+    const names = new Map(await Promise.all(codes.map(async (code) => [code, (await this.communes.byCode(code))?.name ?? null] as const)));
+    const asked = elevationSamples(geometries);
+
+    const progress = new AnalysisProgress(
+      [
+        ...codes.map((code) => ({ key: `commune-${code}`, label: `Risques de la commune : ${names.get(code) ?? code} (Géorisques)` })),
+        { key: 'elevation', label: `Altitudes de ${asked.flat().length} points (IGN)` },
+        ...parcels.map((p) => ({ key: `parcel-${p.id}`, label: `Argiles et hauteurs d’eau, parcelle ${parcelLabel(p)} (Géorisques, BRGM)` })),
+        { key: 'cavities', label: `Cavités à moins de ${NEARBY_RADIUS_M} m (Géorisques)` },
+        { key: 'hydrants', label: `Bornes incendie à moins de ${HYDRANT_RADIUS_M} m (OpenStreetMap)` },
+      ],
+      persist,
+      () => new Date(),
+    );
 
     const communes = [];
     const installations: Known<Awaited<ReturnType<Georisques['installations']>>>[] = [];
     const polluted: Known<Awaited<ReturnType<Georisques['pollutedSites']>>>[] = [];
     for (const code of codes) {
       const g = this.georisques;
-      const [name, radon, seismic, hazards, plans, catnat, inst, sites] = await Promise.all([
-        this.communes.byCode(code).then((c) => c?.name ?? null),
-        this.known(`radon ${code}`, () => g.radon(code)),
-        this.known(`sismicité ${code}`, () => g.seismic(code)),
-        this.known(`GASPAR ${code}`, () => g.hazards(code)),
-        this.known(`PPR ${code}`, () => g.plans(code)),
-        this.known(`CatNat ${code}`, () => g.catnat(code)),
-        this.known(`installations ${code}`, () => g.installations(code)),
-        this.known(`sols pollués ${code}`, () => g.pollutedSites(code)),
-      ]);
+      const [radon, seismic, hazards, plans, catnat, inst, sites] = await progress.run(
+        `commune-${code}`,
+        () =>
+          Promise.all([
+            this.known(`radon ${code}`, () => g.radon(code)),
+            this.known(`sismicité ${code}`, () => g.seismic(code)),
+            this.known(`GASPAR ${code}`, () => g.hazards(code)),
+            this.known(`PPR ${code}`, () => g.plans(code)),
+            this.known(`CatNat ${code}`, () => g.catnat(code)),
+            this.known(`installations ${code}`, () => g.installations(code)),
+            this.known(`sols pollués ${code}`, () => g.pollutedSites(code)),
+          ]),
+        ([radon, seismic, , plans, catnat, inst, sites]) =>
+          outcome([
+            part('radon', radon, (v) => `radon ${v ?? '?'}`),
+            part('sismicité', seismic, (v) => `sismicité ${v ?? '?'}`),
+            part('PPR', plans, (v) => plural(v.length, 'PPR', 'PPR')),
+            part('CatNat', catnat, (v) => plural(v.items.length, 'arrêté CatNat', 'arrêtés CatNat')),
+            part('installations', inst, (v) => plural(v.items.length, 'installation classée', 'installations classées')),
+            part('sols pollués', sites, (v) => plural(v.items.length, 'site pollué', 'sites pollués')),
+          ]),
+      );
       installations.push(inst);
       polluted.push(sites);
       communes.push({
         code,
-        name,
+        name: names.get(code) ?? null,
         radon,
         seismic,
         hazards,
@@ -114,17 +143,32 @@ export class RiskAnalyzer {
     }
 
     // Altitudes : un seul appel par lots pour toutes les parcelles.
-    const asked = elevationSamples(parcels.map((p) => p.geometry));
-    const altitudes = await this.known('altimétrie', () => this.elevation.points(asked.flat()));
+    const altitudes = await progress.run(
+      'elevation',
+      () => this.known('altimétrie', () => this.elevation.points(asked.flat())),
+      (a) =>
+        a.status === 'ok'
+          ? { state: 'done', detail: `${a.data.filter((x) => x.z !== null).length} altitudes reçues` }
+          : { state: 'unavailable', detail: `indisponible : ${a.error}` },
+    );
 
     const parcelResults = [];
     let offset = 0;
     for (const [i, p] of parcels.entries()) {
       const point = asked[i]![0]!;
-      const [clay, flood] = await Promise.all([
-        this.known(`argiles ${p.id}`, () => this.georisques.clay(point[0] ?? 0, point[1] ?? 0).then(clayLevel)),
-        this.known(`TRI ${p.id}`, () => this.floodHeights.at(point[0] ?? 0, point[1] ?? 0)),
-      ]);
+      const [clay, flood] = await progress.run(
+        `parcel-${p.id}`,
+        () =>
+          Promise.all([
+            this.known(`argiles ${p.id}`, () => this.georisques.clay(point[0]!, point[1]!).then(clayLevel)),
+            this.known(`TRI ${p.id}`, () => this.floodHeights.at(point[0]!, point[1]!)),
+          ]),
+        ([c, f]) =>
+          outcome([
+            part('argiles', c, (v) => `argiles ${v ?? 'hors zone'}`),
+            part('hauteurs d’eau', f, (v) => (v.length === 0 ? 'hors zone inondable (TRI)' : `inondable, aléa ${floodHazard(v)}`)),
+          ]),
+      );
       const zs = altitudes.status === 'ok' ? altitudes.data.slice(offset, offset + asked[i]!.length).flatMap((a) => (a.z === null ? [] : [a.z])) : [];
       offset += asked[i]!.length;
       const stats = elevationStats(zs);
@@ -151,8 +195,30 @@ export class RiskAnalyzer {
       return { status: 'ok', data: { items: ok.flatMap((p) => p.data.items), truncated: ok.some((p) => p.data.truncated) } };
     };
 
-    const cavities = await this.known('cavités', () => this.georisques.cavities(center[0] ?? 0, center[1] ?? 0, NEARBY_RADIUS_M));
-    const hydrants = await this.known('bornes incendie', () => this.hydrants.inBbox(expandBbox(box, HYDRANT_RADIUS_M)));
+    const cavities = await progress.run(
+      'cavities',
+      // Un point par case occupée par l'étude (pas le centre de l'emprise, qui peut tomber loin de tout).
+      () =>
+        this.known('cavités', async () => {
+          const found = new Map<string, Awaited<ReturnType<Georisques['cavities']>>['items'][number]>();
+          let truncated = false;
+          for (const [lon, lat] of cavityProbes(geometries)) {
+            const r = await this.georisques.cavities(lon!, lat!, NEARBY_RADIUS_M);
+            truncated ||= r.truncated;
+            for (const c of r.items) found.set(c.identifiant, c);
+          }
+          return { items: [...found.values()], truncated };
+        }),
+      (c) => outcome([part('cavités', c, (v) => plural(v.items.length, 'cavité recensée', 'cavités recensées') + ` à ${NEARBY_RADIUS_M} m`)]),
+    );
+    const hydrants = await progress.run(
+      'hydrants',
+      () => this.known('bornes incendie', () => this.hydrants.inCells(hydrantCells(geometries))),
+      (h) =>
+        h.status === 'ok'
+          ? { state: 'done', detail: `${plural(h.data.items.length, 'borne', 'bornes')} dans la zone ; ${describeCells(h.data.cells)}` }
+          : { state: 'unavailable', detail: `indisponible : ${h.error}` },
+    );
     const allInstallations = merge(installations);
     const allPolluted = merge(polluted);
 
@@ -219,6 +285,38 @@ export class RiskAnalyzer {
           : hydrants,
     };
   }
+}
+
+function plural(n: number, one: string, many: string): string {
+  return n === 0 ? `aucun${one.endsWith('e') && !one.endsWith('é') ? 'e' : ''} ${one}` : `${n} ${n > 1 ? many : one}`;
+}
+
+interface Part {
+  what: string;
+  /** Nul : la source n'a pas répondu. */
+  text: string | null;
+}
+
+/** Ce qu'une source a donné à l'étape, mis en mots. */
+function part<T>(what: string, k: Known<T>, show: (v: T) => string): Part {
+  return { what, text: k.status === 'ok' ? show(k.data) : null };
+}
+
+/** Commentaire d'une étape : ce que chaque source a donné, et lesquelles n'ont pas répondu. */
+function outcome(parts: Part[]): StepOutcome {
+  const ok = parts.flatMap((p) => (p.text === null ? [] : [p.text]));
+  const off = parts.filter((p) => p.text === null).map((p) => p.what);
+  if (ok.length === 0) return { state: 'unavailable', detail: `sources muettes : ${off.join(', ')}` };
+  return { state: off.length ? 'partial' : 'done', detail: [...ok, ...(off.length ? [`sans réponse : ${off.join(', ')}`] : [])].join(' · ') };
+}
+
+/** « 4 cases en cache », « 2 cases interrogées », « 1 case ancienne gardée (Overpass en panne) ». */
+function describeCells(c: { fresh: number; fetched: number; stale: number }): string {
+  const parts = [];
+  if (c.fresh) parts.push(`${c.fresh} case${c.fresh > 1 ? 's' : ''} en cache`);
+  if (c.fetched) parts.push(`${c.fetched} case${c.fetched > 1 ? 's' : ''} interrogée${c.fetched > 1 ? 's' : ''}`);
+  if (c.stale) parts.push(`${c.stale} case${c.stale > 1 ? 's' : ''} ancienne${c.stale > 1 ? 's' : ''} gardée${c.stale > 1 ? 's' : ''} (Overpass indisponible)`);
+  return parts.join(', ');
 }
 
 /** « 23/07/1988 » → « 1988-07-23 », pour trier. */

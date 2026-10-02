@@ -4,7 +4,7 @@
 // rend les bornes « indisponibles ».
 import { Injectable, Logger } from '@nestjs/common';
 
-import { type Bbox, cellKey, gridCells, HYDRANTS_FRESHNESS_DAYS } from '../domain/index.ts';
+import { type Bbox, cellKey, HYDRANTS_FRESHNESS_DAYS, MAX_HYDRANT_CELLS } from '../domain/index.ts';
 import { HydrantsRepository, type HydrantRecord } from '../geo/hydrants.repository.ts';
 import { SourceStatesRepository } from '../geo/source-states.repository.ts';
 import { Clock } from '../shared/clock.ts';
@@ -24,16 +24,19 @@ export class HydrantCache {
     private readonly clock: Clock,
   ) {}
 
-  /** Bornes de l'emprise, et la date de la case la plus ancienne (ce que l'analyse cite). */
-  async inBbox(bbox: Bbox): Promise<{ items: HydrantRecord[]; asOf: Date }> {
+  /** Bornes des cases demandées, et la date de la case la plus ancienne (ce que l'analyse cite). */
+  async inCells(grid: readonly Bbox[]): Promise<{ items: HydrantRecord[]; asOf: Date; cells: { fresh: number; fetched: number; stale: number } }> {
+    if (grid.length > MAX_HYDRANT_CELLS) throw new Error(`Étude trop dispersée pour les bornes : ${grid.length} cases (au plus ${MAX_HYDRANT_CELLS})`);
     const now = this.clock.now();
     let asOf = now;
-    for (const cell of gridCells(bbox)) {
+    const cells = { fresh: 0, fetched: 0, stale: 0 };
+    for (const cell of grid) {
       const key = cellKey(cell);
       const state = await this.states.get(HYDRANTS_SOURCE, key);
       const loadedAt = state?.loadedAt ?? null;
       if (loadedAt && now.getTime() - loadedAt.getTime() < HYDRANTS_FRESHNESS_DAYS * DAY_MS) {
         if (loadedAt < asOf) asOf = loadedAt;
+        cells.fresh++;
         continue;
       }
       try {
@@ -44,6 +47,7 @@ export class HydrantCache {
           items.map((h) => ({ id: h.id, lon: h.lon, lat: h.lat, type: h.type, flowRate: h.flowRate, diameter: h.diameter, ref: h.ref })),
         );
         await this.states.markReady(HYDRANTS_SOURCE, key, now.toISOString().slice(0, 10), items.length, now);
+        cells.fetched++;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         await this.states.markFailed(HYDRANTS_SOURCE, key, message, now, false);
@@ -51,8 +55,11 @@ export class HydrantCache {
         if (!loadedAt) throw error;
         this.logger.warn(`Overpass indisponible pour la case ${key} : bornes du ${loadedAt.toISOString().slice(0, 10)} gardées`);
         if (loadedAt < asOf) asOf = loadedAt;
+        cells.stale++;
       }
     }
-    return { items: await this.hydrants.inBbox(bbox), asOf };
+    const items = new Map<string, HydrantRecord>();
+    for (const cell of grid) for (const h of await this.hydrants.inBbox(cell)) items.set(h.id, h);
+    return { items: [...items.values()], asOf, cells };
   }
 }

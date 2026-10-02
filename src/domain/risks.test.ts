@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { rect } from './geometry.test.ts';
 import {
   type AxesInput,
+  cavityProbes,
   cellKey,
   clayLevel,
   elevationSamples,
@@ -11,6 +12,7 @@ import {
   floodClassLabel,
   floodHazard,
   floodScenarios,
+  hydrantCells,
   isFloodPlan,
   referenceFloodHeight,
   riskAxes,
@@ -153,5 +155,24 @@ describe('cellKey', () => {
   it('coin sud-ouest de la case, au centième', () => {
     expect(cellKey([2.42, 48.79, 2.43, 48.8])).toBe('2.42,48.79');
     expect(cellKey([-0.01, 43, 0, 43.01])).toBe('-0.01,43.00');
+  });
+});
+
+describe('hydrantCells, cavityProbes', () => {
+  it('les cases autour de chaque parcelle, sans doublon ; deux parcelles éloignées ne prennent pas tout ce qui les sépare', () => {
+    const tours = rect(0.6842, 47.402, 0.6846, 47.4023);
+    const annecy = rect(6.1314, 45.9161, 6.1318, 45.9165);
+    const cells = hydrantCells([tours, annecy]);
+    expect(cells.length).toBeLessThanOrEqual(8);
+    expect(cells.map(cellKey)).toContain('0.68,47.40');
+    expect(cells.map(cellKey)).toContain('6.13,45.91');
+    expect(hydrantCells([tours, rect(0.6843, 47.4021, 0.6845, 47.4022)])).toHaveLength(hydrantCells([tours]).length);
+  });
+
+  it('un point de recherche des cavités par case occupée', () => {
+    const a = rect(2.4297, 48.7999, 2.43, 48.8001);
+    const b = rect(2.4301, 48.7999, 2.4303, 48.8001);
+    expect(cavityProbes([a, a, b])).toHaveLength(2);
+    expect(cavityProbes(Array.from({ length: 30 }, (_, i) => rect(2 + i * 0.02, 48, 2.001 + i * 0.02, 48.001)))).toHaveLength(20);
   });
 });

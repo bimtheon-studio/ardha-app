@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { FakeHttp } from '../../test/fake-http.ts';
-import { RisksResult } from '../contracts/index.ts';
+import { type AnalysisStep, RisksResult } from '../contracts/index.ts';
 import { rect } from '../domain/geometry.test.ts';
 import type { CommunesRepository } from '../geo/communes.repository.ts';
 import { Elevation, ELEVATION_URL } from '../sources/elevation.ts';
@@ -30,13 +30,29 @@ const parcel = (n: number, communeCode = '94046'): StudyParcelRecord => ({
 function analyzer(http: FakeHttp, names: Record<string, string> = { '94046': 'Maisons-Alfort' }) {
   const communes = { byCode: async (code: string) => (names[code] ? { name: names[code] } : undefined) } as unknown as CommunesRepository;
   // Le cache des bornes est éprouvé à part (test/risks.test.ts) : ici, Overpass directement.
-  const hydrants = { inBbox: async (b: readonly [number, number, number, number]) => ({ items: await new Hydrants(http).inBbox(b), asOf: new Date('2026-10-02T00:00:00Z') }) } as unknown as HydrantCache;
+  const hydrants = { inCells: async (cells: readonly (readonly [number, number, number, number])[]) => ({ items: [...new Map((await Promise.all(cells.map((c) => new Hydrants(http).inBbox(c)))).flat().map((h) => [h.id, h])).values()], asOf: new Date('2026-10-02T00:00:00Z'), cells: { fresh: 0, fetched: 1, stale: 0 } }) } as unknown as HydrantCache;
   return new RiskAnalyzer(new Georisques(http), new FloodHeights(http), new Elevation(http), hydrants, communes);
 }
 
 describe('RiskAnalyzer', () => {
   it('toutes les sources muettes : chaque donnée est « indisponible », le résultat reste valide', async () => {
-    const r = await analyzer(new FakeHttp()).analyze([parcel(0), parcel(1, '94080')]);
+    const seen: AnalysisStep[][] = [];
+    const r = await analyzer(new FakeHttp()).analyze([parcel(0), parcel(1, '94080')], async (steps) => void seen.push(steps));
+    // Déroulé : chaque étape passe « en cours » puis « indisponible », dans l'ordre.
+    expect(seen).toHaveLength(14);
+    expect(seen[0]!.map((s) => s.state)).toEqual(['running', 'pending', 'pending', 'pending', 'pending', 'pending', 'pending']);
+    expect(seen.at(-1)!.map((s) => [s.key, s.state])).toEqual([
+      ['commune-94046', 'unavailable'],
+      ['commune-94080', 'unavailable'],
+      ['elevation', 'unavailable'],
+      ['parcel-94046000AB0000', 'unavailable'],
+      ['parcel-94080000AB0001', 'unavailable'],
+      ['cavities', 'unavailable'],
+      ['hydrants', 'unavailable'],
+    ]);
+    expect(seen.at(-1)![0]).toMatchObject({ label: 'Risques de la commune : Maisons-Alfort (Géorisques)', detail: 'sources muettes : radon, sismicité, PPR, CatNat, installations, sols pollués' });
+    expect(seen.at(-1)![1]!.label).toBe('Risques de la commune : 94080 (Géorisques)');
+    expect(seen.at(-1)![2]!.detail).toMatch(/^indisponible : Altimétrie IGN : HTTP 404/);
     expect(RisksResult.parse(r)).toEqual(r);
     expect(r.communes.map((c) => [c.code, c.name, c.radon.status, c.plans.status, c.catnat.status])).toEqual([
       ['94046', 'Maisons-Alfort', 'unavailable', 'unavailable', 'unavailable'],
@@ -92,7 +108,16 @@ describe('RiskAnalyzer', () => {
         },
       },
     });
-    const r = RisksResult.parse(await analyzer(http).analyze([parcel(0)]));
+    const seen: AnalysisStep[][] = [];
+    const r = RisksResult.parse(await analyzer(http).analyze([parcel(0)], async (steps) => void seen.push(steps)));
+    expect(seen.at(-1)!.map((s) => [s.state, s.detail])).toEqual([
+      ['done', 'radon 3 · sismicité 2 · 1 PPR · 3 arrêtés CatNat · 3 installations classées · 2 sites pollués'],
+      ['done', '40 altitudes reçues'],
+      ['done', 'argiles moyen · inondable, aléa moyen'],
+      ['done', '2 cavités recensées à 500 m'],
+      // Bornes de la zone interrogée, avant le filtre des 400 m.
+      ['done', '3 bornes dans la zone ; 1 case interrogée'],
+    ]);
     const [c] = r.communes;
     expect(c).toMatchObject({ radon: { status: 'ok', data: 3 }, seismic: { status: 'ok', data: 2 } });
     expect(c!.plans).toMatchObject({ status: 'ok', data: [{ id: 'P1', flood: true, zones: [], modifiedAt: null }] });
@@ -106,6 +131,13 @@ describe('RiskAnalyzer', () => {
     expect(r.pollutedSites.status === 'ok' && r.pollutedSites.data).toMatchObject({ count: 2, items: [{ id: 'S1', kind: 'SIS', distanceM: expect.any(Number) }] });
     // À moins de 400 m, la plus proche d'abord ; celle à ~11 km est écartée.
     expect(r.hydrants.status === 'ok' && r.hydrants.data.items.map((h) => h.id)).toEqual(['node/1', 'node/2']);
+  });
+
+  it('une étape dont une partie des sources répond : « en partie », avec la liste des muettes', async () => {
+    const seen: AnalysisStep[][] = [];
+    const http = new FakeHttp({ [`${GEORISQUES_BASE}/radon`]: { json: { data: [{ classe_potentiel: '1' }] } } });
+    await analyzer(http).analyze([parcel(0)], async (steps) => void seen.push(steps));
+    expect(seen.at(-1)![0]).toMatchObject({ state: 'partial', detail: 'radon 1 · sans réponse : sismicité, PPR, CatNat, installations, sols pollués' });
   });
 
   it('une altitude manquante ne fausse pas la moyenne ; sans altitude, pas de cote', async () => {
