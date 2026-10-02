@@ -41,6 +41,15 @@
 8. Tests unitaires, intégration, e2e ; recette au navigateur (ordinateur et 375 px) ; perf
    consignée ; clore.
 
+## État au soir du 02/10/2026
+
+Étapes 1 à 8 faites sur `l5-land-market`, en commits locaux, rien de poussé. Les critères de fin sont
+tenus en local (recette de [F-05](../fiches/F-05-foncier-marche.md#recette)), à une exception près :
+le cas de la Moselle n'est testé qu'en intégration, sans cadastre enregistré.
+
+**À décider par le porteur du produit** : le push et la PR vers `master`, avec un environnement
+éphémère.
+
 ## Critères de fin
 
 - **Maisons-Alfort AY96 + AY97, à 500 m**, sans Internet (réponses enregistrées) : médianes maison

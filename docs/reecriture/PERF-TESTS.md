@@ -12,3 +12,4 @@ s'affiche à chaque mesure.
 | 01/10/2026 19:55 | `55a9039` | back+outils 333 en 7,6 s · front 70 en 4,7 s · e2e 11 en 22,6 s | 34,8 s |
 | 01/10/2026 23:16 | `96d20c7` | back+outils 394 en 8,4 s · front 79 en 4,7 s · e2e 12 en 26,1 s | 39,2 s |
 | 02/10/2026 19:14 | `0fc674f` | back+outils 484 en 14,4 s · front 91 en 5,6 s · e2e 13 en 31,6 s | 51,7 s |
+| 02/10/2026 19:21 | `b0d5254` | back+outils 484 en 17,3 s · front 91 en 5,5 s · e2e 13 en 27,2 s | 50,0 s |

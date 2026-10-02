@@ -1,6 +1,6 @@
 # F-05 · Foncier et marché : prix de vente autour d'une étude
 
-> Lot : L5 · Statut : `arbitrée` (Q1 à Q10 rendus par le porteur du produit le 02/10/2026) · Branche :
+> Lot : L5 · Statut : `recettée` en local (02/10/2026) ; arbitrages Q1 à Q10 rendus par le porteur du produit le 02/10/2026 · Branche :
 > `l5-land-market` (partie de `master`)
 > Ancien code : `bimtheon-studio/ardha` @ `2a7f9a0`
 
@@ -215,7 +215,48 @@ Dans `src/utils/__tests__/` : `dvfPriceScale.test.ts`, porté avec l'échelle P1
 
 ## Recette
 
-À faire.
+Recette du 02/10/2026, en local.
+
+**Maisons-Alfort AY96 + AY97, réponses enregistrées** (2 millésimes, 2024-2025 ; tests d'intégration,
+e2e et CLI).
+
+| Rayon | Ventes du cercle | Comparables | Appartements anciens | Maisons anciennes | Appartements VEFA |
+|---|---|---|---|---|---|
+| 500 m | 331 | 276 | 5 465 €/m² (131 ventes, −1,3 % sur un an) | 6 056 €/m² (11 ventes, peu de ventes) | aucune vente sur 12 mois |
+| 1 km | 1 010 | 783 | 5 263 €/m² (339 ventes, −1,5 %) | 5 965 €/m² (38 ventes, −2,8 %) | 7 131 €/m² (40 ventes) |
+
+Les autres sources :
+- **ECLN du Val-de-Marne** : 2026-T2, collectif 5 739 €/m², 957 réservations.
+- **Sitadel de Maisons-Alfort** : 95 logements autorisés en 2025.
+- **Indices** : ICC 2 103 (2026-Q2, +0,8 % sur un an) ; appartements anciens du Val-de-Marne 114,7
+  (−0,9 %).
+
+**En direct, base de développement** : Val-de-Marne, 5 millésimes (2021-2025) chargés en 5,7 s. À
+500 m : 791 ventes comparables sur 946.
+
+- **Analyse de bout en bout** : 7,7 s au premier passage, dont 2,1 s pour l'ECLN et 4,1 s pour
+  Sitadel.
+- **Analyses suivantes** : moins de 0,5 s, tout est en base.
+- **Départements du cercle** : 9 points interrogés en parallèle, moins de 0,3 s ; c'était 2,7 à 5 s
+  à la suite.
+
+**Hors couverture et sources muettes** (tests d'intégration) :
+- une parcelle à Metz donne « DVF ne couvre pas l'Alsace-Moselle », et l'ECLN suit ;
+- toutes les sources muettes : chaque partie est « indisponible », et l'analyse aboutit ;
+- l'index de geo-DVF muet, sans rien en base : aucun millésime, échec dit ;
+- l'ECLN vieux de 31 jours, DiDo muet : la copie est servie, avec sa date.
+
+**Navigateur** (Chromium, 1 360 px et 375 px) :
+- prix, historique, neuf, Sitadel, indices et carte (cercle, points colorés, parcelles vendues) ;
+- liste filtrable et triable ; choisir une vente centre la carte ;
+- passage à 1 km ;
+- aucune erreur dans la console.
+- Un débordement de 174 px à 375 px, dû au tableau caché du graphique, a été corrigé.
+
+**Bugs trouvés et corrigés pendant la recette** :
+- liste des ventes vide à la première ouverture : elle était lue avant le chargement de DVF ;
+- graduation du haut du graphique sous la valeur maximale ;
+- clonage concurrent des bases de test (échecs au hasard, antérieurs à L5).
 
 ## Écarts assumés
 

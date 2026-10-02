@@ -403,6 +403,13 @@ vers des comptes pas encore recréés) ; aucune migration ne les a réinjectées
 
 ## Journal
 
+- **02/10/2026** — L5 codé et recetté en local sur `l5-land-market` :
+  - ventes DVF par département (DT-39), ECLN, Sitadel, indices INSEE ;
+  - analyse « market » par étude ;
+  - page Foncier et marché, avec carte, liste et parcelles vendues ;
+  - CLI `dvf:*`, `market:*`.
+
+  Les tests d'intégration ne tombent plus au hasard au clonage des bases.
 - **02/10/2026** — F-05 (foncier et marché) scannée et arbitrée (Q1 à Q10) ; DT-39, DT-40 ;
   feuille de route de L5 écrite.
 - **02/10/2026** — L2, L4 et le lot des secrets once fusionnés dans `master` (PR #3, #4, #5).
