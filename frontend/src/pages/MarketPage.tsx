@@ -306,12 +306,14 @@ function Sales({ id, radiusM, computedAt, basemap, study, center }: { id: string
   const color = (s: MarketSale) => (s.pricePerM2 && scale ? priceColor(s.pricePerM2, scale) : '#8A8F98');
   const thisYear = new Date().getFullYear();
   const mapCenter = sales.data?.center ?? center;
+  // Pendant un changement de rayon, les ventes affichées sont encore celles de l'ancien : leur rayon fait foi.
+  const shownRadius = sales.data?.radiusM ?? radiusM;
   return (
     <div className="space-y-3">
       <div className="h-80 border md:h-[28rem]">
         {basemap && mapCenter ? (
           <Suspense fallback={<Loading />}>
-            <MarketMap basemap={basemap} parcels={study} center={mapCenter} radiusM={radiusM} sales={list} color={color} selectedId={selected} onSelect={setSelected} label={saleLabel} />
+            <MarketMap basemap={basemap} parcels={study} center={mapCenter} radiusM={shownRadius} sales={list} color={color} selectedId={selected} onSelect={setSelected} label={saleLabel} />
           </Suspense>
         ) : (
           <Loading />
@@ -364,7 +366,7 @@ function Sales({ id, radiusM, computedAt, basemap, study, center }: { id: string
       </div>
       {sales.data && (
         <p className="text-xs text-muted-foreground" role="status">
-          {sales.data.truncated ? `Les ${list.length} ventes les plus récentes` : `${list.length} vente${list.length > 1 ? 's' : ''}`} dans {meters(radiusM)}
+          {sales.data.truncated ? `Les ${list.length} ventes les plus récentes` : `${list.length} vente${list.length > 1 ? 's' : ''}`} dans {meters(shownRadius)}
           {list.some((s) => s.parcels.length > 0) && ' · parcelles vendues en couleur sur la carte'}
         </p>
       )}

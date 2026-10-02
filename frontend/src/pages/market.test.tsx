@@ -277,6 +277,8 @@ describe('page Foncier et marché', () => {
     await userEvent.click(within(note).getByRole('button', { name: 'Élargir à 1 km' }));
     await waitFor(() => expect(calls.find((c) => c.key === `POST /api/studies/${ID}/market`)?.body).toEqual({ force: false, radiusM: 1000 }));
     await waitFor(() => expect(screen.getByRole('button', { name: '1 km' })).toHaveAttribute('aria-pressed', 'true'));
+    // Les ventes encore affichées sont celles du rayon d'avant : leur libellé le dit.
+    expect(screen.getByText(/^Les 2 ventes les plus récentes dans 500 m/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: '2 km' }));
     await waitFor(() => expect(calls.filter((c) => c.key === `POST /api/studies/${ID}/market`).at(-1)?.body).toEqual({ force: false, radiusM: 2000 }));
     await userEvent.click(screen.getByRole('button', { name: /Recalculer/ }));
