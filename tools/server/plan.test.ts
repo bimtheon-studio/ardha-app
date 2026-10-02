@@ -72,6 +72,14 @@ describe('plan', () => {
     expect(plan(['psql', 'production'], ctx)).toEqual([{ kind: 'remote', args: ['psql', 'production'], tty: false }]);
   });
 
+  it('app-secret : la valeur part par l’entrée standard, jamais en argument', () => {
+    expect(plan(['app-secret', 'GEORISQUES_TOKEN'], ctx)).toEqual([
+      { kind: 'sync' },
+      { kind: 'remote', args: ['app-secret', 'GEORISQUES_TOKEN'], tty: false, secret: 'Valeur de GEORISQUES_TOKEN : ' },
+    ]);
+    expect(() => plan(['app-secret'], ctx)).toThrow(/nom du secret manquant/);
+  });
+
   it('registry : le jeton part par l’entrée standard, jamais en argument', () => {
     expect(plan(['registry', '--username', 'ci-bot'], ctx)).toEqual([
       { kind: 'sync' },

@@ -16,6 +16,7 @@
 #   ardha-env team-list | team-remove --email <e>    comptes d'équipe (sans les mots de passe)
 #   ardha-env accounts <nom>                         comptes d'équipe présents, avec leur mot de passe
 #   ardha-env registry --username <u>                identifiants de ghcr.io (jeton lu sur l'entrée standard)
+#   ardha-env app-secret <NOM>                       secret de l'application pour tous les environnements (valeur lue sur l'entrée standard)
 #   ardha-env sweep --keep <pr-1,pr-7,…>             supprime les PR absentes de la liste (fermées)
 #   ardha-env ci                                     commande forcée de la clé SSH de la CI
 #
@@ -96,12 +97,18 @@ container_of() {
   die "aucun conteneur en service pour $host"
 }
 
-# Arguments `--env` de once, depuis le fichier de l'environnement (update les remplace tous).
+# Arguments `--env` de once : le fichier de l'environnement, puis les secrets de l'application
+# (`APP_<NOM>` de secrets.env, `ardha-env app-secret`), communs à tous (update les remplace tous).
 env_args() {
   local line
   while IFS= read -r line; do
     [[ -n $line && $line != \#* ]] && printf '%s\0' --env "$line"
   done < "$(env_file "$1")"
+  if [[ -f $SECRETS ]]; then
+    while IFS= read -r line; do
+      printf '%s\0' --env "${line#APP_}"
+    done < <(grep '^APP_' "$SECRETS" || true)
+  fi
 }
 
 # Identifiants de ghcr.io (paquet privé), s'il y en a dans secrets.env (`ardha-env registry`) : once
@@ -352,6 +359,30 @@ cmd_registry() {
   echo "Identifiants du registre enregistrés pour $username (pris en compte au prochain create)."
 }
 
+# Secrets de l'application, les mêmes pour tous les environnements (jeton Géorisques v2, F-04 Q12,
+# porteur du produit, 02/10/2026) : la valeur arrive par l'entrée standard, jamais par la ligne de
+# commande ni par la CI, et rejoint secrets.env (600) sous `APP_<NOM>`. Pris en compte au prochain
+# create ou update. Seuls les noms connus de l'application sont acceptés.
+APP_SECRET_NAMES=(GEORISQUES_TOKEN)
+
+cmd_app_secret() {
+  local name=${1:-}
+  (($# == 1)) || usage
+  [[ " ${APP_SECRET_NAMES[*]} " == *" $name "* ]] || die "secret inconnu « $name » (permis : ${APP_SECRET_NAMES[*]})"
+  local value
+  IFS= read -r value || true
+  [[ -n $value ]] || die "valeur vide : la passer sur l'entrée standard"
+  [[ $value =~ ^[A-Za-z0-9._-]+$ ]] || die "valeur inattendue (caractères hors [A-Za-z0-9._-])"
+  [[ -f $SECRETS ]] || die "$SECRETS absent : lancer « ardha-env setup »"
+  (
+    umask 077
+    grep -v "^APP_$name=" "$SECRETS" > "$SECRETS.tmp" || true
+    printf 'APP_%s=%s\n' "$name" "$value" >> "$SECRETS.tmp"
+    mv "$SECRETS.tmp" "$SECRETS"
+  )
+  echo "Secret $name enregistré (pris en compte au prochain create ou update de chaque environnement)."
+}
+
 # Comptes de l'équipe (porteur du produit, 01/10/2026) : les mêmes comptes, avec les mêmes mots de
 # passe, dans chaque environnement, pour toujours pouvoir s'y reconnecter. La liste vit sur le
 # serveur seulement (`team`, 600 : e-mail, nom, mot de passe, séparés par des tabulations) : jamais
@@ -503,6 +534,7 @@ case $command in
   team-remove) cmd_team_remove "$@" ;;
   accounts) cmd_accounts "$@" ;;
   registry) cmd_registry "$@" ;;
+  app-secret) cmd_app_secret "$@" ;;
   ci) cmd_ci ;;
   *) usage ;;
 esac

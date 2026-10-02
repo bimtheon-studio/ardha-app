@@ -273,6 +273,22 @@ describe('ardha-env', () => {
     expect(ci('registry --username x').err).toMatch(/commande refusée à la CI/);
   });
 
+  it('app-secret : secret de l’application dans secrets.env (entrée standard), passé à chaque déploiement ; nom connu seulement ; pas pour la CI', () => {
+    const set = (name: string, value: string) => spawnSync(path.join(ROOT, 'deploy/server/ardha-env'), ['app-secret', name], { env, encoding: 'utf8', input: value });
+    expect(set('AUTRE', 'x\n').stderr).toMatch(/secret inconnu « AUTRE »/);
+    expect(set('GEORISQUES_TOKEN', '').stderr).toMatch(/valeur vide/);
+    expect(set('GEORISQUES_TOKEN', 'a b\n').stderr).toMatch(/valeur inattendue/);
+    expect(set('GEORISQUES_TOKEN', 'eyJ.premier_-1\n').status).toBe(0);
+    expect(set('GEORISQUES_TOKEN', 'eyJ.second\n').stdout).toMatch(/Secret GEORISQUES_TOKEN enregistré/);
+    const secrets = readFileSync(path.join(home, 'secrets.env'), 'utf8');
+    expect(secrets.match(/^APP_GEORISQUES_TOKEN=/gm)).toHaveLength(1);
+    expect(secrets).toMatch(/^APP_GEORISQUES_TOKEN=eyJ\.second$/m);
+    expect(statSync(path.join(home, 'secrets.env')).mode & 0o777).toBe(0o600);
+    expect(ci('app-secret GEORISQUES_TOKEN').err).toMatch(/commande refusée à la CI/);
+    ok('update', 'production', '--image', IMAGE);
+    expect(calls().at(-1)).toMatch(/--env LOG_LEVEL=… --env GEORISQUES_TOKEN=…/);
+  });
+
   it('un déploiement en échec ne laisse rien', () => {
     const r = ardhaEnv('create', 'pr-7', '--image', 'ardha:inexistante');
     expect(r.code).toBe(1);

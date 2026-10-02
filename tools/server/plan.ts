@@ -21,6 +21,7 @@ export interface PlanContext {
 export const USAGE = `Usage : pnpm server <commande>
   setup                                   copie les fichiers du serveur, installe Postgres et Redis
   registry --username <u>                 jeton ghcr.io (read:packages) pour once, demandé sans écho
+  app-secret <NOM>                        secret de l'application (GEORISQUES_TOKEN) pour tous les environnements, demandé sans écho
   team-set --email <e> --name <nom>       compte d'équipe, mot de passe demandé sans écho (liste sur le serveur)
   team-list                               comptes d'équipe (sans les mots de passe)
   team-remove --email <e>
@@ -70,6 +71,11 @@ export function plan(argv: string[], ctx: PlanContext): Action[] {
       const username = i >= 0 ? rest[i + 1] : undefined;
       if (!username) throw new Error(`--username manquant\n\n${USAGE}`);
       return [{ kind: 'sync' }, { kind: 'remote', args: ['registry', '--username', username], tty: false, secret: 'Jeton ghcr.io (read:packages) : ' }];
+    }
+    case 'app-secret': {
+      const secret = rest[0];
+      if (!secret || rest.length !== 1) throw new Error(`nom du secret manquant\n\n${USAGE}`);
+      return [{ kind: 'sync' }, { kind: 'remote', args: ['app-secret', secret], tty: false, secret: `Valeur de ${secret} : ` }];
     }
     case 'team-set':
       return [{ kind: 'sync' }, { kind: 'remote', args: ['team-set', ...rest], tty: false, secret: 'Mot de passe du compte : ' }];
