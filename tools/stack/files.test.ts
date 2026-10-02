@@ -6,6 +6,7 @@ import {
   BLOCK_END,
   parseEnv,
   newSecrets,
+  randomSecret,
   override,
   existingSecrets,
   upsertBlock,
@@ -89,5 +90,11 @@ describe('secrets', () => {
 
   it('lireEnv ignore commentaires et lignes vides', () => {
     expect([...parseEnv('# c\n\nA=1\nB = 2\n')]).toEqual([['A', '1'], ['B', '2']]);
+  });
+});
+
+describe('randomSecret', () => {
+  it('24 caractères sans risque pour le shell, jamais un tiret en tête (passerait pour une option)', () => {
+    for (let i = 0; i < 500; i++) expect(randomSecret()).toMatch(/^[A-Za-z0-9][A-Za-z0-9_-]{23}$/);
   });
 });
