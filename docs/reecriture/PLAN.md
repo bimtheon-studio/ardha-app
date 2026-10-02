@@ -289,7 +289,7 @@ tâches Node. Livré en L0 (D-09).
 |---|---|
 | Une réécriture longue qui ne livre rien | tranches verticales, déployées dès le lot LD (production et environnements par PR) ; l'ancienne application tourne jusqu'à la bascule |
 | Des comportements perdus en route | fiches arbitrées, recette comparée |
-| L3 bloqué par l'extracteur voisin | L1, L2, L4 et L5 avancent sans lui |
+| L3 bloqué par l'extracteur voisin | L1, L2, L4 et L5 avancent sans lui ; **L3 mis de côté par le porteur du produit (02/10/2026)** : les données PLU s'extrairont de plusieurs façons, à reprendre plus tard, sans attendre `claude/plui-extract` |
 | Le coût LLM de reconstruction | n'extraire que les segments modifiés, par ordre de priorité des communes |
 | Drizzle encore en 0.x | version épinglée, montée de version délibérée, accès confiné aux repositories |
 | Une panne des fonds IGN plus fréquente que prévu | erreurs de tuiles mesurées ; la configuration des fonds est servie par l'API, passer par un proxy revient à changer une URL |
@@ -400,6 +400,11 @@ vers des comptes pas encore recréés) ; aucune migration ne les a réinjectées
 été supprimée le 27/09. Sans conséquence pour la réécriture, qui repart de zéro.
 
 ## Journal
+
+- **02/10/2026** — L2, L4 et le lot des secrets once fusionnés dans `master` (PR #3, #4, #5).
+  **L3 mis de côté** par le porteur du produit : les données PLU viendront de plusieurs sources et
+  méthodes d'extraction, à décider plus tard ; on n'attend plus l'extracteur voisin. **L5 lancé**
+  sur `l5-land-market`.
 
 - **02/10/2026** — arbitrages F-04 Q1 à Q14 rendus (Q6 altitudes aussi sur la carte, Q9 surcoûts dès
   L4, Q10 alentours à 500 m, Q12 jeton Géorisques v2) et repris ; DT-36.
