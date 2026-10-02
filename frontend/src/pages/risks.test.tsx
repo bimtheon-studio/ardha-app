@@ -132,9 +132,9 @@ const surcharges: StudyRisks['surcharges'] = [
 ];
 const progress: StudyRisks['progress'] = [
   { key: 'commune-94046', label: 'Risques de la commune : Maisons-Alfort (Géorisques)', state: 'done', detail: 'radon 1 · 3 PPR', startedAt: '2026-10-01T10:00:00.000Z', finishedAt: '2026-10-01T10:00:01.200Z' },
-  { key: 'elevation', label: 'Altitudes de 23 points (IGN)', state: 'running', detail: null, startedAt: '2026-10-01T10:00:01.200Z', finishedAt: null },
   { key: 'parcel-AY96', label: 'Argiles et hauteurs d’eau, parcelle AY 96', state: 'partial', detail: 'argiles moyen · sans réponse : hauteurs d’eau', startedAt: null, finishedAt: null },
   { key: 'cavities', label: 'Cavités à moins de 500 m', state: 'unavailable', detail: 'sources muettes : cavités', startedAt: null, finishedAt: null },
+  { key: 'elevation', label: 'Altitudes de 23 points (IGN)', state: 'running', detail: null, startedAt: '2026-10-01T10:00:01.200Z', finishedAt: null },
   { key: 'hydrants', label: 'Bornes incendie à moins de 400 m', state: 'pending', detail: null, startedAt: null, finishedAt: null },
 ];
 const finished = progress.map((p) => (p.state === 'running' || p.state === 'pending' ? { ...p, state: 'done' as const } : p));
@@ -171,9 +171,17 @@ describe('page des risques', () => {
     });
     renderAt(`/studies/${ID}/risks`);
     expect(await screen.findByText('Analyse en cours…')).toBeInTheDocument();
-    // Pendant le calcul : le déroulé, étape par étape, avec ce que chacune a trouvé.
+    // Pendant le calcul : en compact, l'étape courante, la dernière trouvaille et l'avancement ;
+    // le détail se déplie.
+    const compact = screen.getByRole('region', { name: 'Calcul en cours' });
+    expect(await within(compact).findByTestId('step-count')).toHaveTextContent('4 / 5');
+    expect(compact).toHaveTextContent('Altitudes de 23 points (IGN)');
+    expect(screen.getByTestId('last-step')).toHaveTextContent('Risques de la commune : Maisons-Alfort : radon 1 · 3 PPR');
+    expect(screen.getByRole('progressbar', { name: 'Avancement du calcul' })).toHaveAttribute('aria-valuenow', '3');
+    expect(screen.queryByRole('list', { name: 'Déroulé de l’analyse' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Voir les 5 étapes' }));
     const live = screen.getByRole('list', { name: 'Déroulé de l’analyse' });
-    expect(within(live).getAllByRole('listitem').map((li) => li.dataset.state)).toEqual(['done', 'running', 'partial', 'unavailable', 'pending']);
+    expect(within(live).getAllByRole('listitem').map((li) => li.dataset.state)).toEqual(['done', 'partial', 'unavailable', 'running', 'pending']);
     expect(live).toHaveTextContent('radon 1 · 3 PPR');
     expect(live).toHaveTextContent('1,2 s');
     expect(live).toHaveTextContent('(en cours)');
@@ -271,6 +279,20 @@ describe('page des risques', () => {
     expect(await screen.findByText('Aucune analyse pour l’instant.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Recalculer' })).toBeNull();
     expect(screen.getByText('Analyse pas encore faite')).toBeInTheDocument();
+  });
+
+  it('avant la première étape : le bloc compact est déjà là ; toutes finies : enregistrement', async () => {
+    let state: StudyRisks = { ...none, status: 'queued' };
+    api({ [`GET /api/studies/${ID}/risks`]: () => ({ status: 200, body: state }) });
+    renderAt(`/studies/${ID}/risks`);
+    expect(await screen.findByText('Préparation du calcul…')).toBeInTheDocument();
+    expect(screen.getByText('Premiers appels aux sources…')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Voir les/ })).toBeNull();
+    state = { ...none, status: 'running', progress: finished };
+    expect(await screen.findByText('Enregistrement de l’analyse', {}, { timeout: 3000 })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Voir les 5 étapes' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Masquer le détail' }));
+    expect(screen.queryByRole('list', { name: 'Déroulé de l’analyse' })).toBeNull();
   });
 
   it('une demande en erreur s’affiche', async () => {
