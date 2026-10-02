@@ -49,13 +49,17 @@ const Installation = z.object({
   latitude: nullableNumber,
   codeAIOT: nullableString,
 });
-const Polygonal = z.object({ type: z.enum(['Polygon', 'MultiPolygon']), coordinates: z.array(z.unknown()) });
+// Un site est un polygone (SIS, certains CASIAS) ou un point (beaucoup de CASIAS, Annecy par exemple).
+const SiteGeometry = z.discriminatedUnion('type', [
+  z.object({ type: z.enum(['Polygon', 'MultiPolygon']), coordinates: z.array(z.unknown()) }),
+  z.object({ type: z.literal('Point'), coordinates: z.tuple([z.number(), z.number()]) }),
+]);
 const PollutedSite = z.object({
   identifiant_ssp: z.string(),
   nom: nullableString,
   nom_etablissement: nullableString,
   fiche_risque: nullableString,
-  geom: Polygonal.nullish(),
+  geom: SiteGeometry.nullish(),
 });
 const Cavity = z.object({ identifiant: z.string(), nom: nullableString, type: nullableString, longitude: z.number(), latitude: z.number() });
 const Clay = z.object({ codeExposition: z.string().nullish() });
@@ -108,7 +112,12 @@ export interface PollutedSiteInfo {
   kind: 'SIS' | 'CASIAS';
   name: string | null;
   url: string | null;
-  geometry: { type: 'Polygon' | 'MultiPolygon'; coordinates: unknown[] } | null;
+  geometry: { type: 'Polygon' | 'MultiPolygon'; coordinates: unknown[] } | { type: 'Point'; coordinates: [number, number] } | null;
+}
+
+/** Paramètres d'une recherche autour d'un point : « longitude,latitude » et rayon en mètres. */
+function near(lon: number, lat: number, radiusM: number): Record<string, string> {
+  return { latlon: `${lon.toFixed(6)},${lat.toFixed(6)}`, rayon: String(radiusM) };
 }
 
 function parse<S extends z.ZodType>(schema: S, items: readonly unknown[]): z.output<S>[] {
@@ -124,6 +133,11 @@ export class Georisques {
     private readonly http: Http,
     private readonly token?: string,
   ) {}
+
+  /** Version de l'API qui sert les PPR : leur forme diffère (états et dates en v2). */
+  get plansVersion(): 'v1' | 'v2' {
+    return this.token ? 'v2' : 'v1';
+  }
 
   private async json(path: string, params: Record<string, string>, v2 = false): Promise<unknown> {
     const url = `${v2 ? GEORISQUES_V2 : GEORISQUES_BASE}/${path}?${new URLSearchParams(params)}`;
@@ -221,14 +235,22 @@ export class Georisques {
     return { items: parse(CatNat, r.items), truncated: r.truncated };
   }
 
-  async installations(code: string): Promise<Listing<z.output<typeof Installation>>> {
-    const r = await this.list('installations_classees', { code_insee: code });
+  /**
+   * Installations classées à moins de `radiusM` mètres d'un point. Par rayon et non par commune :
+   * une grande ville en compte des centaines, dont seules quelques-unes sont voisines.
+   */
+  async installations(lon: number, lat: number, radiusM: number): Promise<Listing<z.output<typeof Installation>>> {
+    const r = await this.list('installations_classees', near(lon, lat, radiusM));
     return { items: parse(Installation, r.items), truncated: r.truncated };
   }
 
-  /** Secteurs d'information sur les sols (SIS) et anciens sites industriels (CASIAS) de la commune. */
-  async pollutedSites(code: string): Promise<Listing<PollutedSiteInfo>> {
-    const [sis, casias] = await Promise.all([this.list('ssp/conclusions_sis', { code_insee: code }), this.list('ssp/casias', { code_insee: code })]);
+  /**
+   * Secteurs d'information sur les sols (SIS) et anciens sites industriels (CASIAS) à moins de
+   * `radiusM` mètres d'un point. CASIAS par commune est lent (5 à 11 s dans une grande ville, plus de
+   * 2 000 sites à Bordeaux, mesuré le 02/10/2026) ; par rayon de 500 m, 0,1 à 1 s.
+   */
+  async pollutedSites(lon: number, lat: number, radiusM: number): Promise<Listing<PollutedSiteInfo>> {
+    const [sis, casias] = await Promise.all([this.list('ssp/conclusions_sis', near(lon, lat, radiusM)), this.list('ssp/casias', near(lon, lat, radiusM))]);
     const map = (kind: PollutedSiteInfo['kind']) => (s: z.output<typeof PollutedSite>) => ({
       id: s.identifiant_ssp,
       kind,
@@ -241,7 +263,7 @@ export class Georisques {
 
   /** Cavités souterraines à moins de `radiusM` mètres d'un point. */
   async cavities(lon: number, lat: number, radiusM: number): Promise<Listing<z.output<typeof Cavity>>> {
-    const r = await this.list('cavites', { latlon: `${lon.toFixed(6)},${lat.toFixed(6)}`, rayon: String(radiusM) });
+    const r = await this.list('cavites', near(lon, lat, radiusM));
     return { items: parse(Cavity, r.items), truncated: r.truncated };
   }
 

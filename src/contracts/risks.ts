@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { route } from './routes.ts';
 
 /** Version du schéma du résultat : un changement incompatible l'augmente, et l'analyse se refait. */
-export const RISKS_VERSION = 2;
+export const RISKS_VERSION = 3;
 
 export function known<T extends z.ZodType>(data: T) {
   return z.discriminatedUnion('status', [z.object({ status: z.literal('ok'), data }), z.object({ status: z.literal('unavailable'), error: z.string() })]);
@@ -45,6 +45,8 @@ export type RiskPlan = z.infer<typeof RiskPlan>;
 export const CommuneRisks = z.object({
   code: z.string(),
   name: z.string().nullable(),
+  /** Date de la plus ancienne donnée de Géorisques retenue pour la commune (gardées 30 jours en base). */
+  asOf: z.iso.datetime().nullable(),
   radon: known(z.number().nullable()),
   seismic: known(z.number().nullable()),
   hazards: known(z.array(z.object({ code: z.string(), label: z.string() }))),
@@ -93,15 +95,12 @@ export const RisksResult = z.object({
   cavities: known(z.object({ truncated: z.boolean(), items: z.array(z.object({ id: z.string(), name: z.string().nullable(), type: z.string().nullable(), point: lonLat, ...near })) })),
   installations: known(
     z.object({
-      /** Installations classées des communes de l'étude (toutes distances). */
-      count: z.number().int(),
       truncated: z.boolean(),
       items: z.array(z.object({ id: z.string().nullable(), name: z.string(), regime: z.string().nullable(), seveso: z.string().nullable(), point: lonLat, ...near })),
     }),
   ),
   pollutedSites: known(
     z.object({
-      count: z.number().int(),
       truncated: z.boolean(),
       items: z.array(z.object({ id: z.string(), kind: z.enum(['SIS', 'CASIAS']), name: z.string().nullable(), url: z.string().nullable(), ...near })),
     }),

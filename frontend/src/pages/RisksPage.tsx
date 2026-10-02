@@ -140,6 +140,7 @@ function Commune({ c }: { c: CommuneRisks }) {
       <p className="font-medium">
         {c.name ?? c.code} <span className="text-muted-foreground">({c.code})</span>
       </p>
+      {c.asOf && <p className="text-xs text-muted-foreground">Données Géorisques du {formatDate(c.asOf)}</p>}
       <p>
         <span className="text-muted-foreground">Risques recensés : </span>
         <Value of={c.hazards}>{(h) => (h.length ? h.map((x) => x.label).join(', ') : 'aucun')}</Value>
@@ -294,9 +295,7 @@ function Nearby({ result }: { result: Result }) {
         <Value of={result.installations}>
           {(i) => (
             <>
-              <p className="text-muted-foreground">
-                {i.items.length} sur {i.count} dans la commune
-              </p>
+              <p className="text-muted-foreground">{i.items.length === 0 ? 'Aucune.' : `${i.items.length}, la plus proche à ${meters(i.items[0]!.distanceM)}`}</p>
               <ul className="text-xs">
                 {i.items.slice(0, 5).map((x) => (
                   <li key={`${x.id}-${x.name}`}>
@@ -315,7 +314,7 @@ function Nearby({ result }: { result: Result }) {
         <Value of={result.pollutedSites}>
           {(s) =>
             s.items.length === 0 ? (
-              <p className="text-muted-foreground">Aucun ({s.count} dans la commune).</p>
+              <p className="text-muted-foreground">Aucun.</p>
             ) : (
               <ul className="text-xs">
                 {s.items.map((x) => (

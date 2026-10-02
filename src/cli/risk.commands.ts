@@ -57,8 +57,8 @@ export function describeRisks(r: StudyRisks): string {
   }
   const near = `${res.radii.nearbyM} m`;
   lines.push(`  cavités à ${near} : ${value(res.cavities, (c) => String(c.items.length))}`);
-  lines.push(`  installations classées à ${near} : ${value(res.installations, (i) => `${i.items.length} (sur ${i.count} dans la commune)`)}`);
-  lines.push(`  sols pollués à ${near} : ${value(res.pollutedSites, (s) => `${s.items.length} (sur ${s.count})`)}`);
+  lines.push(`  installations classées à ${near} : ${value(res.installations, (i) => String(i.items.length))}`);
+  lines.push(`  sols pollués à ${near} : ${value(res.pollutedSites, (s) => String(s.items.length))}`);
   lines.push(`  bornes incendie à ${res.radii.hydrantsM} m : ${value(res.hydrants, (h) => (h.items.length ? `${h.items.length}, la plus proche à ${h.items[0]!.distanceM} m` : 'aucune'))}`);
   return lines.join('\n');
 }

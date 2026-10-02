@@ -85,7 +85,7 @@ export async function createTestApp(options: { worker?: boolean; config?: NodeJS
       await dropKeys(redis, rateLimitPrefix(config));
     },
     resetReference: async () => {
-      await pool.query('TRUNCATE communes, parcels, source_states, hydrants CASCADE');
+      await pool.query('TRUNCATE communes, parcels, source_states, hydrants, commune_risks CASCADE');
       await dropKeys(redis, `${config.QUEUE_PREFIX}:lookup-cache`);
     },
     close: async () => {

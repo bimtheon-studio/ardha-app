@@ -160,6 +160,12 @@ CatNat », « 4 cases en cache », « sans réponse : PPR ») ; la page le montr
 la CLI l'affiche en direct. Bornes et cavités sont cherchées autour de chaque parcelle (une étude
 Tours + Annecy interrogeait toute l'emprise qui les sépare : corrigé).
 
+Temps par source (02/10/2026, 13 communes, chaque source à part) : sols pollués par commune 6,2 s en
+moyenne (jusqu'à 11 s), Overpass 6,3 s (7 réponses sur 13), PPR v2 avec fiches 1,3 s, tout le reste
+sous 0,6 s. D'où DT-38 : données communales en base 30 jours, installations et sols pollués par
+rayon (0,1 à 0,4 s), étape à part. Au passage : les sites CASIAS en point (Annecy, Maisons-Alfort)
+étaient écartés sans bruit ; ils comptent maintenant (29 sites à moins de 500 m de AY96 + AY97).
+
 Bornes incendie : gardées en base par case de 0,01° pendant 30 jours (DT-37) ; Overpass n'est plus
 appelé qu'une fois par case, et une case connue sert quand il sature (504, 429).
 

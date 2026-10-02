@@ -1,5 +1,5 @@
 import { gridCells } from './bbox.ts';
-import { bboxOf, type Bbox, expandBbox, interiorPoint, perimeterPoints, type Position, type Surface } from './geometry.ts';
+import { bboxOf, type Bbox, expandBbox, interiorPoint, perimeterPoints, pointDistanceM, type Position, type Surface } from './geometry.ts';
 
 // Risques d'une étude (F-04) : aléa inondation des cartes TRI, classes d'argiles, de radon et de
 // sismicité, synthèse des quatre axes. Repris de l'ancien code (`usePPRIFloodZone.ts:120-126`,
@@ -293,8 +293,10 @@ export function elevationSamples(parcels: readonly Surface[]): Position[][] {
 
 /** Au-delà, l'étude est trop dispersée pour interroger Overpass case par case. */
 export const MAX_HYDRANT_CELLS = 64;
-/** Points d'interrogation des cavités au plus. */
-export const MAX_CAVITY_PROBES = 20;
+/** Points de recherche alentour au plus (cavités, installations, sols pollués). */
+export const MAX_SEARCH_PROBES = 20;
+/** Données communales de Géorisques gardées en base 30 jours (politique de l'ancien outil, `_shared/fraicheur.ts`). */
+export const GEORISQUES_FRESHNESS_DAYS = 30;
 
 /**
  * Cases de la grille autour de chaque parcelle (élargie du rayon des bornes), sans doublon : une
@@ -306,13 +308,34 @@ export function hydrantCells(parcels: readonly Surface[], radiusM = HYDRANT_RADI
   return [...cells.values()];
 }
 
-/** Points où chercher les cavités : un par case de la grille occupée par des parcelles (leur point intérieur). */
-export function cavityProbes(parcels: readonly Surface[]): Position[] {
-  const probes = new Map<string, Position>();
+export interface SearchProbe {
+  point: Position;
+  /** Rayon qui couvre `radiusM` autour de chaque parcelle du groupe, en mètres. */
+  radiusM: number;
+}
+
+/**
+ * Où chercher ce qui est à moins de `radiusM` des parcelles (cavités, installations, sols pollués) :
+ * un point par case de la grille occupée par des parcelles (le point intérieur de la première), avec
+ * un rayon élargi de l'étendue des parcelles du groupe. Le filtre exact se fait ensuite, sur la
+ * distance réelle aux parcelles.
+ */
+export function searchProbes(parcels: readonly Surface[], radiusM = NEARBY_RADIUS_M): SearchProbe[] {
+  const groups = new Map<string, { point: Position; parcels: Surface[] }>();
   for (const g of parcels) {
     const p = interiorPoint(g);
     const key = cellKey([Math.floor(p[0]! * 100) / 100, Math.floor(p[1]! * 100) / 100]);
-    if (!probes.has(key)) probes.set(key, p);
+    const group = groups.get(key) ?? { point: p, parcels: [] };
+    group.parcels.push(g);
+    groups.set(key, group);
   }
-  return [...probes.values()].slice(0, MAX_CAVITY_PROBES);
+  return [...groups.values()].slice(0, MAX_SEARCH_PROBES).map(({ point, parcels: ps }) => {
+    const reach = Math.max(
+      ...ps.flatMap((g) => {
+        const [w, s, e, n] = bboxOf(g);
+        return [[w, s], [w, n], [e, s], [e, n]].map((corner) => pointDistanceM(point, corner));
+      }),
+    );
+    return { point, radiusM: Math.ceil((radiusM + reach) / 50) * 50 };
+  });
 }

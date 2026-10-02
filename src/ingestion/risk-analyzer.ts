@@ -14,7 +14,7 @@ import {
   distanceToPointM,
   elevationSamples,
   elevationStats,
-  cavityProbes,
+  searchProbes,
   hydrantCells,
   floodHazard,
   floodScenarios,
@@ -30,7 +30,8 @@ import {
 import { CommunesRepository } from '../geo/communes.repository.ts';
 import { Elevation } from '../sources/elevation.ts';
 import { FloodHeights } from '../sources/flood-heights.ts';
-import { Georisques } from '../sources/georisques.ts';
+import { Georisques, type PlanInfo } from '../sources/georisques.ts';
+import { type Cached, CommuneRiskCache } from './commune-risk-cache.ts';
 import { HydrantCache } from './hydrant-cache.ts';
 import type { StudyParcelRecord } from '../studies/studies.repository.ts';
 
@@ -52,7 +53,14 @@ export class RiskAnalyzer {
     private readonly elevation: Elevation,
     private readonly hydrants: HydrantCache,
     private readonly communes: CommunesRepository,
+    private readonly cache: CommuneRiskCache,
   ) {}
+
+  /** Donnée communale de Géorisques, depuis la base si elle a moins de 30 jours (CommuneRiskCache). */
+  private async fromCache<T>(what: string, code: string, key: string, fn: () => Promise<T>): Promise<FromCache<T>> {
+    const r = await this.known(what, () => this.cache.get(code, key, fn));
+    return r.status === 'ok' ? { known: { status: 'ok', data: r.data.data }, fetchedAt: r.data.fetchedAt, origin: r.data.origin } : { known: r, fetchedAt: null, origin: null };
+  }
 
   private async known<T>(what: string, fn: () => Promise<T>): Promise<Known<T>> {
     try {
@@ -80,6 +88,7 @@ export class RiskAnalyzer {
         { key: 'elevation', label: `Altitudes de ${asked.flat().length} points (IGN)` },
         ...parcels.map((p) => ({ key: `parcel-${p.id}`, label: `Argiles et hauteurs d’eau, parcelle ${parcelLabel(p)} (Géorisques, BRGM)` })),
         { key: 'cavities', label: `Cavités à moins de ${NEARBY_RADIUS_M} m (Géorisques)` },
+        { key: 'surroundings', label: `Installations classées et sols pollués à moins de ${NEARBY_RADIUS_M} m (Géorisques)` },
         { key: 'hydrants', label: `Bornes incendie à moins de ${HYDRANT_RADIUS_M} m (OpenStreetMap)` },
       ],
       persist,
@@ -87,58 +96,57 @@ export class RiskAnalyzer {
     );
 
     const communes = [];
-    const installations: Known<Awaited<ReturnType<Georisques['installations']>>>[] = [];
-    const polluted: Known<Awaited<ReturnType<Georisques['pollutedSites']>>>[] = [];
     for (const code of codes) {
       const g = this.georisques;
-      const [radon, seismic, hazards, plans, catnat, inst, sites] = await progress.run(
+      const [radon, seismic, hazards, plans, catnat] = await progress.run(
         `commune-${code}`,
         () =>
           Promise.all([
-            this.known(`radon ${code}`, () => g.radon(code)),
-            this.known(`sismicité ${code}`, () => g.seismic(code)),
-            this.known(`GASPAR ${code}`, () => g.hazards(code)),
-            this.known(`PPR ${code}`, () => g.plans(code)),
-            this.known(`CatNat ${code}`, () => g.catnat(code)),
-            this.known(`installations ${code}`, () => g.installations(code)),
-            this.known(`sols pollués ${code}`, () => g.pollutedSites(code)),
+            this.fromCache(`radon ${code}`, code, 'radon', () => g.radon(code)),
+            this.fromCache(`sismicité ${code}`, code, 'seismic', () => g.seismic(code)),
+            this.fromCache(`GASPAR ${code}`, code, 'hazards', () => g.hazards(code)),
+            this.fromCache(`PPR ${code}`, code, `plans-${g.plansVersion}`, () => g.plans(code)),
+            this.fromCache(`CatNat ${code}`, code, 'catnat', () => g.catnat(code)),
           ]),
-        ([radon, seismic, , plans, catnat, inst, sites]) =>
-          outcome([
+        (all) => {
+          const [radon, seismic, , plans, catnat] = all.map((c) => c.known) as [Known<number | null>, Known<number | null>, unknown, Known<PlanInfo[]>, Known<{ items: unknown[] }>];
+          const o = outcome([
             part('radon', radon, (v) => `radon ${v ?? '?'}`),
             part('sismicité', seismic, (v) => `sismicité ${v ?? '?'}`),
             part('PPR', plans, (v) => plural(v.length, 'PPR', 'PPR')),
             part('CatNat', catnat, (v) => plural(v.items.length, 'arrêté CatNat', 'arrêtés CatNat')),
-            part('installations', inst, (v) => plural(v.items.length, 'installation classée', 'installations classées')),
-            part('sols pollués', sites, (v) => plural(v.items.length, 'site pollué', 'sites pollués')),
-          ]),
+          ]);
+          return { ...o, detail: `${o.detail}${cacheNote(all)}` };
+        },
       );
-      installations.push(inst);
-      polluted.push(sites);
+      const dates = [radon, seismic, hazards, plans, catnat].flatMap((c) => (c.fetchedAt ? [c.fetchedAt.getTime()] : []));
+      const asOf = dates.length ? new Date(Math.min(...dates)).toISOString() : null;
+      const catnatK = catnat.known;
       communes.push({
         code,
         name: names.get(code) ?? null,
-        radon,
-        seismic,
-        hazards,
+        asOf,
+        radon: radon.known,
+        seismic: seismic.known,
+        hazards: hazards.known,
         plans:
-          plans.status === 'ok'
-            ? { status: 'ok' as const, data: plans.data.map((p) => ({ ...p, flood: isFloodPlan(p), url: georisquesPlanUrl(p.id) })) }
-            : plans,
+          plans.known.status === 'ok'
+            ? { status: 'ok' as const, data: plans.known.data.map((p) => ({ ...p, flood: isFloodPlan(p), url: georisquesPlanUrl(p.id) })) }
+            : plans.known,
         catnat:
-          catnat.status === 'ok'
+          catnatK.status === 'ok'
             ? {
                 status: 'ok' as const,
                 data: {
-                  count: catnat.data.items.length,
-                  truncated: catnat.data.truncated,
-                  latest: [...catnat.data.items]
+                  count: catnatK.data.items.length,
+                  truncated: catnatK.data.truncated,
+                  latest: [...catnatK.data.items]
                     .sort((a, b) => frenchDateKey(b.date_debut_evt).localeCompare(frenchDateKey(a.date_debut_evt)))
                     .slice(0, 10)
                     .map((c) => ({ id: c.code_national_catnat, label: c.libelle_risque_jo, start: c.date_debut_evt, published: c.date_publication_jo })),
                 },
               }
-            : catnat,
+            : catnatK,
       });
     }
 
@@ -188,13 +196,8 @@ export class RiskAnalyzer {
     }
 
     const nearby = <T extends { distanceM: number }>(items: T[]) => items.filter((i) => i.distanceM <= NEARBY_RADIUS_M).sort((a, b) => a.distanceM - b.distanceM);
-    const merge = <T>(parts: Known<{ items: T[]; truncated: boolean }>[]): Known<{ items: T[]; truncated: boolean }> => {
-      const failed = parts.find((p) => p.status === 'unavailable');
-      if (failed) return failed;
-      const ok = parts as { status: 'ok'; data: { items: T[]; truncated: boolean } }[];
-      return { status: 'ok', data: { items: ok.flatMap((p) => p.data.items), truncated: ok.some((p) => p.data.truncated) } };
-    };
 
+    const probes = searchProbes(geometries);
     const cavities = await progress.run(
       'cavities',
       // Un point par case occupée par l'étude (pas le centre de l'emprise, qui peut tomber loin de tout).
@@ -202,14 +205,47 @@ export class RiskAnalyzer {
         this.known('cavités', async () => {
           const found = new Map<string, Awaited<ReturnType<Georisques['cavities']>>['items'][number]>();
           let truncated = false;
-          for (const [lon, lat] of cavityProbes(geometries)) {
-            const r = await this.georisques.cavities(lon!, lat!, NEARBY_RADIUS_M);
+          for (const { point, radiusM } of probes) {
+            const r = await this.georisques.cavities(point[0]!, point[1]!, radiusM);
             truncated ||= r.truncated;
             for (const c of r.items) found.set(c.identifiant, c);
           }
           return { items: [...found.values()], truncated };
         }),
       (c) => outcome([part('cavités', c, (v) => plural(v.items.length, 'cavité recensée', 'cavités recensées') + ` à ${NEARBY_RADIUS_M} m`)]),
+    );
+    // Installations classées et sols pollués par rayon autour des parcelles : par commune, CASIAS
+    // prenait 5 à 11 s dans une grande ville (mesuré le 02/10/2026).
+    const [allInstallations, allPolluted] = await progress.run(
+      'surroundings',
+      () =>
+        Promise.all([
+          this.known('installations', async () => {
+            const found = new Map<string, Awaited<ReturnType<Georisques['installations']>>['items'][number]>();
+            let truncated = false;
+            for (const { point, radiusM } of probes) {
+              const r = await this.georisques.installations(point[0]!, point[1]!, radiusM);
+              truncated ||= r.truncated;
+              for (const i of r.items) found.set(i.codeAIOT ?? `${i.raisonSociale}|${i.longitude}|${i.latitude}`, i);
+            }
+            return { items: [...found.values()], truncated };
+          }),
+          this.known('sols pollués', async () => {
+            const found = new Map<string, Awaited<ReturnType<Georisques['pollutedSites']>>['items'][number]>();
+            let truncated = false;
+            for (const { point, radiusM } of probes) {
+              const r = await this.georisques.pollutedSites(point[0]!, point[1]!, radiusM);
+              truncated ||= r.truncated;
+              for (const x of r.items) found.set(`${x.kind}|${x.id}`, x);
+            }
+            return { items: [...found.values()], truncated };
+          }),
+        ]),
+      ([inst, sites]) =>
+        outcome([
+          part('installations', inst, (v) => plural(v.items.length, 'installation classée', 'installations classées') + ' dans le rayon'),
+          part('sols pollués', sites, (v) => plural(v.items.length, 'site pollué', 'sites pollués') + ' dans le rayon'),
+        ]),
     );
     const hydrants = await progress.run(
       'hydrants',
@@ -219,8 +255,6 @@ export class RiskAnalyzer {
           ? { state: 'done', detail: `${plural(h.data.items.length, 'borne', 'bornes')} dans la zone ; ${describeCells(h.data.cells)}` }
           : { state: 'unavailable', detail: `indisponible : ${h.error}` },
     );
-    const allInstallations = merge(installations);
-    const allPolluted = merge(polluted);
 
     return {
       version: RISKS_VERSION,
@@ -243,7 +277,6 @@ export class RiskAnalyzer {
           ? {
               status: 'ok',
               data: {
-                count: allInstallations.data.items.length,
                 truncated: allInstallations.data.truncated,
                 items: nearby(
                   allInstallations.data.items.flatMap((i) =>
@@ -260,11 +293,22 @@ export class RiskAnalyzer {
           ? {
               status: 'ok',
               data: {
-                count: allPolluted.data.items.length,
                 truncated: allPolluted.data.truncated,
                 items: nearby(
                   allPolluted.data.items.flatMap((s) =>
-                    s.geometry ? [{ id: s.id, kind: s.kind, name: s.name, url: s.url, distanceM: Math.round(Math.min(...geometries.map((g) => distanceM(g, s.geometry as Surface)))) }] : [],
+                    s.geometry
+                      ? [
+                          {
+                            id: s.id,
+                            kind: s.kind,
+                            name: s.name,
+                            url: s.url,
+                            distanceM: Math.round(
+                              s.geometry.type === 'Point' ? distanceToStudy(s.geometry.coordinates) : Math.min(...geometries.map((g) => distanceM(g, s.geometry as Surface))),
+                            ),
+                          },
+                        ]
+                      : [],
                   ),
                 ),
               },
@@ -308,6 +352,23 @@ function outcome(parts: Part[]): StepOutcome {
   const off = parts.filter((p) => p.text === null).map((p) => p.what);
   if (ok.length === 0) return { state: 'unavailable', detail: `sources muettes : ${off.join(', ')}` };
   return { state: off.length ? 'partial' : 'done', detail: [...ok, ...(off.length ? [`sans réponse : ${off.join(', ')}`] : [])].join(' · ') };
+}
+
+interface FromCache<T> {
+  known: Known<T>;
+  fetchedAt: Date | null;
+  origin: Cached<T>['origin'] | null;
+}
+
+/** « · en cache du 02/10/2026 », « · données anciennes gardées (Géorisques muet) », ou rien si tout vient d'arriver. */
+function cacheNote(all: readonly FromCache<unknown>[]): string {
+  const ok = all.filter((c) => c.origin);
+  if (ok.some((c) => c.origin === 'stale')) return ' · données anciennes gardées (Géorisques muet)';
+  if (ok.length > 0 && ok.every((c) => c.origin === 'fresh')) {
+    const oldest = new Date(Math.min(...ok.map((c) => c.fetchedAt!.getTime())));
+    return ` · en cache du ${oldest.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' })}`;
+  }
+  return '';
 }
 
 /** « 4 cases en cache », « 2 cases interrogées », « 1 case ancienne gardée (Overpass en panne) ». */
