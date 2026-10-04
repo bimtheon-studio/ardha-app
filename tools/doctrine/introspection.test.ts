@@ -14,7 +14,11 @@ let db: pg.Client;
 
 describe.skipIf(!url)('analyserSchema (base réelle)', () => {
   beforeAll(async () => {
-    admin = new pg.Client({ connectionString: url });
+    // Par la base de maintenance : une session ouverte sur la base modèle des tests d'intégration
+    // (`ardha_test`) ferait échouer leur clonage (« source database is being accessed by other users »).
+    const maintenance = new URL(url!);
+    maintenance.pathname = '/postgres';
+    admin = new pg.Client({ connectionString: maintenance.toString() });
     await admin.connect();
     await admin.query(`CREATE DATABASE ${name}`);
     const target = new URL(url!);
