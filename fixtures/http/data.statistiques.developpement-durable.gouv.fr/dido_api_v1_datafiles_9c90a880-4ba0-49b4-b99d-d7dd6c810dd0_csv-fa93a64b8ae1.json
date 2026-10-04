@@ -1,0 +1,5 @@
+{
+  "url": "https://data.statistiques.developpement-durable.gouv.fr/dido/api/v1/datafiles/9c90a880-4ba0-49b4-b99d-d7dd6c810dd0/csv?COMM=eq:94046&withColumnName=true&withColumnDescription=false",
+  "status": 200,
+  "contentType": "text/csv; charset=utf-8"
+}

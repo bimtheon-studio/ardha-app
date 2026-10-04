@@ -13,6 +13,9 @@ import { Elevation } from './elevation.ts';
 import { FloodHeights } from './flood-heights.ts';
 import { Georisques } from './georisques.ts';
 import { Hydrants } from './hydrants.ts';
+import { GeoDvf } from './dvf.ts';
+import { Dido } from './dido.ts';
+import { Insee } from './insee.ts';
 
 @Module({
   providers: [
@@ -33,7 +36,10 @@ import { Hydrants } from './hydrants.ts';
     { provide: FloodHeights, inject: [Http], useFactory: (http: Http) => new FloodHeights(http) },
     { provide: Elevation, inject: [Http], useFactory: (http: Http) => new Elevation(http) },
     { provide: Hydrants, inject: [Http], useFactory: (http: Http) => new Hydrants(http) },
+    { provide: GeoDvf, inject: [Http], useFactory: (http: Http) => new GeoDvf(http) },
+    { provide: Dido, inject: [Http], useFactory: (http: Http) => new Dido(http) },
+    { provide: Insee, inject: [Http], useFactory: (http: Http) => new Insee(http) },
   ],
-  exports: [Http, Geocoding, Communes, Cadastre, Tiles, Georisques, FloodHeights, Elevation, Hydrants],
+  exports: [Http, Geocoding, Communes, Cadastre, Tiles, Georisques, FloodHeights, Elevation, Hydrants, GeoDvf, Dido, Insee],
 })
 export class SourcesModule {}

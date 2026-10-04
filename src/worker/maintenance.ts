@@ -12,7 +12,7 @@ import { SourceStatesRepository } from '../geo/source-states.repository.ts';
 import { Clock } from '../shared/clock.ts';
 import { MAINTENANCE_QUEUE } from '../shared/queues.ts';
 import { AnalysesRepository } from '../studies/analyses.repository.ts';
-import { ANALYZE_RISKS_JOB, StudyJobs } from '../studies/studies.jobs.ts';
+import { ANALYSIS_JOBS, StudyJobs } from '../studies/studies.jobs.ts';
 import { StudiesRepository } from '../studies/studies.repository.ts';
 import { StudiesService } from '../studies/studies.service.ts';
 
@@ -44,7 +44,7 @@ export class Reconciliation {
     const lagging = await this.studies.lagging(new Date(now - STUDY_GRACE_MS));
     for (const s of lagging) await this.studyJobs.enqueue({ studyId: s.id, parcelsKey: s.parcelsKey });
     const analyses = await this.analyses.stalled(new Date(now - QUEUED_GRACE_MS), new Date(now - LOADING_GRACE_MS));
-    for (const a of analyses) await this.studyJobs.enqueue({ studyId: a.studyId, parcelsKey: a.parcelsKey }, [ANALYZE_RISKS_JOB]);
+    for (const a of analyses) await this.studyJobs.enqueue({ studyId: a.studyId, parcelsKey: a.parcelsKey }, [ANALYSIS_JOBS[a.kind]]);
     return { communes: stalled.map((s) => s.scope), studies: lagging.map((s) => s.id), analyses: analyses.map((a) => a.studyId) };
   }
 }

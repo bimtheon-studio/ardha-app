@@ -13,10 +13,13 @@ import { RiskAnalyses } from './risk-analyses.ts';
 import { RiskAnalyzer } from './risk-analyzer.ts';
 import { HydrantCache } from './hydrant-cache.ts';
 import { CommuneRiskCache } from './commune-risk-cache.ts';
+import { MarketAnalyses } from './market-analyses.ts';
+import { MarketAnalyzer } from './market-analyzer.ts';
+import { MarketData } from './market-data.ts';
 
 @Module({
   imports: [SourcesModule, GeoModule, StudiesModule],
-  providers: [CadastreLoader, LookupHandlers, ReferenceSeed, StudyDerivations, RiskAnalyzer, RiskAnalyses, HydrantCache, CommuneRiskCache],
-  exports: [CadastreLoader, LookupHandlers, ReferenceSeed, StudyDerivations, RiskAnalyzer, RiskAnalyses, HydrantCache, CommuneRiskCache, SourcesModule],
+  providers: [CadastreLoader, LookupHandlers, ReferenceSeed, StudyDerivations, RiskAnalyzer, RiskAnalyses, HydrantCache, CommuneRiskCache, MarketData, MarketAnalyzer, MarketAnalyses],
+  exports: [CadastreLoader, LookupHandlers, ReferenceSeed, StudyDerivations, RiskAnalyzer, RiskAnalyses, HydrantCache, CommuneRiskCache, MarketData, MarketAnalyzer, MarketAnalyses, SourcesModule],
 })
 export class IngestionModule {}

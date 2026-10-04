@@ -55,6 +55,11 @@ const Schema = z.object({
   S3_BUCKET: z.string().optional(),
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
+  /**
+   * Millésimes DVF chargés par département (F-05 Q1), les plus récents : tous ceux publiés si absent.
+   * 2 en test et en e2e, pour des enregistrements légers.
+   */
+  DVF_YEARS: z.coerce.number().int().min(1).max(20).optional(),
   /** Jeton de l'API Géorisques v2 (F-04, Q12), pour le worker ; sans lui, l'analyse lit la v1. */
   GEORISQUES_TOKEN: z
     .string()

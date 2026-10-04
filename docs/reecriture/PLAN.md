@@ -289,7 +289,7 @@ tâches Node. Livré en L0 (D-09).
 |---|---|
 | Une réécriture longue qui ne livre rien | tranches verticales, déployées dès le lot LD (production et environnements par PR) ; l'ancienne application tourne jusqu'à la bascule |
 | Des comportements perdus en route | fiches arbitrées, recette comparée |
-| L3 bloqué par l'extracteur voisin | L1, L2, L4 et L5 avancent sans lui |
+| L3 bloqué par l'extracteur voisin | L1, L2, L4 et L5 avancent sans lui ; **L3 mis de côté par le porteur du produit (02/10/2026)** : les données PLU s'extrairont de plusieurs façons, à reprendre plus tard, sans attendre `claude/plui-extract` |
 | Le coût LLM de reconstruction | n'extraire que les segments modifiés, par ordre de priorité des communes |
 | Drizzle encore en 0.x | version épinglée, montée de version délibérée, accès confiné aux repositories |
 | Une panne des fonds IGN plus fréquente que prévu | erreurs de tuiles mesurées ; la configuration des fonds est servie par l'API, passer par un proxy revient à changer une URL |
@@ -383,6 +383,8 @@ Les arbitrages fonctionnels, rendus le 01/10/2026, sont dans [F-01](fiches/F-01-
 | DT-37 | **Bornes incendie en base** (`hydrants`), par case de la grille de 0,01°, état par case dans `source_states` (`osm-hydrants`), rechargées au bout de 30 jours ; une case connue sert même vieille quand Overpass sature, l'analyse cite la date | cache Redis ; appel à chaque analyse | Overpass répond souvent 504 et 429 (constaté les 01 et 02/10/2026) ; deux études voisines partagent leurs cases ; données de référence en base (PLAN §4) |
 | DT-38 | **Données communales de Géorisques gardées 30 jours** (`commune_risks`, une ligne par commune et par donnée ; donnée ancienne servie si la source se tait) ; installations classées, SIS et CASIAS **par rayon autour des parcelles**, plus par commune ; étape à part dans le déroulé | appel à chaque analyse ; recherche par commune | mesuré le 02/10/2026 sur 13 communes : CASIAS par commune 6,2 s en moyenne (jusqu'à 11 s, 2 093 sites à Bordeaux, liste tronquée) contre 0,1 à 0,4 s par rayon ; la commune revient en 0 s depuis la base |
 | DT-39 | **Analyse des risques au fil de l'eau** : communes, parcelles, alentours et bornes interrogés **en même temps** ; chaque partie du résultat est enregistrée dès qu'elle est prête (`study_analyses.partial`) et la page la montre aussitôt, la synthèse dès que communes et parcelles sont là ; bornes de toutes les cases à charger en **une seule requête Overpass** | étapes à la suite, résultat montré à la fin ; une requête Overpass par case | « le chargement des bornes est trop lent » (porteur du produit, 02/10/2026) : Overpass coûte autant pour 9 cases que pour 1 (3 à 5 s, mesuré), répond 504 une fois sur deux après 9 à 12 s, et passait en dernier, case par case, avec 3 tentatives de 20 s ; mesuré après : Maisons-Alfort 2,3 s en tout, Tours + Annecy tout affiché en 1,2 s, bornes à 17,6 s (10 cases, un appel) |
+| DT-40 | **DVF en base par département, à la demande** (`dvf_mutations`, une ligne par mutation dédoublonnée, remplacée par département et millésime, millésimes passés gardés), depuis geo-DVF d'Etalab ; version = date du fichier lue dans l'index | toute la France d'un coup ; par commune ; Cerema | F-05 Q1, arbitré le 02/10/2026 ; Cerema en 503 depuis le 27/09 ; 1 à 2 Mo par département et par an contre 93 Mo pour la France |
+| DT-41 | **Prix de marché = médiane des ventes simples sur 12 mois** dans un rayon fixe autour des parcelles (250 m à 2 km, gardé dans l'étude), tendance sur 12 mois glissants ; pas de rayon adaptatif ni de projection en L5 | régression pondérée mêlée à l'INSEE, projections à 5 ans | F-05 Q2 à Q5 ; les deux séries INSEE de l'ancien code étaient fausses (coût du travail, balance commerciale) |
 
 ## 12. Questions ouvertes
 
@@ -401,6 +403,20 @@ vers des comptes pas encore recréés) ; aucune migration ne les a réinjectées
 été supprimée le 27/09. Sans conséquence pour la réécriture, qui repart de zéro.
 
 ## Journal
+
+- **02/10/2026** — L5 codé et recetté en local sur `l5-land-market` :
+  - ventes DVF par département (DT-40), ECLN, Sitadel, indices INSEE ;
+  - analyse « market » par étude ;
+  - page Foncier et marché, avec carte, liste et parcelles vendues ;
+  - CLI `dvf:*`, `market:*`.
+
+  Les tests d'intégration ne tombent plus au hasard au clonage des bases.
+- **02/10/2026** — F-05 (foncier et marché) scannée et arbitrée (Q1 à Q10) ; DT-40, DT-41 ;
+  feuille de route de L5 écrite.
+- **02/10/2026** — L2, L4 et le lot des secrets once fusionnés dans `master` (PR #3, #4, #5).
+  **L3 mis de côté** par le porteur du produit : les données PLU viendront de plusieurs sources et
+  méthodes d'extraction, à décider plus tard ; on n'attend plus l'extracteur voisin. **L5 lancé**
+  sur `l5-land-market`.
 
 - **02/10/2026** — arbitrages F-04 Q1 à Q14 rendus (Q6 altitudes aussi sur la carte, Q9 surcoûts dès
   L4, Q10 alentours à 500 m, Q12 jeton Géorisques v2) et repris ; DT-36.

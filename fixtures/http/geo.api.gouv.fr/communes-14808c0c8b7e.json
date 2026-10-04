@@ -1,0 +1,5 @@
+{
+  "url": "https://geo.api.gouv.fr/communes?lon=2.420291&lat=48.806380&fields=nom%2Ccode&format=json",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8"
+}
