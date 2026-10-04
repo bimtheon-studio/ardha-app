@@ -110,8 +110,10 @@ it('erreurs : auteur absent ou inconnu, étude inconnue', async () => {
 it('risk:analyze --inline, risk:show, risk:commune, risk:point', async () => {
   const s = await json('study:create', '--user', 'etude@ardha.test', AY96, AY97);
   const analyzed = await run('risk:analyze', s.id, '--inline');
-  // Le déroulé s'affiche au fil du calcul, puis le bilan.
-  expect(analyzed).toMatch(/^ {2}… Risques de la commune : Maisons-Alfort \(Géorisques\)\n {2}✓ Risques de la commune : Maisons-Alfort \(Géorisques\) : radon 1 · sismicité 1 · 3 PPR/);
+  // Le déroulé s'affiche au fil du calcul (les sources en même temps), puis le bilan.
+  expect(analyzed).toMatch(/^ {2}… Risques de la commune : Maisons-Alfort \(Géorisques\)\n/);
+  expect(analyzed).toMatch(/\n {2}… Bornes incendie à moins de 400 m \(OpenStreetMap\)\n/);
+  expect(analyzed).toContain('  ✓ Risques de la commune : Maisons-Alfort (Géorisques) : radon 1 · sismicité 1 · 3 PPR');
   expect(analyzed).toContain('  ✓ Altitudes de 23 points (IGN) : 23 altitudes reçues');
   expect(analyzed).toMatch(/\nAnalyse : prête, calculée le /);
   expect(analyzed).toContain('!!  Inondation : Aléa moyen');

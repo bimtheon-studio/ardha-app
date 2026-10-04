@@ -1,0 +1,1 @@
+ALTER TABLE "study_analyses" ADD COLUMN "partial" jsonb;

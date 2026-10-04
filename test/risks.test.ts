@@ -184,6 +184,30 @@ describe('analyse des risques', () => {
     expect((await get(`/api/studies/${id}/risks`)).status).toBe(200);
   });
 
+  it('pendant le calcul : les parties déjà connues, la synthèse dès que communes et parcelles sont là', async () => {
+    const id = await create([AY96, AY97]);
+    await post(`/api/studies/${id}/risks`);
+    const { result, progress } = await analyzed(id);
+    const key = (await t.pool.query('SELECT parcels_key FROM studies WHERE id = $1', [id])).rows[0].parcels_key as string;
+    const repo = t.app.get(AnalysesRepository);
+    await repo.request(id, 'risks', key, new Date(), true);
+    await repo.markRunning(id, 'risks', key, new Date());
+    const { hydrants: _, parcels, ...early } = result!;
+    // Communes et alentours connus, parcelles pas encore : pas de synthèse.
+    await repo.saveProgress(id, 'risks', key, progress, early);
+    let r = (await get(`/api/studies/${id}/risks`)).body as StudyRisks;
+    expect(r).toMatchObject({ status: 'running', partial: { communes: result!.communes, cavities: result!.cavities }, axes: null, surcharges: null });
+    expect(r.partial!.hydrants).toBeUndefined();
+    // Les parcelles arrivent : la synthèse suit, avant les bornes.
+    await repo.saveProgress(id, 'risks', key, progress, { ...early, parcels });
+    r = (await get(`/api/studies/${id}/risks`)).body as StudyRisks;
+    expect(r.axes!.map((a) => a.key)).toEqual(['flood', 'clay', 'radon', 'seismic']);
+    expect(r.partial!.hydrants).toBeUndefined();
+    // Fini : le résultat complet, plus de partiel.
+    await repo.markReady(id, 'risks', key, result!, new Date());
+    expect((await get(`/api/studies/${id}/risks`)).body).toMatchObject({ status: 'ready', partial: null, result: { hydrants: result!.hydrants } });
+  });
+
   it('un résultat d’une ancienne version du schéma est périmé et ne se lit plus', async () => {
     const id = await create([AY96, AY97]);
     await post(`/api/studies/${id}/risks`);
@@ -242,7 +266,7 @@ describe('cache des bornes incendie', () => {
   it('cases gardées 30 jours en base : pas de nouvel appel ; case vieille et Overpass en panne : les bornes connues servent', async () => {
     const cache = t.worker!.get(HydrantCache);
     const overpass = t.worker!.get(Hydrants);
-    const spy = vi.spyOn(overpass, 'inBbox');
+    const spy = vi.spyOn(overpass, 'inBboxes');
     // Emprise AY96 + AY97 élargie de 400 m (celle de l'analyse) : cases enregistrées.
     const bbox = [2.4243, 48.7963, 2.4357, 48.8038] as const;
     await t.pool.query(`DELETE FROM source_states WHERE source = 'osm-hydrants'`);

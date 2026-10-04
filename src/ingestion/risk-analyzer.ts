@@ -5,7 +5,7 @@
 // cavités, installations, sols pollués, bornes incendie.
 import { Injectable, Logger } from '@nestjs/common';
 
-import { type AnalysisStep, RISKS_VERSION, type RisksResult } from '../contracts/index.ts';
+import { type AnalysisStep, RISKS_VERSION, type RisksPartial, type RisksResult } from '../contracts/index.ts';
 import { AnalysisProgress, type StepOutcome } from './analysis-progress.ts';
 import {
   bboxOf,
@@ -72,8 +72,13 @@ export class RiskAnalyzer {
     }
   }
 
-  /** `persist` reçoit le déroulé à chaque étape (enregistré par l'appelant, vu pendant le calcul). */
-  async analyze(parcels: readonly StudyParcelRecord[], persist: (steps: AnalysisStep[]) => Promise<void> = async () => {}): Promise<RisksResult> {
+  /**
+   * `persist` reçoit le déroulé à chaque étape, et les parties du résultat déjà connues (enregistrés
+   * par l'appelant, vus pendant le calcul). Les sources ne dépendent pas les unes des autres : les
+   * communes, les parcelles, les alentours et les bornes se cherchent en même temps, et chaque partie
+   * se montre dès qu'elle est prête (les bornes d'Overpass, les plus lentes, n'arrêtent plus le reste).
+   */
+  async analyze(parcels: readonly StudyParcelRecord[], persist: (steps: AnalysisStep[], partial: RisksPartial) => Promise<void> = async () => {}): Promise<RisksResult> {
     const geometries = parcels.map((p) => p.geometry);
     const box = unionBbox(geometries.map(bboxOf))!;
     const center: Position = [(box[0] + box[2]) / 2, (box[1] + box[3]) / 2];
@@ -91,243 +96,264 @@ export class RiskAnalyzer {
         { key: 'surroundings', label: `Installations classées et sols pollués à moins de ${NEARBY_RADIUS_M} m (Géorisques)` },
         { key: 'hydrants', label: `Bornes incendie à moins de ${HYDRANT_RADIUS_M} m (OpenStreetMap)` },
       ],
-      persist,
+      (steps) => persist(steps, { ...partial }),
       () => new Date(),
     );
+    const partial: RisksPartial = { version: RISKS_VERSION, center: lonLat(center), radii: { nearbyM: NEARBY_RADIUS_M, hydrantsM: HYDRANT_RADIUS_M } };
+    /** Ajoute une partie au résultat et l'enregistre. */
+    const publish = async (part: Partial<RisksPartial>) => {
+      Object.assign(partial, part);
+      await progress.save();
+    };
+    const nearby = <T extends { distanceM: number }>(items: T[]) => items.filter((i) => i.distanceM <= NEARBY_RADIUS_M).sort((a, b) => a.distanceM - b.distanceM);
+    const probes = searchProbes(geometries);
 
-    const communes = [];
-    for (const code of codes) {
-      const g = this.georisques;
-      const [radon, seismic, hazards, plans, catnat] = await progress.run(
-        `commune-${code}`,
-        () =>
-          Promise.all([
-            this.fromCache(`radon ${code}`, code, 'radon', () => g.radon(code)),
-            this.fromCache(`sismicité ${code}`, code, 'seismic', () => g.seismic(code)),
-            this.fromCache(`GASPAR ${code}`, code, 'hazards', () => g.hazards(code)),
-            this.fromCache(`PPR ${code}`, code, `plans-${g.plansVersion}`, () => g.plans(code)),
-            this.fromCache(`CatNat ${code}`, code, 'catnat', () => g.catnat(code)),
-          ]),
-        (all) => {
-          const [radon, seismic, , plans, catnat] = all.map((c) => c.known) as [Known<number | null>, Known<number | null>, unknown, Known<PlanInfo[]>, Known<{ items: unknown[] }>];
-          const o = outcome([
-            part('radon', radon, (v) => `radon ${v ?? '?'}`),
-            part('sismicité', seismic, (v) => `sismicité ${v ?? '?'}`),
-            part('PPR', plans, (v) => plural(v.length, 'PPR', 'PPR')),
-            part('CatNat', catnat, (v) => plural(v.items.length, 'arrêté CatNat', 'arrêtés CatNat')),
-          ]);
-          return { ...o, detail: `${o.detail}${cacheNote(all)}` };
-        },
+    const communesTask = async () => {
+      const communes = [];
+      for (const code of codes) {
+        const g = this.georisques;
+        const [radon, seismic, hazards, plans, catnat] = await progress.run(
+          `commune-${code}`,
+          () =>
+            Promise.all([
+              this.fromCache(`radon ${code}`, code, 'radon', () => g.radon(code)),
+              this.fromCache(`sismicité ${code}`, code, 'seismic', () => g.seismic(code)),
+              this.fromCache(`GASPAR ${code}`, code, 'hazards', () => g.hazards(code)),
+              this.fromCache(`PPR ${code}`, code, `plans-${g.plansVersion}`, () => g.plans(code)),
+              this.fromCache(`CatNat ${code}`, code, 'catnat', () => g.catnat(code)),
+            ]),
+          (all) => {
+            const [radon, seismic, , plans, catnat] = all.map((c) => c.known) as [Known<number | null>, Known<number | null>, unknown, Known<PlanInfo[]>, Known<{ items: unknown[] }>];
+            const o = outcome([
+              part('radon', radon, (v) => `radon ${v ?? '?'}`),
+              part('sismicité', seismic, (v) => `sismicité ${v ?? '?'}`),
+              part('PPR', plans, (v) => plural(v.length, 'PPR', 'PPR')),
+              part('CatNat', catnat, (v) => plural(v.items.length, 'arrêté CatNat', 'arrêtés CatNat')),
+            ]);
+            return { ...o, detail: `${o.detail}${cacheNote(all)}` };
+          },
+        );
+        const dates = [radon, seismic, hazards, plans, catnat].flatMap((c) => (c.fetchedAt ? [c.fetchedAt.getTime()] : []));
+        const asOf = dates.length ? new Date(Math.min(...dates)).toISOString() : null;
+        const catnatK = catnat.known;
+        communes.push({
+          code,
+          name: names.get(code) ?? null,
+          asOf,
+          radon: radon.known,
+          seismic: seismic.known,
+          hazards: hazards.known,
+          plans:
+            plans.known.status === 'ok'
+              ? { status: 'ok' as const, data: plans.known.data.map((p) => ({ ...p, flood: isFloodPlan(p), url: georisquesPlanUrl(p.id) })) }
+              : plans.known,
+          catnat:
+            catnatK.status === 'ok'
+              ? {
+                  status: 'ok' as const,
+                  data: {
+                    count: catnatK.data.items.length,
+                    truncated: catnatK.data.truncated,
+                    latest: [...catnatK.data.items]
+                      .sort((a, b) => frenchDateKey(b.date_debut_evt).localeCompare(frenchDateKey(a.date_debut_evt)))
+                      .slice(0, 10)
+                      .map((c) => ({ id: c.code_national_catnat, label: c.libelle_risque_jo, start: c.date_debut_evt, published: c.date_publication_jo })),
+                  },
+                }
+              : catnatK,
+        });
+      }
+      await publish({ communes });
+    };
+
+    const parcelsTask = async () => {
+      // Altitudes : un seul appel par lots pour toutes les parcelles.
+      const altitudes = await progress.run(
+        'elevation',
+        () => this.known('altimétrie', () => this.elevation.points(asked.flat())),
+        (a) =>
+          a.status === 'ok'
+            ? { state: 'done', detail: `${a.data.filter((x) => x.z !== null).length} altitudes reçues` }
+            : { state: 'unavailable', detail: `indisponible : ${a.error}` },
       );
-      const dates = [radon, seismic, hazards, plans, catnat].flatMap((c) => (c.fetchedAt ? [c.fetchedAt.getTime()] : []));
-      const asOf = dates.length ? new Date(Math.min(...dates)).toISOString() : null;
-      const catnatK = catnat.known;
-      communes.push({
-        code,
-        name: names.get(code) ?? null,
-        asOf,
-        radon: radon.known,
-        seismic: seismic.known,
-        hazards: hazards.known,
-        plans:
-          plans.known.status === 'ok'
-            ? { status: 'ok' as const, data: plans.known.data.map((p) => ({ ...p, flood: isFloodPlan(p), url: georisquesPlanUrl(p.id) })) }
-            : plans.known,
-        catnat:
-          catnatK.status === 'ok'
+
+      const parcelResults = [];
+      let offset = 0;
+      for (const [i, p] of parcels.entries()) {
+        const point = asked[i]![0]!;
+        const [clay, flood] = await progress.run(
+          `parcel-${p.id}`,
+          () =>
+            Promise.all([
+              this.known(`argiles ${p.id}`, () => this.georisques.clay(point[0]!, point[1]!).then(clayLevel)),
+              this.known(`TRI ${p.id}`, () => this.floodHeights.at(point[0]!, point[1]!)),
+            ]),
+          ([c, f]) =>
+            outcome([
+              part('argiles', c, (v) => `argiles ${v ?? 'hors zone'}`),
+              part('hauteurs d’eau', f, (v) => (v.length === 0 ? 'hors zone inondable (TRI)' : `inondable, aléa ${floodHazard(v)}`)),
+            ]),
+        );
+        const zs = altitudes.status === 'ok' ? altitudes.data.slice(offset, offset + asked[i]!.length).flatMap((a) => (a.z === null ? [] : [a.z])) : [];
+        offset += asked[i]!.length;
+        const stats = elevationStats(zs);
+        const floodData =
+          flood.status === 'ok' ? { hazard: floodHazard(flood.data), scenarios: floodScenarios(flood.data), reference: referenceFloodHeight(flood.data) } : null;
+        const reference = floodData?.reference;
+        const level = stats && reference ? { level: Math.round((stats.mean + reference.height) * 100) / 100, atLeast: reference.atLeast } : null;
+        parcelResults.push({
+          id: p.id,
+          label: parcelLabel(p),
+          point: lonLat(point),
+          clay,
+          flood: floodData ? { status: 'ok' as const, data: floodData } : (flood as Known<never>),
+          elevation: altitudes.status === 'ok' ? { status: 'ok' as const, data: stats && { ...stats, points: zs.length } } : altitudes,
+          floodLevel: level,
+        });
+      }
+      await publish({ parcels: parcelResults });
+    };
+
+    const cavitiesTask = async () => {
+      const cavities = await progress.run(
+        'cavities',
+        // Un point par case occupée par l'étude (pas le centre de l'emprise, qui peut tomber loin de tout).
+        () =>
+          this.known('cavités', async () => {
+            const found = new Map<string, Awaited<ReturnType<Georisques['cavities']>>['items'][number]>();
+            let truncated = false;
+            for (const { point, radiusM } of probes) {
+              const r = await this.georisques.cavities(point[0]!, point[1]!, radiusM);
+              truncated ||= r.truncated;
+              for (const c of r.items) found.set(c.identifiant, c);
+            }
+            return { items: [...found.values()], truncated };
+          }),
+        (c) => outcome([part('cavités', c, (v) => plural(v.items.length, 'cavité recensée', 'cavités recensées') + ` à ${NEARBY_RADIUS_M} m`)]),
+      );
+      await publish({
+        cavities:
+          cavities.status === 'ok'
             ? {
-                status: 'ok' as const,
+                status: 'ok',
                 data: {
-                  count: catnatK.data.items.length,
-                  truncated: catnatK.data.truncated,
-                  latest: [...catnatK.data.items]
-                    .sort((a, b) => frenchDateKey(b.date_debut_evt).localeCompare(frenchDateKey(a.date_debut_evt)))
-                    .slice(0, 10)
-                    .map((c) => ({ id: c.code_national_catnat, label: c.libelle_risque_jo, start: c.date_debut_evt, published: c.date_publication_jo })),
+                  truncated: cavities.data.truncated,
+                  items: nearby(cavities.data.items.map((c) => ({ id: c.identifiant, name: c.nom, type: c.type, point: lonLat([c.longitude, c.latitude]), distanceM: Math.round(distanceToStudy([c.longitude, c.latitude])) }))),
                 },
               }
-            : catnatK,
+            : cavities,
       });
-    }
+    };
 
-    // Altitudes : un seul appel par lots pour toutes les parcelles.
-    const altitudes = await progress.run(
-      'elevation',
-      () => this.known('altimétrie', () => this.elevation.points(asked.flat())),
-      (a) =>
-        a.status === 'ok'
-          ? { state: 'done', detail: `${a.data.filter((x) => x.z !== null).length} altitudes reçues` }
-          : { state: 'unavailable', detail: `indisponible : ${a.error}` },
-    );
-
-    const parcelResults = [];
-    let offset = 0;
-    for (const [i, p] of parcels.entries()) {
-      const point = asked[i]![0]!;
-      const [clay, flood] = await progress.run(
-        `parcel-${p.id}`,
+    const surroundingsTask = async () => {
+      // Installations classées et sols pollués par rayon autour des parcelles : par commune, CASIAS
+      // prenait 5 à 11 s dans une grande ville (mesuré le 02/10/2026).
+      const [allInstallations, allPolluted] = await progress.run(
+        'surroundings',
         () =>
           Promise.all([
-            this.known(`argiles ${p.id}`, () => this.georisques.clay(point[0]!, point[1]!).then(clayLevel)),
-            this.known(`TRI ${p.id}`, () => this.floodHeights.at(point[0]!, point[1]!)),
+            this.known('installations', async () => {
+              const found = new Map<string, Awaited<ReturnType<Georisques['installations']>>['items'][number]>();
+              let truncated = false;
+              for (const { point, radiusM } of probes) {
+                const r = await this.georisques.installations(point[0]!, point[1]!, radiusM);
+                truncated ||= r.truncated;
+                for (const i of r.items) found.set(i.codeAIOT ?? `${i.raisonSociale}|${i.longitude}|${i.latitude}`, i);
+              }
+              return { items: [...found.values()], truncated };
+            }),
+            this.known('sols pollués', async () => {
+              const found = new Map<string, Awaited<ReturnType<Georisques['pollutedSites']>>['items'][number]>();
+              let truncated = false;
+              for (const { point, radiusM } of probes) {
+                const r = await this.georisques.pollutedSites(point[0]!, point[1]!, radiusM);
+                truncated ||= r.truncated;
+                for (const x of r.items) found.set(`${x.kind}|${x.id}`, x);
+              }
+              return { items: [...found.values()], truncated };
+            }),
           ]),
-        ([c, f]) =>
+        ([inst, sites]) =>
           outcome([
-            part('argiles', c, (v) => `argiles ${v ?? 'hors zone'}`),
-            part('hauteurs d’eau', f, (v) => (v.length === 0 ? 'hors zone inondable (TRI)' : `inondable, aléa ${floodHazard(v)}`)),
+            part('installations', inst, (v) => plural(v.items.length, 'installation classée', 'installations classées') + ' dans le rayon'),
+            part('sols pollués', sites, (v) => plural(v.items.length, 'site pollué', 'sites pollués') + ' dans le rayon'),
           ]),
       );
-      const zs = altitudes.status === 'ok' ? altitudes.data.slice(offset, offset + asked[i]!.length).flatMap((a) => (a.z === null ? [] : [a.z])) : [];
-      offset += asked[i]!.length;
-      const stats = elevationStats(zs);
-      const floodData =
-        flood.status === 'ok' ? { hazard: floodHazard(flood.data), scenarios: floodScenarios(flood.data), reference: referenceFloodHeight(flood.data) } : null;
-      const reference = floodData?.reference;
-      const level = stats && reference ? { level: Math.round((stats.mean + reference.height) * 100) / 100, atLeast: reference.atLeast } : null;
-      parcelResults.push({
-        id: p.id,
-        label: parcelLabel(p),
-        point: lonLat(point),
-        clay,
-        flood: floodData ? { status: 'ok' as const, data: floodData } : (flood as Known<never>),
-        elevation: altitudes.status === 'ok' ? { status: 'ok' as const, data: stats && { ...stats, points: zs.length } } : altitudes,
-        floodLevel: level,
+      await publish({
+        installations:
+          allInstallations.status === 'ok'
+            ? {
+                status: 'ok',
+                data: {
+                  truncated: allInstallations.data.truncated,
+                  items: nearby(
+                    allInstallations.data.items.flatMap((i) =>
+                      i.longitude === null || i.latitude === null
+                        ? []
+                        : [{ id: i.codeAIOT, name: i.raisonSociale, regime: i.regime, seveso: i.statutSeveso, point: lonLat([i.longitude, i.latitude]), distanceM: Math.round(distanceToStudy([i.longitude, i.latitude])) }],
+                    ),
+                  ),
+                },
+              }
+            : allInstallations,
+        pollutedSites:
+          allPolluted.status === 'ok'
+            ? {
+                status: 'ok',
+                data: {
+                  truncated: allPolluted.data.truncated,
+                  items: nearby(
+                    allPolluted.data.items.flatMap((s) =>
+                      s.geometry
+                        ? [
+                            {
+                              id: s.id,
+                              kind: s.kind,
+                              name: s.name,
+                              url: s.url,
+                              distanceM: Math.round(
+                                s.geometry.type === 'Point' ? distanceToStudy(s.geometry.coordinates) : Math.min(...geometries.map((g) => distanceM(g, s.geometry as Surface))),
+                              ),
+                            },
+                          ]
+                        : [],
+                    ),
+                  ),
+                },
+              }
+            : allPolluted,
       });
-    }
-
-    const nearby = <T extends { distanceM: number }>(items: T[]) => items.filter((i) => i.distanceM <= NEARBY_RADIUS_M).sort((a, b) => a.distanceM - b.distanceM);
-
-    const probes = searchProbes(geometries);
-    const cavities = await progress.run(
-      'cavities',
-      // Un point par case occupée par l'étude (pas le centre de l'emprise, qui peut tomber loin de tout).
-      () =>
-        this.known('cavités', async () => {
-          const found = new Map<string, Awaited<ReturnType<Georisques['cavities']>>['items'][number]>();
-          let truncated = false;
-          for (const { point, radiusM } of probes) {
-            const r = await this.georisques.cavities(point[0]!, point[1]!, radiusM);
-            truncated ||= r.truncated;
-            for (const c of r.items) found.set(c.identifiant, c);
-          }
-          return { items: [...found.values()], truncated };
-        }),
-      (c) => outcome([part('cavités', c, (v) => plural(v.items.length, 'cavité recensée', 'cavités recensées') + ` à ${NEARBY_RADIUS_M} m`)]),
-    );
-    // Installations classées et sols pollués par rayon autour des parcelles : par commune, CASIAS
-    // prenait 5 à 11 s dans une grande ville (mesuré le 02/10/2026).
-    const [allInstallations, allPolluted] = await progress.run(
-      'surroundings',
-      () =>
-        Promise.all([
-          this.known('installations', async () => {
-            const found = new Map<string, Awaited<ReturnType<Georisques['installations']>>['items'][number]>();
-            let truncated = false;
-            for (const { point, radiusM } of probes) {
-              const r = await this.georisques.installations(point[0]!, point[1]!, radiusM);
-              truncated ||= r.truncated;
-              for (const i of r.items) found.set(i.codeAIOT ?? `${i.raisonSociale}|${i.longitude}|${i.latitude}`, i);
-            }
-            return { items: [...found.values()], truncated };
-          }),
-          this.known('sols pollués', async () => {
-            const found = new Map<string, Awaited<ReturnType<Georisques['pollutedSites']>>['items'][number]>();
-            let truncated = false;
-            for (const { point, radiusM } of probes) {
-              const r = await this.georisques.pollutedSites(point[0]!, point[1]!, radiusM);
-              truncated ||= r.truncated;
-              for (const x of r.items) found.set(`${x.kind}|${x.id}`, x);
-            }
-            return { items: [...found.values()], truncated };
-          }),
-        ]),
-      ([inst, sites]) =>
-        outcome([
-          part('installations', inst, (v) => plural(v.items.length, 'installation classée', 'installations classées') + ' dans le rayon'),
-          part('sols pollués', sites, (v) => plural(v.items.length, 'site pollué', 'sites pollués') + ' dans le rayon'),
-        ]),
-    );
-    const hydrants = await progress.run(
-      'hydrants',
-      () => this.known('bornes incendie', () => this.hydrants.inCells(hydrantCells(geometries))),
-      (h) =>
-        h.status === 'ok'
-          ? { state: 'done', detail: `${plural(h.data.items.length, 'borne', 'bornes')} dans la zone ; ${describeCells(h.data.cells)}` }
-          : { state: 'unavailable', detail: `indisponible : ${h.error}` },
-    );
-
-    return {
-      version: RISKS_VERSION,
-      communes,
-      parcels: parcelResults,
-      center: lonLat(center),
-      radii: { nearbyM: NEARBY_RADIUS_M, hydrantsM: HYDRANT_RADIUS_M },
-      cavities:
-        cavities.status === 'ok'
-          ? {
-              status: 'ok',
-              data: {
-                truncated: cavities.data.truncated,
-                items: nearby(cavities.data.items.map((c) => ({ id: c.identifiant, name: c.nom, type: c.type, point: lonLat([c.longitude, c.latitude]), distanceM: Math.round(distanceToStudy([c.longitude, c.latitude])) }))),
-              },
-            }
-          : cavities,
-      installations:
-        allInstallations.status === 'ok'
-          ? {
-              status: 'ok',
-              data: {
-                truncated: allInstallations.data.truncated,
-                items: nearby(
-                  allInstallations.data.items.flatMap((i) =>
-                    i.longitude === null || i.latitude === null
-                      ? []
-                      : [{ id: i.codeAIOT, name: i.raisonSociale, regime: i.regime, seveso: i.statutSeveso, point: lonLat([i.longitude, i.latitude]), distanceM: Math.round(distanceToStudy([i.longitude, i.latitude])) }],
-                  ),
-                ),
-              },
-            }
-          : allInstallations,
-      pollutedSites:
-        allPolluted.status === 'ok'
-          ? {
-              status: 'ok',
-              data: {
-                truncated: allPolluted.data.truncated,
-                items: nearby(
-                  allPolluted.data.items.flatMap((s) =>
-                    s.geometry
-                      ? [
-                          {
-                            id: s.id,
-                            kind: s.kind,
-                            name: s.name,
-                            url: s.url,
-                            distanceM: Math.round(
-                              s.geometry.type === 'Point' ? distanceToStudy(s.geometry.coordinates) : Math.min(...geometries.map((g) => distanceM(g, s.geometry as Surface))),
-                            ),
-                          },
-                        ]
-                      : [],
-                  ),
-                ),
-              },
-            }
-          : allPolluted,
-      hydrants:
-        hydrants.status === 'ok'
-          ? {
-              status: 'ok',
-              data: {
-                asOf: hydrants.data.asOf.toISOString(),
-                items: hydrants.data.items
-                  .map((h) => ({ id: h.id, point: lonLat([h.lon, h.lat]), type: h.type, flowRate: h.flowRate, diameter: h.diameter, ref: h.ref, distanceM: Math.round(distanceToStudy([h.lon, h.lat])) }))
-                  .filter((h) => h.distanceM <= HYDRANT_RADIUS_M)
-                  .sort((a, b) => a.distanceM - b.distanceM),
-              },
-            }
-          : hydrants,
     };
+
+    const hydrantsTask = async () => {
+      const hydrants = await progress.run(
+        'hydrants',
+        () => this.known('bornes incendie', () => this.hydrants.inCells(hydrantCells(geometries))),
+        (h) =>
+          h.status === 'ok'
+            ? { state: 'done', detail: `${plural(h.data.items.length, 'borne', 'bornes')} dans la zone ; ${describeCells(h.data.cells)}` }
+            : { state: 'unavailable', detail: `indisponible : ${h.error}` },
+      );
+      await publish({
+        hydrants:
+          hydrants.status === 'ok'
+            ? {
+                status: 'ok',
+                data: {
+                  asOf: hydrants.data.asOf.toISOString(),
+                  items: hydrants.data.items
+                    .map((h) => ({ id: h.id, point: lonLat([h.lon, h.lat]), type: h.type, flowRate: h.flowRate, diameter: h.diameter, ref: h.ref, distanceM: Math.round(distanceToStudy([h.lon, h.lat])) }))
+                    .filter((h) => h.distanceM <= HYDRANT_RADIUS_M)
+                    .sort((a, b) => a.distanceM - b.distanceM),
+                },
+              }
+            : hydrants,
+      });
+    };
+
+    await Promise.all([communesTask(), parcelsTask(), cavitiesTask(), surroundingsTask(), hydrantsTask()]);
+    const { communes, parcels: parcelResults, cavities, installations, pollutedSites, hydrants } = partial;
+    return { ...partial, communes: communes!, parcels: parcelResults!, cavities: cavities!, installations: installations!, pollutedSites: pollutedSites!, hydrants: hydrants! };
   }
 }
 

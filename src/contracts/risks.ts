@@ -117,6 +117,13 @@ export const RisksResult = z.object({
 });
 export type RisksResult = z.infer<typeof RisksResult>;
 
+/**
+ * Le résultat en cours de calcul : chaque partie y entre dès que ses sources ont répondu (communes,
+ * parcelles, alentours, bornes), pour être montrée sans attendre la plus lente.
+ */
+export const RisksPartial = RisksResult.partial({ communes: true, parcels: true, cavities: true, installations: true, pollutedSites: true, hydrants: true });
+export type RisksPartial = z.infer<typeof RisksPartial>;
+
 export const RiskAxis = z.object({
   key: z.enum(['flood', 'clay', 'radon', 'seismic']),
   label: z.string(),
@@ -151,7 +158,9 @@ export const StudyRisks = z.object({
   computedAt: z.iso.datetime().nullable(),
   error: z.string().nullable(),
   result: RisksResult.nullable(),
-  /** Synthèse des quatre axes, la plus sévère d'abord. */
+  /** Pendant le calcul : les parties déjà connues du nouveau résultat (nul sinon). */
+  partial: RisksPartial.nullable(),
+  /** Synthèse des quatre axes, la plus sévère d'abord ; pendant le calcul, dès que communes et parcelles sont connues. */
   axes: z.array(RiskAxis).nullable(),
   /** Surcoûts indicatifs de construction, en € HT par m² de surface de plancher (Q9). */
   surcharges: z

@@ -3,7 +3,7 @@
 // sols pollués, bornes incendie), carte avec couches, sources. L'analyse se lance d'elle-même à la
 // première ouverture (Q1), se recalcule à la demande quand les parcelles ont changé ; une source muette
 // est dite « indisponible » (Q4).
-import type { AnalysisStep, CommuneRisks, RiskLayer, StudyRisks } from '@contracts';
+import type { AnalysisStep, CommuneRisks, RiskLayer, RisksPartial, StudyRisks } from '@contracts';
 import { FLOOD_SCENARIO_LABELS, FLOOD_TYPE_LABELS, floodClassLabel } from '@domain';
 import { AlertTriangle, ArrowLeft, Check, Circle, CircleX, ExternalLink, LoaderCircle, RefreshCw } from 'lucide-react';
 import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from 'react';
@@ -18,7 +18,8 @@ import { useRequestRisks, useStudyRisks } from '@/studies/risks-api';
 
 const RiskMap = lazy(() => import('@/map/leaflet/RiskMap'));
 
-type Result = NonNullable<StudyRisks['result']>;
+/** Le résultat complet, ou ce qu'on en sait pendant le calcul : une partie absente est encore cherchée. */
+type Result = RisksPartial;
 type Known<T> = { status: 'ok'; data: T } | { status: 'unavailable'; error: string };
 
 const SEVERITY_STYLE: Record<NonNullable<StudyRisks['axes']>[number]['severity'], string> = {
@@ -49,6 +50,21 @@ function Value<T>({ of, children }: { of: Known<T>; children: (data: T) => React
     );
   }
   return <>{children(of.data)}</>;
+}
+
+/** Pendant le calcul : une partie pas encore arrivée. */
+function Searching({ children = 'Recherche en cours…' }: { children?: ReactNode }) {
+  return (
+    <p className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="searching">
+      <LoaderCircle className="size-4 shrink-0 animate-spin" aria-hidden />
+      <span>{children}</span>
+    </p>
+  );
+}
+
+/** Comme `Value`, mais la donnée peut ne pas être encore arrivée. */
+function Later<T>({ of, children, waiting }: { of: Known<T> | undefined; children: (data: T) => ReactNode; waiting?: ReactNode }) {
+  return of ? <Value of={of}>{children}</Value> : <Searching>{waiting}</Searching>;
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -101,7 +117,9 @@ function Progress({ steps }: { steps: AnalysisStep[] }) {
 function LiveProgress({ steps }: { steps: AnalysisStep[] }) {
   const [open, setOpen] = useState(false);
   const finished = steps.filter((s) => s.state !== 'pending' && s.state !== 'running').length;
-  const current = steps.find((s) => s.state === 'running') ?? steps.find((s) => s.state === 'pending');
+  // Les sources s'interrogent en même temps : la première en cours, et combien d'autres avec elle.
+  const running = steps.filter((s) => s.state === 'running');
+  const current = running[0] ?? steps.find((s) => s.state === 'pending');
   const last = [...steps].reverse().find((s) => s.finishedAt && s.detail);
   return (
     <section className="space-y-2 border bg-card px-3 py-2 text-sm" aria-label="Calcul en cours">
@@ -124,7 +142,7 @@ function LiveProgress({ steps }: { steps: AnalysisStep[] }) {
       </div>
       <p className="flex items-center gap-2 truncate">
         <LoaderCircle className="size-4 shrink-0 animate-spin text-primary" aria-hidden />
-        <span className="truncate">{steps.length === 0 ? 'Préparation du calcul…' : (current?.label ?? 'Enregistrement de l’analyse')}</span>
+        <span className="truncate">{steps.length === 0 ? 'Préparation du calcul…' : current ? `${current.label}${running.length > 1 ? ` et ${running.length - 1} autre${running.length > 2 ? 's' : ''}` : ''}` : 'Enregistrement de l’analyse'}</span>
       </p>
       <p className="truncate text-xs text-muted-foreground" data-testid="last-step">
         {last ? `${last.label.split(' (')[0]} : ${last.detail}` : 'Premiers appels aux sources…'}
@@ -211,7 +229,7 @@ function Commune({ c }: { c: CommuneRisks }) {
   );
 }
 
-function Parcels({ result }: { result: Result }) {
+function Parcels({ parcels }: { parcels: NonNullable<Result['parcels']> }) {
   return (
     <div className="overflow-x-auto border">
       <table className="w-full text-sm">
@@ -224,7 +242,7 @@ function Parcels({ result }: { result: Result }) {
           </tr>
         </thead>
         <tbody className="divide-y align-top">
-          {result.parcels.map((p) => (
+          {parcels.map((p) => (
             <tr key={p.id}>
               <td className="px-3 py-2 font-medium">{p.label}</td>
               <td className="px-3 py-2">
@@ -286,13 +304,13 @@ function Nearby({ result }: { result: Result }) {
     <ul className="divide-y border text-sm">
       <li className="px-3 py-2">
         <p className="font-medium">Cavités souterraines à moins de {meters(result.radii.nearbyM)}</p>
-        <Value of={result.cavities}>
+        <Later of={result.cavities}>
           {(c) => (c.items.length === 0 ? <p className="text-muted-foreground">Aucune.</p> : <p>{c.items.length}, la plus proche à {meters(c.items[0]!.distanceM)}</p>)}
-        </Value>
+        </Later>
       </li>
       <li className="px-3 py-2">
         <p className="font-medium">Installations classées à moins de {meters(result.radii.nearbyM)}</p>
-        <Value of={result.installations}>
+        <Later of={result.installations}>
           {(i) => (
             <>
               <p className="text-muted-foreground">{i.items.length === 0 ? 'Aucune.' : `${i.items.length}, la plus proche à ${meters(i.items[0]!.distanceM)}`}</p>
@@ -307,11 +325,11 @@ function Nearby({ result }: { result: Result }) {
               </ul>
             </>
           )}
-        </Value>
+        </Later>
       </li>
       <li className="px-3 py-2">
         <p className="font-medium">Sols pollués à moins de {meters(result.radii.nearbyM)}</p>
-        <Value of={result.pollutedSites}>
+        <Later of={result.pollutedSites}>
           {(s) =>
             s.items.length === 0 ? (
               <p className="text-muted-foreground">Aucun.</p>
@@ -330,14 +348,14 @@ function Nearby({ result }: { result: Result }) {
               </ul>
             )
           }
-        </Value>
+        </Later>
       </li>
       <li className="px-3 py-2">
         <p className="font-medium">Bornes incendie à moins de {meters(result.radii.hydrantsM)} (OpenStreetMap, indicatif)</p>
-        {result.hydrants.status === 'ok' && <p className="text-xs text-muted-foreground">Données OSM du {formatDate(result.hydrants.data.asOf)}</p>}
-        <Value of={result.hydrants}>
+        {result.hydrants?.status === 'ok' && <p className="text-xs text-muted-foreground">Données OSM du {formatDate(result.hydrants.data.asOf)}</p>}
+        <Later of={result.hydrants} waiting="Recherche en cours ; OpenStreetMap répond parfois lentement, le reste de l’analyse n’attend pas.">
           {(h) => (h.items.length === 0 ? <p className="text-muted-foreground">Aucune connue.</p> : <p>{h.items.length}, la plus proche à {meters(h.items[0]!.distanceM)}</p>)}
-        </Value>
+        </Later>
       </li>
     </ul>
   );
@@ -388,7 +406,8 @@ export function RisksPage() {
   const s = study.data;
   const r = risks.data;
   const busy = r.status === 'queued' || r.status === 'running' || request.isPending;
-  const result = r.result;
+  // Pendant le calcul, chaque partie se montre dès qu'elle arrive (le résultat précédent s'efface).
+  const result: Result | null = busy ? r.partial : r.result;
   const riskLayers: RiskLayer[] = layers.data?.riskLayers ?? [];
   const basemap = layers.data && (layers.data.basemaps.find((b) => b.id === layers.data.defaultBasemap) ?? layers.data.basemaps[0]!);
 
@@ -440,6 +459,11 @@ export function RisksPage() {
 
       <div className="grid gap-6 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-6">
+          {!r.axes && busy && (
+            <Section title="Synthèse">
+              <Searching>Synthèse dès que les communes et les parcelles sont connues…</Searching>
+            </Section>
+          )}
           {r.axes && (
             <Section title="Synthèse">
               <ul className="grid gap-2 sm:grid-cols-2">
@@ -479,19 +503,13 @@ export function RisksPage() {
               )}
             </Section>
           )}
-          {result && (
+          {(result || busy) && (
             <>
-              <Section title="Par parcelle">
-                <Parcels result={result} />
+              <Section title="Par parcelle">{result?.parcels ? <Parcels parcels={result.parcels} /> : <Searching>Argiles, hauteurs d’eau et altitudes…</Searching>}</Section>
+              <Section title={(result?.communes?.length ?? new Set(s.parcels.map((p) => p.communeCode)).size) > 1 ? 'Communes' : 'Commune'}>
+                {result?.communes ? result.communes.map((c) => <Commune key={c.code} c={c} />) : <Searching>Radon, sismicité, PPR, arrêtés CatNat…</Searching>}
               </Section>
-              <Section title={result.communes.length > 1 ? 'Communes' : 'Commune'}>
-                {result.communes.map((c) => (
-                  <Commune key={c.code} c={c} />
-                ))}
-              </Section>
-              <Section title="Alentours">
-                <Nearby result={result} />
-              </Section>
+              <Section title="Alentours">{result ? <Nearby result={result} /> : <Searching />}</Section>
             </>
           )}
           {!result && !busy && r.status !== 'failed' && <p className="text-sm text-muted-foreground">Aucune analyse pour l’instant.</p>}
@@ -516,8 +534,8 @@ export function RisksPage() {
                   basemap={basemap}
                   layers={riskLayers.filter((l) => shown.includes(l.id))}
                   parcels={s.parcels}
-                  hydrants={result?.hydrants.status === 'ok' ? result.hydrants.data.items.map((h) => ({ id: h.id, point: h.point, label: `Borne incendie · ${meters(h.distanceM)}` })) : []}
-                  cavities={result?.cavities.status === 'ok' ? result.cavities.data.items.map((c) => ({ id: c.id, point: c.point, label: `Cavité ${c.type ?? ''} · ${c.name ?? c.id}` })) : []}
+                  hydrants={result?.hydrants?.status === 'ok' ? result.hydrants.data.items.map((h) => ({ id: h.id, point: h.point, label: `Borne incendie · ${meters(h.distanceM)}` })) : []}
+                  cavities={result?.cavities?.status === 'ok' ? result.cavities.data.items.map((c) => ({ id: c.id, point: c.point, label: `Cavité ${c.type ?? ''} · ${c.name ?? c.id}` })) : []}
                 />
               </Suspense>
             ) : (
