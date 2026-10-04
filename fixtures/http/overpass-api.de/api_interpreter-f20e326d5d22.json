@@ -1,5 +1,0 @@
-{
-  "url": "https://overpass-api.de/api/interpreter?data=%5Bout%3Ajson%5D%5Btimeout%3A15%5D%3Bnode%5B%22emergency%22%3D%22fire_hydrant%22%5D%2845.91000%2C6.12000%2C45.92000%2C6.13000%29%3Bout+body%3B",
-  "status": 200,
-  "contentType": "application/json"
-}
