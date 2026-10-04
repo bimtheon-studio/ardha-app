@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { FakeHttp } from '../../test/fake-http.ts';
-import { type AnalysisStep, RisksResult } from '../contracts/index.ts';
+import { type AnalysisStep, RisksPartial, RisksResult } from '../contracts/index.ts';
 import { rect } from '../domain/geometry.test.ts';
 import type { CommunesRepository } from '../geo/communes.repository.ts';
 import { Elevation, ELEVATION_URL } from '../sources/elevation.ts';
@@ -41,9 +41,9 @@ describe('RiskAnalyzer', () => {
   it('toutes les sources muettes : chaque donnée est « indisponible », le résultat reste valide', async () => {
     const seen: AnalysisStep[][] = [];
     const r = await analyzer(new FakeHttp()).analyze([parcel(0), parcel(1, '94080')], async (steps) => void seen.push(steps));
-    // Déroulé : chaque étape passe « en cours » puis « indisponible », dans l'ordre.
-    expect(seen).toHaveLength(16);
-    expect(seen[0]!.map((s) => s.state)).toEqual(['running', 'pending', 'pending', 'pending', 'pending', 'pending', 'pending', 'pending']);
+    // Déroulé : chaque étape passe « en cours » puis « indisponible » ; plusieurs à la fois.
+    expect(seen[0]!.filter((s) => s.state === 'running')).toHaveLength(1);
+    expect(Math.max(...seen.map((steps) => steps.filter((s) => s.state === 'running').length))).toBeGreaterThan(1);
     expect(seen.at(-1)!.map((s) => [s.key, s.state])).toEqual([
       ['commune-94046', 'unavailable'],
       ['commune-94080', 'unavailable'],
@@ -138,6 +138,33 @@ describe('RiskAnalyzer', () => {
     ]);
     // À moins de 400 m, la plus proche d'abord ; celle à ~11 km est écartée.
     expect(r.hydrants.status === 'ok' && r.hydrants.data.items.map((h) => h.id)).toEqual(['node/1', 'node/2']);
+  });
+
+  it('les parties du résultat se montrent dès qu’elles sont prêtes : des bornes lentes ne retiennent pas le reste', async () => {
+    let release!: () => void;
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    const http = new FakeHttp({ [`${GEORISQUES_BASE}/radon`]: { json: { data: [{ classe_potentiel: '1' }] } } });
+    const a = analyzer(http);
+    const inCells = (a as unknown as { hydrants: HydrantCache }).hydrants.inCells.bind((a as unknown as { hydrants: HydrantCache }).hydrants);
+    (a as unknown as { hydrants: Pick<HydrantCache, 'inCells'> }).hydrants = { inCells: async (cells) => (await slow, inCells(cells)) };
+    const seen: { steps: AnalysisStep[]; partial: RisksPartial }[] = [];
+    let ready!: () => void;
+    const others = new Promise<void>((resolve) => (ready = resolve));
+    const done = a.analyze([parcel(0)], async (steps, partial) => {
+      seen.push({ steps, partial });
+      if (partial.communes && partial.parcels && partial.cavities && partial.installations && partial.pollutedSites) ready();
+    });
+    // Tout est là, sauf les bornes, qui attendent encore Overpass.
+    await others;
+    const last = seen.at(-1)!;
+    expect(RisksPartial.parse(last.partial)).toEqual(last.partial);
+    expect(last.partial.hydrants).toBeUndefined();
+    expect(last.partial.communes![0]!.radon).toEqual({ status: 'ok', data: 1 });
+    expect(last.steps.find((s) => s.key === 'hydrants')!.state).toBe('running');
+    expect(last.steps.filter((s) => s.key !== 'hydrants').every((s) => s.finishedAt)).toBe(true);
+    release();
+    const r = await done;
+    expect(seen.at(-1)!.partial.hydrants).toEqual(r.hydrants);
   });
 
   it('une étape dont une partie des sources répond : « en partie », avec la liste des muettes', async () => {

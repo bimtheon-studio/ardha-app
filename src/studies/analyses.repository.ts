@@ -3,7 +3,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, lt, or, sql } from 'drizzle-orm';
 
-import type { AnalysisStep, MarketResult, RisksResult } from '../contracts/index.ts';
+import type { AnalysisStep, MarketResult, RisksPartial, RisksResult } from '../contracts/index.ts';
 import { DB, type Db } from '../db/db.ts';
 import { studyAnalysis, type StudyAnalysisRow } from '../db/schema.ts';
 
@@ -30,7 +30,7 @@ export class AnalysesRepository {
       .values({ studyId, kind, status: 'queued', parcelsKey, requestedAt: now })
       .onConflictDoUpdate({
         target: [studyAnalysis.studyId, studyAnalysis.kind],
-        set: { status: 'queued', parcelsKey, requestedAt: now, startedAt: null, error: null, attempts: 0, progress: [] },
+        set: { status: 'queued', parcelsKey, requestedAt: now, startedAt: null, error: null, attempts: 0, progress: [], partial: null },
       })
       .returning();
     return { row: row!, queued: true };
@@ -40,24 +40,24 @@ export class AnalysesRepository {
   async markRunning(studyId: string, kind: AnalysisKind, parcelsKey: string, now: Date): Promise<boolean> {
     const r = await this.db
       .update(studyAnalysis)
-      .set({ status: 'running', startedAt: now, attempts: sql`${studyAnalysis.attempts} + 1`, progress: [] })
+      .set({ status: 'running', startedAt: now, attempts: sql`${studyAnalysis.attempts} + 1`, progress: [], partial: null })
       .where(and(eq(studyAnalysis.studyId, studyId), eq(studyAnalysis.kind, kind), eq(studyAnalysis.parcelsKey, parcelsKey)))
       .returning({ id: studyAnalysis.id });
     return r.length > 0;
   }
 
-  /** Déroulé du calcul en cours, tant que l'analyse vaut pour cette empreinte. */
-  async saveProgress(studyId: string, kind: AnalysisKind, parcelsKey: string, progress: AnalysisStep[]): Promise<void> {
+  /** Déroulé du calcul en cours et parties déjà connues du résultat, tant que l'analyse vaut pour cette empreinte. */
+  async saveProgress(studyId: string, kind: AnalysisKind, parcelsKey: string, progress: AnalysisStep[], partial: RisksPartial | null = null): Promise<void> {
     await this.db
       .update(studyAnalysis)
-      .set({ progress })
+      .set({ progress, partial })
       .where(and(eq(studyAnalysis.studyId, studyId), eq(studyAnalysis.kind, kind), eq(studyAnalysis.parcelsKey, parcelsKey), eq(studyAnalysis.status, 'running')));
   }
 
   async markReady(studyId: string, kind: AnalysisKind, parcelsKey: string, result: RisksResult | MarketResult, now: Date): Promise<boolean> {
     const r = await this.db
       .update(studyAnalysis)
-      .set({ status: 'ready', result, error: null, computedAt: now })
+      .set({ status: 'ready', result, partial: null, error: null, computedAt: now })
       .where(and(eq(studyAnalysis.studyId, studyId), eq(studyAnalysis.kind, kind), eq(studyAnalysis.parcelsKey, parcelsKey)))
       .returning({ id: studyAnalysis.id });
     return r.length > 0;
@@ -66,7 +66,7 @@ export class AnalysesRepository {
   async markFailed(studyId: string, kind: AnalysisKind, parcelsKey: string, error: string): Promise<void> {
     await this.db
       .update(studyAnalysis)
-      .set({ status: 'failed', error })
+      .set({ status: 'failed', error, partial: null })
       .where(and(eq(studyAnalysis.studyId, studyId), eq(studyAnalysis.kind, kind), eq(studyAnalysis.parcelsKey, parcelsKey)));
   }
 

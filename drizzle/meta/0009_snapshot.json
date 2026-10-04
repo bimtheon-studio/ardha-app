@@ -1,6 +1,6 @@
 {
-  "id": "75ab8004-7ff0-425d-8ef6-1203e2d02a0c",
-  "prevId": "9f6f7d0b-2afc-4854-9d67-0b4d9ef54737",
+  "id": "574c4092-6476-4f1a-9c09-b6e1bf9e34a0",
+  "prevId": "75ab8004-7ff0-425d-8ef6-1203e2d02a0c",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -231,6 +231,246 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.dvf_mutations": {
+      "name": "dvf_mutations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "year": {
+          "name": "year",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "department_code": {
+          "name": "department_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "commune_code": {
+          "name": "commune_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nature": {
+          "name": "nature",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vefa": {
+          "name": "vefa",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "price": {
+          "name": "price",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "property_type": {
+          "name": "property_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dwelling_count": {
+          "name": "dwelling_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "built_area": {
+          "name": "built_area",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "land_area": {
+          "name": "land_area",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rooms": {
+          "name": "rooms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "price_per_sqm": {
+          "name": "price_per_sqm",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parcel_ids": {
+          "name": "parcel_ids",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "address": {
+          "name": "address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "postcode": {
+          "name": "postcode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "point": {
+          "name": "point",
+          "type": "geometry(Point, 4326)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "locals": {
+          "name": "locals",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cultures": {
+          "name": "cultures",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "dvf_mutations_department_code_year_index": {
+          "name": "dvf_mutations_department_code_year_index",
+          "columns": [
+            {
+              "expression": "department_code",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "year",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "dvf_mutations_point_index": {
+          "name": "dvf_mutations_point_index",
+          "columns": [
+            {
+              "expression": "point",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gist",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.housing_permits": {
+      "name": "housing_permits",
+      "schema": "",
+      "columns": {
+        "commune_code": {
+          "name": "commune_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "year": {
+          "name": "year",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "housing_type": {
+          "name": "housing_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "authorized_units": {
+          "name": "authorized_units",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "started_units": {
+          "name": "started_units",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "authorized_area": {
+          "name": "authorized_area",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "started_area": {
+          "name": "started_area",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "housing_permits_commune_code_year_housing_type_pk": {
+          "name": "housing_permits_commune_code_year_housing_type_pk",
+          "columns": [
+            "commune_code",
+            "year",
+            "housing_type"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.hydrants": {
       "name": "hydrants",
       "schema": "",
@@ -312,6 +552,127 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.index_values": {
+      "name": "index_values",
+      "schema": "",
+      "columns": {
+        "series": {
+          "name": "series",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "period": {
+          "name": "period",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "index_values_series_period_pk": {
+          "name": "index_values_series_period_pk",
+          "columns": [
+            "series",
+            "period"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.new_build_prices": {
+      "name": "new_build_prices",
+      "schema": "",
+      "columns": {
+        "department_code": {
+          "name": "department_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quarter": {
+          "name": "quarter",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "housing_type": {
+          "name": "housing_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "listed": {
+          "name": "listed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reservations": {
+          "name": "reservations",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancellations": {
+          "name": "cancellations",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stock": {
+          "name": "stock",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "months_to_sell": {
+          "name": "months_to_sell",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "price_per_sqm": {
+          "name": "price_per_sqm",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "average_price": {
+          "name": "average_price",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "new_build_prices_department_code_quarter_housing_type_pk": {
+          "name": "new_build_prices_department_code_quarter_housing_type_pk",
+          "columns": [
+            "department_code",
+            "quarter",
+            "housing_type"
+          ]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
@@ -821,6 +1182,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "market_radius_m": {
+          "name": "market_radius_m",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 500
+        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -1218,7 +1586,8 @@
       "name": "analysis_kind",
       "schema": "public",
       "values": [
-        "risks"
+        "risks",
+        "market"
       ]
     },
     "public.analysis_status": {

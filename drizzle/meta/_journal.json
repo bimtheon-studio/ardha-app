@@ -61,8 +61,15 @@
     {
       "idx": 8,
       "version": "7",
-      "when": 1790959387114,
-      "tag": "0008_land_market",
+      "when": 1790958779794,
+      "tag": "0008_analysis_partial",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791116038289,
+      "tag": "0009_land_market",
       "breakpoints": true
     }
   ]

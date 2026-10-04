@@ -22,7 +22,7 @@ import {
 
 import type { Address } from '../contracts/geo.ts';
 import type { MarketResult } from '../contracts/market.ts';
-import type { AnalysisStep, RisksResult } from '../contracts/risks.ts';
+import type { AnalysisStep, RisksPartial, RisksResult } from '../contracts/risks.ts';
 import type { DvfLocal } from '../domain/dvf.ts';
 
 const id = () => uuid().primaryKey().default(sql`uuidv7()`);
@@ -377,6 +377,8 @@ export const studyAnalysis = pgTable(
     /** Empreinte des parcelles pour laquelle l'analyse est demandée, puis calculée. */
     parcelsKey: text().notNull(),
     result: jsonb().$type<RisksResult | MarketResult>(),
+    /** Pendant le calcul : les parties du résultat déjà connues, montrées sans attendre la fin. */
+    partial: jsonb().$type<RisksPartial>(),
     /** Déroulé du calcul, mis à jour à chaque étape (visible pendant le calcul). */
     progress: jsonb().$type<AnalysisStep[]>().notNull().default([]),
     error: text(),

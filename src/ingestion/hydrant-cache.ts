@@ -24,38 +24,49 @@ export class HydrantCache {
     private readonly clock: Clock,
   ) {}
 
-  /** Bornes des cases demandées, et la date de la case la plus ancienne (ce que l'analyse cite). */
+  /**
+   * Bornes des cases demandées, et la date de la case la plus ancienne (ce que l'analyse cite). Les
+   * cases à charger le sont en une seule requête : une étude courante en compte 4 à 6, et Overpass
+   * coûte autant pour une que pour toutes.
+   */
   async inCells(grid: readonly Bbox[]): Promise<{ items: HydrantRecord[]; asOf: Date; cells: { fresh: number; fetched: number; stale: number } }> {
     if (grid.length > MAX_HYDRANT_CELLS) throw new Error(`Étude trop dispersée pour les bornes : ${grid.length} cases (au plus ${MAX_HYDRANT_CELLS})`);
     const now = this.clock.now();
     let asOf = now;
     const cells = { fresh: 0, fetched: 0, stale: 0 };
+    const toLoad: { cell: Bbox; key: string; loadedAt: Date | null }[] = [];
     for (const cell of grid) {
       const key = cellKey(cell);
-      const state = await this.states.get(HYDRANTS_SOURCE, key);
-      const loadedAt = state?.loadedAt ?? null;
+      const loadedAt = (await this.states.get(HYDRANTS_SOURCE, key))?.loadedAt ?? null;
       if (loadedAt && now.getTime() - loadedAt.getTime() < HYDRANTS_FRESHNESS_DAYS * DAY_MS) {
         if (loadedAt < asOf) asOf = loadedAt;
         cells.fresh++;
-        continue;
-      }
+      } else toLoad.push({ cell, key, loadedAt });
+    }
+    if (toLoad.length > 0) {
+      for (const c of toLoad) await this.states.markLoading(HYDRANTS_SOURCE, c.key, now);
       try {
-        await this.states.markLoading(HYDRANTS_SOURCE, key, now);
-        const items = await this.overpass.inBbox(cell);
-        await this.hydrants.replaceCell(
-          key,
-          items.map((h) => ({ id: h.id, lon: h.lon, lat: h.lat, type: h.type, flowRate: h.flowRate, diameter: h.diameter, ref: h.ref })),
-        );
-        await this.states.markReady(HYDRANTS_SOURCE, key, now.toISOString().slice(0, 10), items.length, now);
-        cells.fetched++;
+        const found = await this.overpass.inBboxes(toLoad.map((c) => c.cell));
+        // Chaque borne va à la première case chargée qui la contient (une borne au bord est dans deux).
+        const byCell = new Map<string, HydrantRecord[]>(toLoad.map((c) => [c.key, []]));
+        for (const h of found) {
+          const home = toLoad.find(({ cell: [w, s, e, n] }) => h.lon >= w && h.lon <= e && h.lat >= s && h.lat <= n);
+          if (home) byCell.get(home.key)!.push({ id: h.id, lon: h.lon, lat: h.lat, type: h.type, flowRate: h.flowRate, diameter: h.diameter, ref: h.ref });
+        }
+        for (const c of toLoad) {
+          const items = byCell.get(c.key)!;
+          await this.hydrants.replaceCell(c.key, items);
+          await this.states.markReady(HYDRANTS_SOURCE, c.key, now.toISOString().slice(0, 10), items.length, now);
+        }
+        cells.fetched = toLoad.length;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        await this.states.markFailed(HYDRANTS_SOURCE, key, message, now, false);
-        // Jamais chargée : rien à servir à la place.
-        if (!loadedAt) throw error;
-        this.logger.warn(`Overpass indisponible pour la case ${key} : bornes du ${loadedAt.toISOString().slice(0, 10)} gardées`);
-        if (loadedAt < asOf) asOf = loadedAt;
-        cells.stale++;
+        for (const c of toLoad) await this.states.markFailed(HYDRANTS_SOURCE, c.key, message, now, false);
+        // Une case jamais chargée : rien à servir à la place.
+        if (toLoad.some((c) => !c.loadedAt)) throw error;
+        for (const c of toLoad) if (c.loadedAt! < asOf) asOf = c.loadedAt!;
+        this.logger.warn(`Overpass indisponible : bornes de ${toLoad.length} case(s) gardées telles quelles`);
+        cells.stale = toLoad.length;
       }
     }
     const items = new Map<string, HydrantRecord>();

@@ -67,7 +67,9 @@ export function Progress({ steps }: { steps: AnalysisStep[] }) {
 export function LiveProgress({ steps }: { steps: AnalysisStep[] }) {
   const [open, setOpen] = useState(false);
   const finished = steps.filter((s) => s.state !== 'pending' && s.state !== 'running').length;
-  const current = steps.find((s) => s.state === 'running') ?? steps.find((s) => s.state === 'pending');
+  // Les sources s'interrogent en même temps : la première en cours, et combien d'autres avec elle.
+  const running = steps.filter((s) => s.state === 'running');
+  const current = running[0] ?? steps.find((s) => s.state === 'pending');
   const last = [...steps].reverse().find((s) => s.finishedAt && s.detail);
   return (
     <section className="space-y-2 border bg-card px-3 py-2 text-sm" aria-label="Calcul en cours">
@@ -90,7 +92,7 @@ export function LiveProgress({ steps }: { steps: AnalysisStep[] }) {
       </div>
       <p className="flex items-center gap-2 truncate">
         <LoaderCircle className="size-4 shrink-0 animate-spin text-primary" aria-hidden />
-        <span className="truncate">{steps.length === 0 ? 'Préparation du calcul…' : (current?.label ?? 'Enregistrement de l’analyse')}</span>
+        <span className="truncate">{steps.length === 0 ? 'Préparation du calcul…' : current ? `${current.label}${running.length > 1 ? ` et ${running.length - 1} autre${running.length > 2 ? 's' : ''}` : ''}` : 'Enregistrement de l’analyse'}</span>
       </p>
       <p className="truncate text-xs text-muted-foreground" data-testid="last-step">
         {last ? `${last.label.split(' (')[0]} : ${last.detail}` : 'Premiers appels aux sources…'}

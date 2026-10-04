@@ -3,7 +3,7 @@
 // résultat enregistré : une règle corrigée s'applique sans refaire l'analyse.
 import { Injectable } from '@nestjs/common';
 
-import { RISKS_VERSION, RisksResult, type StudyRisks } from '../contracts/index.ts';
+import { RISKS_VERSION, RisksPartial, RisksResult, type StudyRisks } from '../contracts/index.ts';
 import { type AxesInput, type Known, type Level, riskAxes, riskSurcharges, worstLevel } from '../domain/index.ts';
 import { Clock } from '../shared/clock.ts';
 import { AnalysesRepository } from './analyses.repository.ts';
@@ -28,7 +28,7 @@ function worst<T>(values: { status: string; data?: T }[], pick: (known: T[]) => 
   return best;
 }
 
-export function axesInput(r: RisksResult): AxesInput {
+export function axesInput(r: Pick<RisksResult, 'communes' | 'parcels'>): AxesInput {
   const maxClass = (vs: (number | null)[]) => vs.reduce<number | null>((m, v) => (v !== null && (m === null || v > m) ? v : m), null);
   return {
     floodHazard: worst<Level | null>(
@@ -59,11 +59,16 @@ export class RisksService {
   async get(actor: Actor, id: string): Promise<StudyRisks> {
     const study = await this.studies.require(actor, id);
     const row = await this.analyses.get(id, 'risks');
-    if (!row) return { status: 'none', stale: false, requestedAt: null, computedAt: null, error: null, result: null, axes: null, surcharges: null, sources: RISK_SOURCES, progress: [] };
+    if (!row) return { status: 'none', stale: false, requestedAt: null, computedAt: null, error: null, result: null, partial: null, axes: null, surcharges: null, sources: RISK_SOURCES, progress: [] };
     // Un résultat d'une ancienne version du schéma ne se lit plus : il est à refaire.
     const parsed = RisksResult.safeParse(row.result);
     const result = parsed.success ? parsed.data : null;
-    const input = result && axesInput(result);
+    // Pendant le calcul, la synthèse suit le nouveau résultat, dès que communes et parcelles sont là.
+    const busy = row.status === 'queued' || row.status === 'running';
+    const partialParsed = busy ? RisksPartial.safeParse(row.partial) : null;
+    const partial = partialParsed?.success ? partialParsed.data : null;
+    const shown = busy ? partial : result;
+    const input = shown?.communes && shown.parcels ? axesInput({ communes: shown.communes, parcels: shown.parcels }) : null;
     return {
       status: row.status,
       stale: row.parcelsKey !== study.parcelsKey || (row.result !== null && (row.result as { version?: number }).version !== RISKS_VERSION),
@@ -71,6 +76,7 @@ export class RisksService {
       computedAt: row.computedAt?.toISOString() ?? null,
       error: row.error,
       result,
+      partial,
       axes: input && riskAxes(input),
       surcharges: input && riskSurcharges(input),
       sources: RISK_SOURCES,
