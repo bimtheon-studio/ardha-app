@@ -208,7 +208,7 @@ export function MapPage() {
               <Button
                 type="button"
                 className="w-full"
-                disabled={create.isPending}
+                disabled={create.isPending || sel.summary.pieces > 1}
                 onClick={() => create.mutate(free.ids, { onSuccess: (s) => void navigate(`/studies/${s.id}`) })}
               >
                 <FilePlus2 /> {create.isPending ? 'Création…' : 'Créer l’étude'}

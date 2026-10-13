@@ -404,6 +404,11 @@ vers des comptes pas encore recréés) ; aucune migration ne les a réinjectées
 
 ## Journal
 
+- **13/10/2026** — retours du porteur du produit, sur `feedback-contiguity-risk-map` :
+  - F-01 Q4 revu : sélection et étude **d'un seul tenant** (ajout d'une parcelle qui ne touche pas et
+    retrait qui couperait refusés, au clic comme par l'API) ;
+  - F-04 Q15 : carte des risques cadrée sur les alentours à 500 m, contour en pointillés ; une couche
+    à la fois (PPR inondation par défaut), avec sa légende.
 - **02/10/2026** — L5 codé et recetté en local sur `l5-land-market` :
   - ventes DVF par département (DT-40), ECLN, Sitadel, indices INSEE ;
   - analyse « market » par étude ;

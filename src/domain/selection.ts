@@ -1,6 +1,7 @@
-// Sélection de parcelles (F-01) : plafond, morceaux, surfaces. La sélection est libre (Q4, arbitré
-// le 01/10/2026) : une sélection qui n'est pas d'un seul tenant est signalée, pas refusée. Partagé
-// par le front (réponse immédiate au clic) et le back (contrôle à l'enregistrement de l'étude, L2).
+// Sélection de parcelles (F-01) : plafond, contiguïté, surfaces. Une sélection est d'un seul tenant
+// (Q4, revu le 13/10/2026 par le porteur du produit) : une parcelle qui ne la touche pas est refusée,
+// un retrait qui la couperait aussi. Partagé par le front (réponse immédiate au clic) et le back
+// (contrôle à l'enregistrement de l'étude).
 import { areaM2, distanceM, type Surface } from './geometry.ts';
 
 /** Plafond de sélection (F-01, Q5). */
@@ -15,10 +16,14 @@ export interface SelectableParcel {
   contenance: number | null;
 }
 
-export type AddRefusal = 'limit-reached';
+export type AddRefusal = 'limit-reached' | 'not-touching';
+export type RemoveRefusal = 'would-split';
+export type SelectionRefusal = AddRefusal | RemoveRefusal;
 
-export const REFUSAL_MESSAGES: Record<AddRefusal, string> = {
+export const REFUSAL_MESSAGES: Record<SelectionRefusal, string> = {
   'limit-reached': `Une sélection compte au plus ${SELECTION_MAX} parcelles.`,
+  'not-touching': 'Cette parcelle ne touche pas la sélection : une sélection est d’un seul tenant.',
+  'would-split': 'Retirer cette parcelle couperait la sélection en deux : retirez d’abord celles d’un côté.',
 };
 
 export function touches(a: SelectableParcel, b: SelectableParcel): boolean {
@@ -26,22 +31,31 @@ export function touches(a: SelectableParcel, b: SelectableParcel): boolean {
 }
 
 /** Pourquoi la parcelle ne peut pas rejoindre la sélection, ou `null` si elle le peut. */
-export function addRefusal(selection: readonly SelectableParcel[]): AddRefusal | null {
-  return selection.length >= SELECTION_MAX ? 'limit-reached' : null;
+export function addRefusal(selection: readonly SelectableParcel[], candidate: SelectableParcel): AddRefusal | null {
+  if (selection.length >= SELECTION_MAX) return 'limit-reached';
+  if (selection.length > 0 && !selection.some((p) => touches(p, candidate))) return 'not-touching';
+  return null;
+}
+
+/**
+ * Pourquoi la parcelle ne peut pas quitter la sélection, ou `null` si elle le peut : le retrait ne
+ * doit pas ajouter de morceau (une sélection déjà en morceaux, venue d'un lien, peut se défaire).
+ */
+export function removeRefusal(selection: readonly SelectableParcel[], id: string): RemoveRefusal | null {
+  const rest = selection.filter((p) => p.id !== id);
+  return rest.length > 1 && pieces(rest) > pieces(selection) ? 'would-split' : null;
 }
 
 export type ToggleResult<P extends SelectableParcel> =
   | { action: 'added' | 'removed'; selection: P[] }
-  | { action: 'refused'; refusal: AddRefusal; selection: P[] };
+  | { action: 'refused'; refusal: SelectionRefusal; selection: P[] };
 
-/** Clic sur une parcelle : la retire si elle est sélectionnée (toujours permis), l'ajoute sinon. */
+/** Clic sur une parcelle : la retire si elle est sélectionnée, l'ajoute sinon, si les règles le permettent. */
 export function toggle<P extends SelectableParcel>(selection: readonly P[], candidate: P): ToggleResult<P> {
-  if (selection.some((p) => p.id === candidate.id)) {
-    return { action: 'removed', selection: selection.filter((p) => p.id !== candidate.id) };
-  }
-  const refusal = addRefusal(selection);
+  const selected = selection.some((p) => p.id === candidate.id);
+  const refusal = selected ? removeRefusal(selection, candidate.id) : addRefusal(selection, candidate);
   if (refusal) return { action: 'refused', refusal, selection: [...selection] };
-  return { action: 'added', selection: [...selection, candidate] };
+  return selected ? { action: 'removed', selection: selection.filter((p) => p.id !== candidate.id) } : { action: 'added', selection: [...selection, candidate] };
 }
 
 /** Nombre de morceaux d'un seul tenant (composantes connexes de « se touchent »). */

@@ -43,6 +43,11 @@ describe('accès', () => {
     expect(r.body).toEqual(MAP_LAYERS);
     expect(r.body.basemaps.map((b: { id: string }) => b.id)).toEqual(['osm', 'plan', 'ortho']);
     expect(r.body.defaultBasemap).toBe('osm');
+    // Couches de risques : une à la fois, PPR inondation d'abord, chacune avec sa légende.
+    expect(r.body.defaultRiskLayer).toBe('ppr-flood');
+    expect(r.body.riskLayers.find((l: { id: string }) => l.id === 'tri-heights').legendUrl).toBe(
+      'https://mapsref.brgm.fr/wxs/georisques/risques?SERVICE=WMS&REQUEST=GetLegendGraphic&VERSION=1.3.0&FORMAT=image%2Fpng&SLD_VERSION=1.1.0&LAYER=ISO_HT_01_02MOY',
+    );
   });
 });
 

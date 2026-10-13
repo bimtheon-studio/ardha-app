@@ -9,6 +9,7 @@ import { offlineTiles, screenPoint, signUp } from './helpers.ts';
 const AY96 = { lat: 48.7999887, lon: 2.4298255 };
 const AY97 = { lat: 48.8000665, lon: 2.4300124 };
 const AY98 = { lat: 48.8002762, lon: 2.4297286 };
+const AY95 = { lat: 48.7999055, lon: 2.4300092 };
 const VIEW = { lat: 48.8, lon: 2.43, zoom: 19 };
 
 test.beforeEach(async ({ page }) => {
@@ -34,7 +35,7 @@ for (const ref of [
   });
 }
 
-test('sélectionner des parcelles au clic, signaler une sélection en morceaux, la garder au rechargement', async ({ page }) => {
+test('sélectionner des parcelles au clic, d’un seul tenant, la garder au rechargement', async ({ page }) => {
   await page.goto(`/map?at=${VIEW.lat},${VIEW.lon},${VIEW.zoom}`);
   await expect(page.getByText('Maisons-Alfort · cadastre du 1er septembre 2026')).toBeVisible();
   const list = page.getByRole('list', { name: 'Parcelles' });
@@ -54,15 +55,16 @@ test('sélectionner des parcelles au clic, signaler une sélection en morceaux, 
   // Altitudes de la sélection (F-04, Q6), mesurées par le worker (réponses IGN enregistrées).
   await expect(page.getByTestId('elevation')).toHaveText('31,88 m à 32,55 m NGF · moyenne 32,2 m · dénivelé 0,67 m');
 
-  // Sélection libre (Q4) : une parcelle isolée s'ajoute, et la sélection est dite en morceaux.
+  // D'un seul tenant (Q4, revu le 13/10/2026) : une parcelle qui ne touche pas la sélection est refusée.
   await click(AY98);
+  await expect(page.getByRole('alert')).toHaveText('Cette parcelle ne touche pas la sélection : une sélection est d’un seul tenant.');
+  await expect(list.getByRole('listitem')).toHaveCount(2);
+  await click(AY95);
   await expect(list.getByRole('listitem')).toHaveCount(3);
-  await expect(page.getByText('La sélection est en 2 morceaux : elle n’est plus d’un seul tenant.')).toBeVisible();
 
   await page.reload();
   await expect(page.getByRole('list', { name: 'Parcelles' }).getByRole('listitem')).toHaveCount(3);
-  await page.getByRole('button', { name: 'Retirer la parcelle AY 98' }).click();
-  await expect(page.getByText(/en 2 morceaux/)).toBeHidden();
+  await page.getByRole('button', { name: 'Retirer la parcelle AY 95' }).click();
   await page.getByRole('button', { name: 'Retirer la parcelle AY 96' }).click();
   await expect(page.getByRole('list', { name: 'Parcelles' }).getByRole('listitem')).toHaveCount(1);
   await expect(page.getByTestId('total-contenance')).toHaveText('270 m²');

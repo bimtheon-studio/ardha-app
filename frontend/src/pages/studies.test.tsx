@@ -103,7 +103,7 @@ function study(over: Partial<Study> = {}): Study {
 
 const ID = summary().id;
 const COPY = '01a0f885-0000-7000-8000-000000000002';
-const LAYERS = { basemaps: [{ id: 'osm', label: 'OpenStreetMap', url: 'https://osm/{z}/{x}/{y}', attribution: 'OSM', maxZoom: 19 }], defaultBasemap: 'osm', parcelsMinZoom: 16, riskLayers: [] };
+const LAYERS = { basemaps: [{ id: 'osm', label: 'OpenStreetMap', url: 'https://osm/{z}/{x}/{y}', attribution: 'OSM', maxZoom: 19 }], defaultBasemap: 'osm', parcelsMinZoom: 16, riskLayers: [], defaultRiskLayer: 'none' };
 const base = { 'GET /api/auth/me': { status: 200, body: alice }, 'GET /api/map/layers': { status: 200, body: LAYERS } };
 
 describe('accueil', () => {
@@ -439,6 +439,9 @@ describe('carte d’une étude (Q8)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'zoomer' }));
     await userEvent.click(await screen.findByRole('button', { name: 'parcelle AB 2' }));
     await waitFor(() => expect(within(screen.getByRole('list', { name: 'Parcelles' })).getAllByRole('listitem')).toHaveLength(3));
+    // Retirer celle du milieu couperait l'étude en deux : refus affiché, sans appel.
+    await userEvent.click(screen.getByRole('button', { name: 'Retirer la parcelle AB 1' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Retirer cette parcelle couperait la sélection en deux');
     await userEvent.click(screen.getByRole('button', { name: 'parcelle AB 0' }));
     await userEvent.click(screen.getByRole('button', { name: 'Retirer la parcelle AB 1' }));
     await waitFor(() => expect(within(screen.getByRole('list', { name: 'Parcelles' })).getAllByRole('listitem')).toHaveLength(1));

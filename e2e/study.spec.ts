@@ -7,7 +7,7 @@ import { offlineTiles, screenPoint, signUp } from './helpers.ts';
 
 const AY96 = { lat: 48.7999887, lon: 2.4298255 };
 const AY97 = { lat: 48.8000665, lon: 2.4300124 };
-const AY98 = { lat: 48.8002762, lon: 2.4297286 };
+const AY95 = { lat: 48.7999055, lon: 2.4300092 };
 const VIEW = { lat: 48.8, lon: 2.43, zoom: 19 };
 
 test.beforeEach(async ({ page }) => {
@@ -55,14 +55,15 @@ test('créer une étude depuis la carte, la renommer, en modifier les parcelles,
   await expect(page.getByRole('list', { name: 'Parcelles' }).getByRole('listitem')).toHaveCount(2);
   await expect(page.getByText('Maisons-Alfort · cadastre du 1er septembre 2026')).toBeVisible();
   const view = viewOf(page);
-  const { x, y } = await screenPoint(page, view, AY98.lat, AY98.lon);
+  const { x, y } = await screenPoint(page, view, AY95.lat, AY95.lon);
   await page.mouse.click(x, y);
   await expect(page.getByRole('list', { name: 'Parcelles' }).getByRole('listitem')).toHaveCount(3);
   await expect(page.getByText('Chaque clic est enregistré.')).toBeVisible();
   await page.getByRole('link', { name: 'Terminer' }).click();
 
-  // L'adresse suit les parcelles ; le nom, renommé, ne bouge plus.
-  await expect(page.getByText('6 Avenue de la République 94700 Maisons-Alfort')).toBeVisible();
+  // Les adresses suivent les parcelles (AY 95 en apporte trois) ; le nom, renommé, ne bouge plus.
+  await expect(page.getByRole('button', { name: 'Changer d’adresse (6 trouvées)' })).toBeVisible();
+  await expect(page.getByText('6 Rue Pasteur 94700 Maisons-Alfort')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Angle Pasteur' })).toBeVisible();
   await expect(page.getByRole('list', { name: 'Parcelles de l’étude' }).getByRole('listitem')).toHaveCount(3);
 
@@ -72,7 +73,7 @@ test('créer une étude depuis la carte, la renommer, en modifier les parcelles,
   await expect(card).toHaveCount(1);
   await expect(card).toContainText('Maisons-Alfort · 3 parcelles');
   await expect.poll(() => card.locator('img').evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth), { timeout: 10_000 }).toBe(480);
-  await page.getByRole('searchbox', { name: 'Rechercher une étude' }).fill('republique');
+  await page.getByRole('searchbox', { name: 'Rechercher une étude' }).fill('rue pasteur');
   await expect(card).toHaveCount(1);
   await page.getByRole('searchbox', { name: 'Rechercher une étude' }).fill('lyon');
   await expect(page.getByText('Aucune étude ne correspond à « lyon ».')).toBeVisible();

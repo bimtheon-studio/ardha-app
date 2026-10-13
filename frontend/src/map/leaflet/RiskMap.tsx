@@ -1,14 +1,19 @@
-// Carte des risques d'une étude (F-04) : le fond, les couches de risques choisies (tuiles WMS de
-// Géorisques et du BRGM, Q8), les parcelles, les bornes incendie et les cavités alentour. Couverte par
-// l'e2e (happy-dom ne dessine pas de carte).
+// Carte des risques d'une étude (F-04) : le fond, la couche de risques choisie (tuiles WMS de
+// Géorisques et du BRGM, Q8), les parcelles, la zone des alentours, les bornes incendie et les cavités.
+// Cadrée sur la zone des alentours (500 m) : les points listés y sont, et les hauteurs d'eau du TRI,
+// que le BRGM ne sert qu'entre 1:5 000 et 1:30 000, s'y voient. Couverte par l'e2e (happy-dom ne
+// dessine pas de carte).
 import 'leaflet/dist/leaflet.css';
 
 import type { Basemap, RiskLayer, StudyParcel } from '@contracts';
-import { bboxOf, unionBbox } from '@domain';
+import { bboxOf, NEARBY_RADIUS_M, zoneAround } from '@domain';
 import type L from 'leaflet';
 import { CircleMarker, GeoJSON, MapContainer, TileLayer, Tooltip, WMSTileLayer } from 'react-leaflet';
 
-const PARCEL: L.PathOptions = { color: '#0033A8', weight: 2.5, opacity: 1, fillColor: '#0033A8', fillOpacity: 0.15 };
+import { RISK_MAP_COLORS as C } from '@/map/risk-styles';
+
+const PARCEL: L.PathOptions = { color: C.parcel, weight: 2.5, opacity: 1, fillColor: C.parcel, fillOpacity: 0.15 };
+const ZONE: L.PathOptions = { color: C.zone, weight: 1.5, opacity: 0.9, dashArray: '6 6', fill: false };
 
 export interface MapPoint {
   id: string;
@@ -18,17 +23,18 @@ export interface MapPoint {
 
 interface Props {
   basemap: Basemap;
-  layers: RiskLayer[];
+  layer: RiskLayer | null;
   parcels: StudyParcel[];
   hydrants: MapPoint[];
   cavities: MapPoint[];
 }
 
-export default function RiskMap({ basemap, layers, parcels, hydrants, cavities }: Props) {
-  // Cadrée sur les parcelles et la borne incendie la plus proche (la liste arrive triée par distance).
-  const nearest = hydrants[0]?.point;
-  const boxes = [...parcels.map((p) => bboxOf(p.geometry)), ...(nearest ? [[nearest[0], nearest[1], nearest[0], nearest[1]] as const] : [])];
-  const [w, s, e, n] = unionBbox(boxes) ?? [2.2, 46.2, 2.6, 46.6];
+export default function RiskMap({ basemap, layer, parcels, hydrants, cavities }: Props) {
+  const zone = zoneAround(
+    parcels.map((p) => p.geometry),
+    NEARBY_RADIUS_M,
+  );
+  const [w, s, e, n] = zone ? bboxOf(zone) : [2.2, 46.2, 2.6, 46.6];
   const data: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: parcels.map((p) => ({ type: 'Feature', id: p.id, geometry: p.geometry, properties: {} })) };
   return (
     <MapContainer
@@ -37,22 +43,21 @@ export default function RiskMap({ basemap, layers, parcels, hydrants, cavities }
         [n, e],
       ]}
       key={`${w},${s},${e},${n}`}
-      boundsOptions={{ padding: [48, 48], maxZoom: 18 }}
+      boundsOptions={{ padding: [8, 8] }}
       scrollWheelZoom={false}
       className="h-full w-full"
     >
       <TileLayer url={basemap.url} attribution={basemap.attribution} maxZoom={basemap.maxZoom} />
-      {layers.map((l) => (
-        <WMSTileLayer key={l.id} url={l.url} params={{ layers: l.layers, format: 'image/png', transparent: true }} opacity={0.6} attribution={l.attribution} />
-      ))}
+      {layer && <WMSTileLayer key={layer.id} url={layer.url} params={{ layers: layer.layers, format: 'image/png', transparent: true }} opacity={0.6} attribution={layer.attribution} />}
+      {zone && <GeoJSON key={`zone-${w},${s},${e},${n}`} data={zone} style={ZONE} interactive={false} />}
       <GeoJSON key={parcels.map((p) => p.id).join(',')} data={data} style={PARCEL} interactive={false} />
       {cavities.map((c) => (
-        <CircleMarker key={c.id} center={[c.point[1], c.point[0]]} radius={5} pathOptions={{ color: '#fff', weight: 1.5, fillColor: '#7A4B1E', fillOpacity: 1 }}>
+        <CircleMarker key={c.id} center={[c.point[1], c.point[0]]} radius={5} pathOptions={{ color: '#fff', weight: 1.5, fillColor: C.cavity, fillOpacity: 1 }}>
           <Tooltip>{c.label}</Tooltip>
         </CircleMarker>
       ))}
       {hydrants.map((h) => (
-        <CircleMarker key={h.id} center={[h.point[1], h.point[0]]} radius={6} pathOptions={{ color: '#fff', weight: 2, fillColor: '#C1272D', fillOpacity: 1 }}>
+        <CircleMarker key={h.id} center={[h.point[1], h.point[0]]} radius={6} pathOptions={{ color: '#fff', weight: 2, fillColor: C.hydrant, fillOpacity: 1 }}>
           <Tooltip>{h.label}</Tooltip>
         </CircleMarker>
       ))}

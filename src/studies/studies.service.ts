@@ -14,6 +14,9 @@ import {
   parcelsKey,
   principalCommune,
   proposeStudyName,
+  addRefusal,
+  pieces,
+  removeRefusal,
   SELECTION_MAX,
   studySteps,
   marketKey,
@@ -169,6 +172,7 @@ export class StudiesService {
     const records = await this.parcels.byIds(ids);
     const missing = ids.filter((id) => !records.some((p) => p.id === id));
     if (missing.length > 0) throw new DomainError('unknown-parcel', `Parcelle inconnue : ${missing.join(', ')}.`);
+    if (pieces(records) > 1) throw new DomainError('study-not-contiguous');
     const parcels = records.map(toNewParcel);
     const communeCode = principalCommune(parcels)!;
     const communeName = await this.communeName(communeCode);
@@ -230,6 +234,7 @@ export class StudiesService {
       if (current.length >= SELECTION_MAX) throw new DomainError('study-limit-reached');
       const [record] = await this.parcels.byIds([parcelId]);
       if (!record) throw new DomainError('unknown-parcel');
+      if (addRefusal(current, record) === 'not-touching') throw new DomainError('parcel-not-touching');
       await this.studies.insertParcels(tx, id, [toNewParcel(record)], Math.max(-1, ...current.map((p) => p.position)) + 1);
       return true;
     });
@@ -239,6 +244,7 @@ export class StudiesService {
     return this.changeParcels(actor, id, async (tx, current) => {
       if (!current.some((p) => p.id === parcelId)) return false;
       if (current.length === 1) throw new DomainError('study-needs-parcel');
+      if (removeRefusal(current, parcelId)) throw new DomainError('parcel-would-split');
       await this.studies.removeParcel(tx, id, parcelId);
       return true;
     });

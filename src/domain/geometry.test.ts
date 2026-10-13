@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { areaM2, bboxOf, containsPoint, distanceM, distanceToPointM, interiorPoint, type MultiPolygon, perimeterPoints, pointDistanceM, type Polygon, unionBbox } from './geometry.ts';
+import { areaM2, bboxOf, containsPoint, distanceM, distanceToPointM, expandBbox, interiorPoint, type MultiPolygon, perimeterPoints, pointDistanceM, type Polygon, unionBbox, zoneAround } from './geometry.ts';
 
 /** Rectangle `[ouest, sud, est, nord]` en degrés. */
 export function rect(w: number, s: number, e: number, n: number): Polygon {
@@ -113,5 +113,30 @@ describe('interiorPoint, perimeterPoints, pointDistanceM', () => {
 
   it('distance entre deux points', () => {
     expect(pointDistanceM([2.44, 48.8], [2.441, 48.8])).toBeCloseTo(73.4, 0);
+  });
+});
+
+describe('zoneAround', () => {
+  it('à 500 m d’une parcelle : contour fermé, toujours au moins à 500 m, jamais beaucoup plus', () => {
+    const zone = zoneAround([square], 500)!;
+    const ring = zone.coordinates[0]!;
+    expect(ring[0]).toEqual(ring.at(-1));
+    for (const p of ring) {
+      const d = distanceToPointM(square, p);
+      expect(d).toBeGreaterThanOrEqual(499.9);
+      expect(d).toBeLessThan(501);
+    }
+    // Ses bords ne passent pas à moins de 500 m : la zone contient tout ce qui est à 500 m.
+    const mid = ring.slice(0, -1).map((p, i) => [(p[0]! + ring[i + 1]![0]!) / 2, (p[1]! + ring[i + 1]![1]!) / 2]);
+    for (const p of mid) expect(distanceToPointM(square, p)).toBeGreaterThanOrEqual(499.9);
+    const [w, s, e, n] = bboxOf(zone);
+    expandBbox(bboxOf(square), 500).forEach((v, i) => expect([w, s, e, n][i]).toBeCloseTo(v, 4));
+  });
+
+  it('plusieurs parcelles : une seule zone, qui les englobe ; rien sans parcelle', () => {
+    const zone = zoneAround([square, rect(2.441, 48.8, 2.442, 48.801)], 100)!;
+    expect(containsPoint(zone, [2.4415, 48.8005])).toBe(true);
+    expect(bboxOf(zone)[2]).toBeCloseTo(expandBbox([2.44, 48.8, 2.442, 48.801], 100)[2], 4);
+    expect(zoneAround([], 500)).toBeNull();
   });
 });
