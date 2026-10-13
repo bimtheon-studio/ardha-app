@@ -97,6 +97,16 @@ describe('désactivation (Q5)', () => {
     expect(actions).toContainEqual({ action: 'user.reactivated', origin: 'cli' });
   });
 
+  it('change le rôle ; la session ouverte le voit aussitôt', async () => {
+    await auth.signup({ email: 'bob@exemple.fr', name: 'Bob', password: 'cheval pomme agrafe' }, ctx);
+    const { token } = await auth.login({ email: 'bob@exemple.fr', password: 'cheval pomme agrafe' }, ctx);
+    await service.setRole('BOB@exemple.fr', 'admin');
+    expect((await auth.currentSession(token))?.user.role).toBe('admin');
+    const actions = (await pool.query('SELECT action, origin, details FROM audit_logs ORDER BY created_at, id')).rows;
+    expect(actions).toContainEqual({ action: 'user.role-set', origin: 'cli', details: { role: 'admin' } });
+    await expect(service.setRole('personne@exemple.fr', 'admin')).rejects.toMatchObject({ code: 'unknown-user' });
+  });
+
   it('un compte inconnu est signalé', async () => {
     await expect(service.deactivate('personne@exemple.fr')).rejects.toMatchObject({ code: 'unknown-user' });
     await expect(service.createResetLink('personne@exemple.fr')).rejects.toMatchObject({ code: 'unknown-user' });

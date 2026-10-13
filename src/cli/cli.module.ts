@@ -10,6 +10,7 @@ import {
   ReactivateCommand,
   ResetPasswordCommand,
   SetPasswordCommand,
+  SetRoleCommand,
 } from './user.commands.ts';
 import { AccountsModule } from '../accounts/accounts.module.ts';
 import type { Config } from '../config/config.ts';
@@ -47,6 +48,7 @@ export class CliModule {
         CreateAdminCommand,
         ResetPasswordCommand,
         SetPasswordCommand,
+        SetRoleCommand,
         DeactivateCommand,
         ReactivateCommand,
         ListUsersCommand,

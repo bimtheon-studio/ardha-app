@@ -93,6 +93,27 @@ export class SetPasswordCommand extends EmailCommand {
   }
 }
 
+const ROLES = ['admin', 'user'] as const;
+
+@Command({ name: 'user:set-role', description: 'Fixe le rôle d’un compte : admin ou user' })
+export class SetRoleCommand extends EmailCommand {
+  constructor(private readonly users: UsersService) {
+    super();
+  }
+
+  @Option({ flags: '-r, --role <role>', description: 'admin ou user', required: true })
+  parseRole(value: string): string {
+    return value;
+  }
+
+  async run(_: string[], options: EmailOptions & { role: string }): Promise<void> {
+    const role = ROLES.find((r) => r === options.role);
+    if (!role) throw new Error(`rôle inconnu « ${options.role} » (admin ou user)`);
+    await this.users.setRole(options.email, role);
+    console.log(`Rôle de ${options.email} : ${role}.`);
+  }
+}
+
 @Command({ name: 'user:deactivate', description: 'Désactive un compte et ferme ses sessions' })
 export class DeactivateCommand extends EmailCommand {
   constructor(private readonly users: UsersService) {

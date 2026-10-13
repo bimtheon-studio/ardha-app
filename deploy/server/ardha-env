@@ -5,16 +5,13 @@
 # touche qu'à ce qui porte le nom d'Ardha (le serveur est partagé).
 #
 #   ardha-env setup                                  services partagés (Postgres, Redis), secrets
-#   ardha-env create <nom> --image <image>           crée l'environnement et le déploie
-#   ardha-env update <nom> --image <image> [--reset-db]
+#   ardha-env create <nom> --image <image> [--empty-db]   crée l'environnement et le déploie ; une PR part d'une copie de la production
+#   ardha-env update <nom> --image <image> [--reset-db [--empty-db]]
 #   ardha-env remove <nom> [--confirm production]    supprime tout : application, base, clés Redis
 #   ardha-env list                                   environnements, hôte, image, état
 #   ardha-env logs <nom> [--tail <n>] [--follow]     journaux du conteneur
 #   ardha-env exec <nom> <commande…>                 commande dans le conteneur (once exec)
 #   ardha-env psql <nom> [arguments de psql…]        psql sur la base de l'environnement
-#   ardha-env team-set --email <e> --name <nom>      compte d'équipe (mot de passe lu sur l'entrée standard)
-#   ardha-env team-list | team-remove --email <e>    comptes d'équipe (sans les mots de passe)
-#   ardha-env accounts <nom>                         comptes d'équipe présents, avec leur mot de passe
 #   ardha-env registry --username <u>                identifiants de ghcr.io (jeton lu sur l'entrée standard)
 #   ardha-env app-secret <NOM>                       secret de l'application pour tous les environnements (valeur lue sur l'entrée standard)
 #   ardha-env sweep --keep <pr-1,pr-7,…>             supprime les PR absentes de la liste (fermées)
@@ -147,6 +144,61 @@ drop_redis_keys() {
     | xargs -r -n 500 docker exec -i "$REDIS" redis-cli del >/dev/null
 }
 
+# Copie de la production (porteur du produit, 13/10/2026 : « copier la bdd de prod par défaut lors
+# d'un nouvel env, comme ça on peut reprendre les dossiers ») : une base de PR neuve part d'une copie
+# de la base de la production, puis de ses fichiers une fois le conteneur démarré. Les comptes
+# suivent (mêmes e-mails, mots de passe et rôles) ; ni les sessions ni les liens de réinitialisation.
+# Sans production, ou si la copie échoue, la base reste vide et le seed au démarrage la remplit.
+# Les objets copiés appartiennent au rôle de la PR ; les extensions, déjà là, ne sont pas copiées.
+# Les messages de pg_dump et pg_restore peuvent citer des lignes de la base (e-mails, empreintes) :
+# ils vont dans `envs/<nom>.copy.log` (600), jamais sur la sortie, que la CI publie.
+copy_production_database() { # copy_production_database <nom> <base> : rend 0 si la base est copiée
+  local name=$1 db=$2 log
+  log="$ENVS/$name.copy.log"
+  [[ -f $(env_file production) ]] || { echo "Pas de production à copier." >&2; return 1; }
+  (umask 077 && : > "$log")
+  if docker exec "$POSTGRES" pg_dump -U postgres -Fc --no-owner --no-acl --exclude-extension='*' -d "$(database_of production)" 2>> "$log" \
+    | docker exec -i "$POSTGRES" pg_restore -U postgres --no-owner --no-acl --role="$db" --exit-on-error --single-transaction -d "$db" 2>> "$log" \
+    && sql "$db" <<< 'DELETE FROM sessions; DELETE FROM password_resets;' 2>> "$log"; then
+    return 0
+  fi
+  echo "ardha-env : détail sur le serveur, $log" >&2
+  return 1
+}
+
+# Base neuve d'un environnement ; copiée de la production pour une PR, sauf `--empty-db`. Laisse
+# `copied` à true quand la copie a réussi (les fichiers suivront).
+copied=false
+prepare_database() { # prepare_database <nom> <base> <mot de passe> <copier : true|false>
+  local name=$1 db=$2 password=$3 copy=$4
+  create_database "$db" "$password"
+  [[ $name == pr-* && $copy == true ]] || { echo "Base $db vide."; return; }
+  if copy_production_database "$name" "$db"; then
+    copied=true
+    echo "Base $db copiée de la production."
+  else
+    drop_database "$db"
+    create_database "$db" "$password"
+    echo "ardha-env : copie de la production impossible ; base $db vide (le seed la remplira)." >&2
+  fi
+}
+
+# Fichiers de la production (`/storage/files`, volume de once) vers l'environnement, une fois son
+# conteneur démarré. Un échec n'arrête pas le déploiement : la base copiée sert sans eux.
+copy_production_files() { # copy_production_files <nom>
+  local from to
+  if ! from=$(container_of "$(host_of production)" 2>/dev/null) || ! to=$(container_of "$(host_of "$1")" 2>/dev/null); then
+    echo "ardha-env : fichiers de la production non copiés (conteneur introuvable)." >&2
+    return 0
+  fi
+  docker exec "$from" test -d /storage/files || { echo "Aucun fichier en production."; return 0; }
+  if docker exec "$from" tar -C /storage -c files | docker exec -i "$to" tar -C /storage -x; then
+    echo "Fichiers copiés de la production."
+  else
+    echo "ardha-env : copie des fichiers de la production incomplète." >&2
+  fi
+}
+
 # Commandes
 
 cmd_setup() {
@@ -167,12 +219,13 @@ cmd_setup() {
 }
 
 cmd_create() {
-  local name=${1:-} image=''
+  local name=${1:-} image='' copy=true
   check_name "$name"
   shift
   while (($#)); do
     case $1 in
       --image) image=${2:-}; shift 2 ;;
+      --empty-db) copy=false; shift ;;
       *) usage ;;
     esac
   done
@@ -195,14 +248,15 @@ cmd_create() {
 
   local password
   password=$(random_secret)
-  create_database "$db" "$password"
+  prepare_database "$name" "$db" "$password" "$copy"
   (
     umask 077
     {
       echo "DATABASE_URL=postgres://$db:$password@$POSTGRES:5432/$db"
       echo "REDIS_URL=redis://$REDIS:6379"
       echo "REDIS_PREFIX=$prefix"
-      # Une PR démarre sur les communes de référence ; la production se remplit à la demande.
+      # Une PR sans copie de la production démarre sur les communes de référence (le seed ne touche
+      # pas à une base qui a déjà des communes) ; la production se remplit à la demande.
       [[ $name == pr-* ]] && echo "ARDHA_SEED_ON_BOOT=true"
       echo "LOG_LEVEL=info"
     } > "$(env_file "$name")"
@@ -223,24 +277,27 @@ cmd_create() {
   if ! registry_password | "$ONCE" "${args[@]}"; then
     # once a déjà retiré l'application ; on retire le reste, pour ne rien laisser.
     drop_database "$db"
-    rm -f "$(env_file "$name")" "$(meta_file "$name")"
+    rm -f "$(env_file "$name")" "$(meta_file "$name")" "$ENVS/$name.copy.log"
     die "échec du déploiement de $name : rien n'a été gardé"
   fi
+  if $copied; then copy_production_files "$name"; fi
   echo "Environnement $name prêt : https://$host"
 }
 
 cmd_update() {
-  local name=${1:-} image='' reset=false
+  local name=${1:-} image='' reset=false copy=true
   check_name "$name"
   shift
   while (($#)); do
     case $1 in
       --image) image=${2:-}; shift 2 ;;
       --reset-db) reset=true; shift ;;
+      --empty-db) copy=false; shift ;;
       *) usage ;;
     esac
   done
   [[ -n $image ]] || die "--image manquant"
+  $reset || $copy || die "--empty-db va avec --reset-db"
   [[ -f $(env_file "$name") ]] || die "$name n'existe pas : « ardha-env create $name --image … »"
   services_ready
   local host db
@@ -251,9 +308,8 @@ cmd_update() {
     local password
     password=$(sed -n "s|^DATABASE_URL=postgres://$db:\([^@]*\)@.*|\1|p" "$(env_file "$name")")
     drop_database "$db"
-    create_database "$db" "$password"
     drop_redis_keys "$(prefix_of "$name")"
-    echo "Base $db recréée."
+    prepare_database "$name" "$db" "$password" "$copy"
   fi
   local envs=()
   mapfile -d '' envs < <(env_args "$name")
@@ -262,6 +318,7 @@ cmd_update() {
   mapfile -t registry < <(registry_args)
   registry_password | "$ONCE" update "$host" --image "$image" "${envs[@]}" "${registry[@]}"
   sed -i "s|^IMAGE=.*|IMAGE=$image|" "$(meta_file "$name")"
+  if $copied; then copy_production_files "$name"; fi
   echo "Environnement $name à jour : https://$host"
 }
 
@@ -285,7 +342,7 @@ cmd_remove() {
   services_ready
   drop_database "$(database_of "$name")"
   drop_redis_keys "$(prefix_of "$name")"
-  rm -f "$(env_file "$name")" "$(meta_file "$name")"
+  rm -f "$(env_file "$name")" "$(meta_file "$name")" "$ENVS/$name.copy.log"
   echo "Environnement $name supprimé."
 }
 
@@ -383,86 +440,6 @@ cmd_app_secret() {
   echo "Secret $name enregistré (pris en compte au prochain create ou update de chaque environnement)."
 }
 
-# Comptes de l'équipe (porteur du produit, 01/10/2026) : les mêmes comptes, avec les mêmes mots de
-# passe, dans chaque environnement, pour toujours pouvoir s'y reconnecter. La liste vit sur le
-# serveur seulement (`team`, 600 : e-mail, nom, mot de passe, séparés par des tabulations) : jamais
-# dans le dépôt, public, ni dans les journaux de la CI.
-TEAM="$ARDHA_HOME/team"
-
-check_email() {
-  [[ ${1:-} =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] || die "e-mail invalide « ${1:-} »"
-}
-
-cmd_team_set() {
-  local email='' name=''
-  while (($#)); do
-    case $1 in
-      --email) email=${2:-}; shift 2 ;;
-      --name) name=${2:-}; shift 2 ;;
-      *) usage ;;
-    esac
-  done
-  check_email "$email"
-  [[ -n $name && $name != *$'\t'* ]] || die "--name manquant"
-  local password
-  IFS= read -r password || true
-  ((${#password} >= 12)) || die "mot de passe d'au moins 12 caractères attendu sur l'entrée standard"
-  [[ $password != *$'\t'* ]] || die "mot de passe sans tabulation attendu"
-  [[ -d $ARDHA_HOME ]] || die "$ARDHA_HOME absent : lancer « ardha-env setup »"
-  (
-    umask 077
-    touch "$TEAM"
-    # Remplacé à sa place, ou ajouté en fin de liste ; valeurs passées par l'environnement (awk -v
-    # interpréterait les barres obliques inverses d'un mot de passe).
-    E=$email N=$name P=$password awk -F'\t' '
-      $1 == ENVIRON["E"] { print ENVIRON["E"] "\t" ENVIRON["N"] "\t" ENVIRON["P"]; done = 1; next }
-      { print }
-      END { if (!done) print ENVIRON["E"] "\t" ENVIRON["N"] "\t" ENVIRON["P"] }' "$TEAM" > "$TEAM.tmp"
-    mv "$TEAM.tmp" "$TEAM"
-  )
-  echo "Compte d'équipe $email enregistré (pris en compte au prochain déploiement, ou par « accounts »)."
-}
-
-cmd_team_list() {
-  [[ -f $TEAM ]] || return 0
-  awk -F'\t' '{ print $1 "\t" $2 }' "$TEAM"
-}
-
-cmd_team_remove() {
-  [[ ${1:-} == --email ]] || usage
-  local email=${2:-}
-  if [[ ! -f $TEAM ]] || ! awk -F'\t' -v e="$email" '$1 == e { found = 1 } END { exit !found }' "$TEAM"; then
-    die "$email absent de la liste"
-  fi
-  (umask 077 && awk -F'\t' -v e="$email" '$1 != e' "$TEAM" > "$TEAM.tmp" && mv "$TEAM.tmp" "$TEAM")
-  echo "Compte d'équipe $email retiré de la liste (les comptes déjà créés restent dans les environnements)."
-}
-
-# Comptes de l'équipe dans un environnement : créés s'ils manquent, mot de passe donné à qui n'en a
-# pas ; un compte actif (sessions comprises) ou désactivé n'est pas touché. Ne dit que des nombres.
-cmd_accounts() {
-  local name=${1:-}
-  check_name "$name"
-  local host created=0 given=0 unchanged=0 users email person password status
-  host=$(host_of "$name")
-  [[ -s $TEAM ]] || { echo "Comptes de l’équipe : aucun (« ardha-env team-set »)."; return; }
-  users=$("$ONCE" exec "$host" ardha user:list)
-  while IFS=$'\t' read -r email person password; do
-    [[ -n $email ]] || continue
-    status=$(awk -F'\t' -v e="$email" '$1 == e { print $3 }' <<< "$users")
-    if [[ -z $status ]]; then
-      printf '%s\n' "$password" | "$ONCE" exec "$host" ardha user:create-admin --email "$email" --name "$person" --password-stdin >/dev/null
-      created=$((created + 1))
-    elif [[ $status == 'mot de passe à choisir' ]]; then
-      printf '%s\n' "$password" | "$ONCE" exec "$host" ardha user:set-password --email "$email" --password-stdin >/dev/null
-      given=$((given + 1))
-    else
-      unchanged=$((unchanged + 1))
-    fi
-  done < "$TEAM"
-  echo "Comptes de l’équipe sur $name : $created créé(s), $given mot(s) de passe donné(s), $unchanged inchangé(s)."
-}
-
 cmd_sweep() {
   local keep=''
   while (($#)); do
@@ -501,7 +478,6 @@ cmd_ci() {
   case $command in
     list) (($# == 1)) || refuse ;;
     create | remove) [[ $name =~ ^pr-[0-9]{1,6}$ ]] || refuse ;;
-    accounts) [[ $name =~ ^(production|pr-[0-9]{1,6})$ && $# == 2 ]] || refuse ;;
     update) [[ $name =~ ^(production|pr-[0-9]{1,6})$ ]] || refuse ;;
     logs) [[ $name =~ ^(production|pr-[0-9]{1,6})$ && ($# == 2 || ($# == 4 && $3 == --tail && $4 =~ ^[0-9]{1,5}$)) ]] || refuse ;;
     sweep) [[ ${2:-} == --keep && $# -le 3 ]] || refuse ;;
@@ -529,10 +505,6 @@ case $command in
   exec) cmd_exec "$@" ;;
   psql) cmd_psql "$@" ;;
   sweep) cmd_sweep "$@" ;;
-  team-set) cmd_team_set "$@" ;;
-  team-list) cmd_team_list "$@" ;;
-  team-remove) cmd_team_remove "$@" ;;
-  accounts) cmd_accounts "$@" ;;
   registry) cmd_registry "$@" ;;
   app-secret) cmd_app_secret "$@" ;;
   ci) cmd_ci ;;

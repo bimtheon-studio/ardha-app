@@ -22,14 +22,12 @@ export const USAGE = `Usage : pnpm server <commande>
   setup                                   copie les fichiers du serveur, installe Postgres et Redis
   registry --username <u>                 jeton ghcr.io (read:packages) pour once, demandé sans écho
   app-secret <NOM>                        secret de l'application (GEORISQUES_TOKEN) pour tous les environnements, demandé sans écho
-  team-set --email <e> --name <nom>       compte d'équipe, mot de passe demandé sans écho (liste sur le serveur)
-  team-list                               comptes d'équipe (sans les mots de passe)
-  team-remove --email <e>
-  accounts <nom>                          crée les comptes d'équipe manquants dans un environnement
   sync                                    copie seulement les fichiers du serveur (~/ardha)
   image [--push]                          construit l'image du commit courant ; --push la publie
-  create <nom> [--image <image>]          crée un environnement (production, pr-<n>)
-  update <nom> [--image <image>] [--reset-db]
+  create <nom> [--image <image>] [--empty-db]
+                                          crée un environnement (production, pr-<n>) ; une PR part
+                                          d'une copie de la production (base, comptes, fichiers)
+  update <nom> [--image <image>] [--reset-db [--empty-db]]
   remove <nom> [--confirm production]
   list                                    environnements, hôtes, états, images
   logs <nom> [--tail <n>] [--follow]
@@ -77,14 +75,6 @@ export function plan(argv: string[], ctx: PlanContext): Action[] {
       if (!secret || rest.length !== 1) throw new Error(`nom du secret manquant\n\n${USAGE}`);
       return [{ kind: 'sync' }, { kind: 'remote', args: ['app-secret', secret], tty: false, secret: `Valeur de ${secret} : ` }];
     }
-    case 'team-set':
-      return [{ kind: 'sync' }, { kind: 'remote', args: ['team-set', ...rest], tty: false, secret: 'Mot de passe du compte : ' }];
-    case 'team-list':
-    case 'team-remove':
-      return [remote([command, ...rest])];
-    case 'accounts':
-      name();
-      return [remote([command, ...rest])];
     case 'image': {
       const image = commitImage(ctx);
       return rest.includes('--push') ? [{ kind: 'build', image }, { kind: 'push', image }] : [{ kind: 'build', image }];

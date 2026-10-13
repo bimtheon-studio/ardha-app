@@ -68,6 +68,13 @@ export class UsersService {
     return closedCount;
   }
 
+  /** Rôle d'un compte (administration, CLI) ; relu à chaque requête, les sessions ouvertes le suivent. */
+  async setRole(email: string, role: UserRow['role']): Promise<void> {
+    const u = await this.requireUser(email);
+    await this.users.update(u.id, { role }, this.clock.now());
+    await this.auditLog.record({ origin: 'cli', action: 'user.role-set', targetId: u.id, details: { role } });
+  }
+
   /** Désactive le compte et ferme ses sessions ; rend le nombre de sessions fermées. */
   async deactivate(email: string): Promise<number> {
     const u = await this.requireUser(email);
