@@ -37,8 +37,8 @@ export interface CommuneInfo {
 export class Communes {
   constructor(private readonly http: Http) {}
 
-  private async json(url: string): Promise<unknown | null> {
-    const r = await this.http.get({ url, timeoutMs: 8_000 });
+  private async json(url: string, signal?: AbortSignal): Promise<unknown | null> {
+    const r = await this.http.get({ url, timeoutMs: 8_000, signal });
     if (r.status === 404) return null;
     if (r.status !== 200) throw new SourceError(SOURCE, 'unavailable', `${SOURCE} : HTTP ${r.status}`);
     try {
@@ -67,10 +67,10 @@ export class Communes {
   }
 
   /** Commune (ou arrondissement) qui contient le point ; `null` en mer ou hors de France. */
-  async locate(lon: number, lat: number): Promise<{ code: string; name: string } | null> {
+  async locate(lon: number, lat: number, signal?: AbortSignal): Promise<{ code: string; name: string } | null> {
     const find = async (type?: string) => {
       const params = new URLSearchParams({ lon: lon.toFixed(6), lat: lat.toFixed(6), fields: 'nom,code', format: 'json', ...(type && { type }) });
-      const list = z.array(CommuneJson.pick({ code: true, nom: true })).safeParse(await this.json(`${GEO_API_BASE}/communes?${params}`));
+      const list = z.array(CommuneJson.pick({ code: true, nom: true })).safeParse(await this.json(`${GEO_API_BASE}/communes?${params}`, signal));
       if (!list.success) throw new SourceError(SOURCE, 'invalid', `${SOURCE} : réponse illisible`);
       const first = list.data[0];
       return first ? { code: first.code, name: first.nom } : null;

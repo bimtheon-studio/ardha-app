@@ -49,26 +49,26 @@ function toAddress(raw: unknown): Address | null {
 export class Geocoding {
   constructor(private readonly http: Http) {}
 
-  private async read(url: string): Promise<Address[]> {
-    const r = await this.http.get({ url, timeoutMs: 4_000 });
+  private async read(url: string, signal?: AbortSignal): Promise<Address[]> {
+    const r = await this.http.get({ url, timeoutMs: 4_000, signal });
     if (r.status !== 200) throw new SourceError(SOURCE, 'unavailable', `Géocodage : HTTP ${r.status}`);
     const parsed = Response.safeParse(JSON.parse(r.body.toString('utf8')));
     if (!parsed.success) throw new SourceError(SOURCE, 'invalid', 'Géocodage : réponse illisible');
     return parsed.data.features.map(toAddress).filter((a): a is Address => a !== null);
   }
 
-  search(q: string, limit: number): Promise<Address[]> {
+  search(q: string, limit: number, signal?: AbortSignal): Promise<Address[]> {
     const params = new URLSearchParams({ q, limit: String(limit), index: 'address' });
-    return this.read(`${GEOCODING_BASE}/search?${params}`);
+    return this.read(`${GEOCODING_BASE}/search?${params}`, signal);
   }
 
-  async reverse(lon: number, lat: number): Promise<Address | null> {
-    return (await this.reverseAll(lon, lat, 1))[0] ?? null;
+  async reverse(lon: number, lat: number, signal?: AbortSignal): Promise<Address | null> {
+    return (await this.reverseAll(lon, lat, 1, signal))[0] ?? null;
   }
 
   /** Les adresses les plus proches d'un point, de la plus proche à la plus lointaine (F-02, Q3). */
-  reverseAll(lon: number, lat: number, limit = 15): Promise<Address[]> {
+  reverseAll(lon: number, lat: number, limit = 15, signal?: AbortSignal): Promise<Address[]> {
     const params = new URLSearchParams({ lon: lon.toFixed(6), lat: lat.toFixed(6), limit: String(limit), index: 'address' });
-    return this.read(`${GEOCODING_BASE}/reverse?${params}`);
+    return this.read(`${GEOCODING_BASE}/reverse?${params}`, signal);
   }
 }

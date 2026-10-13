@@ -11,7 +11,7 @@ import { REDIS } from '../src/shared/redis.ts';
 import { Communes } from '../src/sources/communes.ts';
 import { Elevation } from '../src/sources/elevation.ts';
 import { Geocoding, GEOCODING_BASE } from '../src/sources/geocoding.ts';
-import { Http, SourceError } from '../src/sources/http.ts';
+import { Http, type HttpRequest, SourceError } from '../src/sources/http.ts';
 import { FakeHttp } from './fake-http.ts';
 import { type TestApp, createTestApp } from './test-app.ts';
 import { signedIn } from './session.ts';
@@ -191,5 +191,28 @@ describe('recherches sans worker (DT-20)', () => {
     const started = Date.now();
     await expect(lookupsOn(silent, 100).run('address:search', { q: 'source muette', limit: 1 })).rejects.toMatchObject({ code: 'lookup-unavailable' });
     expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
+  it('au plus 8 appels à la source à la fois ; hors délai, l’appel en cours est coupé', async () => {
+    const signals: AbortSignal[] = [];
+    let running = 0;
+    let peak = 0;
+    const slow = new (class extends Http {
+      get = ({ signal }: HttpRequest) =>
+        new Promise<never>((_, reject) => {
+          signals.push(signal!);
+          peak = Math.max(peak, ++running);
+          signal!.addEventListener('abort', () => {
+            running--;
+            reject(signal!.reason as Error);
+          });
+        });
+    })();
+    const lookups = lookupsOn(slow, 100);
+    const asked = Array.from({ length: 10 }, (_, i) => lookups.run('address:search', { q: `encombrement ${i} ${Date.now()}`, limit: 1 }));
+    for (const r of asked) await expect(r).rejects.toMatchObject({ code: 'lookup-unavailable' });
+    expect(peak).toBe(8);
+    expect(signals.length).toBeGreaterThanOrEqual(8);
+    expect(signals.every((s) => s.aborted)).toBe(true);
   });
 });

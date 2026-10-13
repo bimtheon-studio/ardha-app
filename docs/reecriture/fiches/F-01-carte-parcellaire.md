@@ -80,7 +80,8 @@ le 01/10/2026 (Q4, Q8 et Q11 changés).
 
 ## Données
 
-- **Sources externes**, appelées par le worker seul :
+- **Sources externes**, appelées par le worker, sauf les recherches à la demande, appelées par l'API
+  (DT-20 amendée ; au plus 40 par seconde et 8 à la fois par processus, appel coupé au délai de 5 s) :
   - géocodage Géoplateforme `https://data.geopf.fr/geocodage/search` et `/reverse` (BAN) ; limite
     publiée : 50 requêtes/s par IP ; réponses gardées 24 h en cache ;
   - `https://geo.api.gouv.fr/communes/{code}` (nom, codes postaux, centre, contour) et

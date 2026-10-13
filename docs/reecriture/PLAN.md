@@ -412,7 +412,9 @@ vers des comptes pas encore recréés) ; aucune migration ne les a réinjectées
   - DT-20 : les recherches à la demande sont appelées directement par l'API, sans file ni worker ;
   - D-05 : la file ne fait qu'empiler, relancer et planifier, sans flux parent-enfant.
 
-  La file `lookups` est supprimée (branche `dt-20-direct-lookups`).
+  La file `lookups` est supprimée (branche `dt-20-direct-lookups`). Son débit est conservé dans
+  l'API : au plus 40 recherches par seconde et 8 à la fois par processus, sous la limite de la
+  Géoplateforme (50/s par IP) ; une recherche hors délai coupe son appel à la source.
 - **02/10/2026** — L5 codé et recetté en local sur `l5-land-market` :
   - ventes DVF par département (DT-40), ECLN, Sitadel, indices INSEE ;
   - analyse « market » par étude ;
