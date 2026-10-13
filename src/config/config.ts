@@ -40,7 +40,7 @@ const Schema = z.object({
    */
   ARDHA_SOURCES: z.enum(['live', 'recorded', 'record']).default('live'),
   FIXTURES_DIR: z.string().default(path.join(REPO_ROOT, 'fixtures/http')),
-  /** Attente maximale d'une recherche confiée au worker, en millisecondes (F-01, Q1). */
+  /** Attente maximale d'une recherche à la demande par l'API (DT-20), en millisecondes (F-01, Q1). */
   LOOKUP_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
   /**
    * Magasin de fichiers (F-02, Q11) : `disk` (production, sous `/storage`) ou `s3` (MinIO en local

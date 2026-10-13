@@ -149,7 +149,7 @@ export const geoRoutes = {
   addressSearch: route({
     method: 'GET',
     path: '/api/addresses/search',
-    summary: 'Suggestions d’adresses (BAN, par le worker)',
+    summary: 'Suggestions d’adresses (BAN, recherche à la demande)',
     body: undefined,
     query: AddressSearch,
     response: z.object({ addresses: z.array(Address) }),
@@ -159,7 +159,7 @@ export const geoRoutes = {
   addressReverse: route({
     method: 'GET',
     path: '/api/addresses/reverse',
-    summary: 'Adresse la plus proche d’un point (BAN, par le worker)',
+    summary: 'Adresse la plus proche d’un point (BAN, recherche à la demande)',
     body: undefined,
     query: Point,
     response: z.object({ address: Address.nullable() }),
@@ -209,7 +209,7 @@ export const geoRoutes = {
   parcelsElevation: route({
     method: 'GET',
     path: '/api/parcels/elevation',
-    summary: 'Altitudes de parcelles (IGN, par le worker) : min, max, moyenne, dénivelé',
+    summary: 'Altitudes de parcelles (IGN, recherche à la demande) : min, max, moyenne, dénivelé',
     body: undefined,
     query: z.object({
       ids: z
