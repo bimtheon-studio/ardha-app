@@ -1,6 +1,6 @@
 // Risques d'une étude (F-04) : synthèse des quatre axes, détail par parcelle (argiles, hauteurs d'eau,
 // altitudes), par commune (PPR et leurs zones, CatNat), alentours (cavités, installations classées,
-// sols pollués, bornes incendie), carte avec couches, sources. L'analyse se lance d'elle-même à la
+// sols pollués, bornes incendie), carte avec une couche de risques au choix et sa légende, sources. L'analyse se lance d'elle-même à la
 // première ouverture (Q1), se recalcule à la demande quand les parcelles ont changé ; une source muette
 // est dite « indisponible » (Q4).
 import type { CommuneRisks, RiskLayer, RisksPartial, StudyRisks } from '@contracts';
@@ -14,6 +14,7 @@ import { Loading } from '@/components/Loading';
 import { Button } from '@/components/ui/button';
 import { formatDate } from '@/lib/dates';
 import { useMapLayers } from '@/map/api';
+import { NO_RISK_LAYER, RiskLayerPicker } from '@/map/RiskLayerPicker';
 import { useStudy } from '@/studies/api';
 import { useRequestRisks, useStudyRisks } from '@/studies/risks-api';
 
@@ -29,14 +30,14 @@ const SEVERITY_STYLE: Record<NonNullable<StudyRisks['axes']>[number]['severity']
   none: 'border-emerald-300 bg-emerald-50 text-emerald-900',
   unknown: 'border-border bg-muted text-muted-foreground',
 };
-const PREFS_KEY = 'ardha.risks.layers';
+const PREF_KEY = 'ardha.risks.layer';
 
-function readPrefs(): string[] {
+/** Couche choisie lors d'une visite précédente (Q13), ou `null`. */
+function readPref(): string | null {
   try {
-    const v = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '[]') as unknown;
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+    return localStorage.getItem(PREF_KEY);
   } catch {
-    return [];
+    return null;
   }
 }
 
@@ -272,7 +273,7 @@ export function RisksPage() {
   const risks = useStudyRisks(id);
   const request = useRequestRisks(id);
   const layers = useMapLayers();
-  const [shown, setShown] = useState<string[]>(readPrefs);
+  const [chosen, setChosen] = useState<string | null>(readPref);
   const asked = useRef(false);
 
   // Première ouverture : l'analyse se demande d'elle-même (Q1).
@@ -285,11 +286,10 @@ export function RisksPage() {
     }
   }, [status, editable, request]);
 
-  function toggle(layerId: string) {
-    const next = shown.includes(layerId) ? shown.filter((l) => l !== layerId) : [...shown, layerId];
-    setShown(next);
+  function choose(layerId: string) {
+    setChosen(layerId);
     try {
-      localStorage.setItem(PREFS_KEY, JSON.stringify(next));
+      localStorage.setItem(PREF_KEY, layerId);
     } catch {
       // Préférence de confort : sans stockage, elle ne dure que la visite.
     }
@@ -314,6 +314,9 @@ export function RisksPage() {
   // Pendant le calcul, chaque partie se montre dès qu'elle arrive (le résultat précédent s'efface).
   const result: Result | null = busy ? r.partial : r.result;
   const riskLayers: RiskLayer[] = layers.data?.riskLayers ?? [];
+  // Une préférence qui ne désigne plus aucune couche (couche retirée) rend la couche par défaut.
+  const known = chosen !== null && (chosen === NO_RISK_LAYER || riskLayers.some((l) => l.id === chosen));
+  const shown = known ? chosen : (layers.data?.defaultRiskLayer ?? NO_RISK_LAYER);
   const basemap = layers.data && (layers.data.basemaps.find((b) => b.id === layers.data.defaultBasemap) ?? layers.data.basemaps[0]!);
 
   return (
@@ -437,7 +440,7 @@ export function RisksPage() {
               <Suspense fallback={<Loading />}>
                 <RiskMap
                   basemap={basemap}
-                  layers={riskLayers.filter((l) => shown.includes(l.id))}
+                  layer={riskLayers.find((l) => l.id === shown) ?? null}
                   parcels={s.parcels}
                   hydrants={result?.hydrants?.status === 'ok' ? result.hydrants.data.items.map((h) => ({ id: h.id, point: h.point, label: `Borne incendie · ${meters(h.distanceM)}` })) : []}
                   cavities={result?.cavities?.status === 'ok' ? result.cavities.data.items.map((c) => ({ id: c.id, point: c.point, label: `Cavité ${c.type ?? ''} · ${c.name ?? c.id}` })) : []}
@@ -447,15 +450,7 @@ export function RisksPage() {
               <Loading />
             )}
           </div>
-          <fieldset className="space-y-1 text-sm">
-            <legend className="mb-1 text-muted-foreground">Couches de risques</legend>
-            {riskLayers.map((l) => (
-              <label key={l.id} className="flex items-center gap-2">
-                <input type="checkbox" checked={shown.includes(l.id)} onChange={() => toggle(l.id)} />
-                {l.label}
-              </label>
-            ))}
-          </fieldset>
+          <RiskLayerPicker layers={riskLayers} value={shown} onChange={choose} />
           <Section title="Sources">
             <ul className="space-y-1 text-xs text-muted-foreground">
               {r.sources.map((src) => (

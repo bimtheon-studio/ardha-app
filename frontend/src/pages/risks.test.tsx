@@ -1,16 +1,16 @@
 // Page des risques d'une étude (F-04) contre une fausse API ; la carte Leaflet est remplacée par un double.
 import type { Study, StudyRisks } from '@contracts';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { alice, fakeApi, renderAt } from '@/test/helpers';
 
-let mapProps: { layers: { id: string }[]; hydrants: { id: string; label: string }[]; cavities: { id: string }[] } | undefined;
+let mapProps: { layer: { id: string } | null; hydrants: { id: string; label: string }[]; cavities: { id: string }[] } | undefined;
 vi.mock('@/map/leaflet/RiskMap', () => ({
   default: (props: NonNullable<typeof mapProps>) => {
     mapProps = props;
-    return <div data-testid="risk-map">{props.layers.map((l) => l.id).join(',')}</div>;
+    return <div data-testid="risk-map">{props.layer?.id}</div>;
   },
 }));
 
@@ -147,9 +147,10 @@ const LAYERS = {
   defaultBasemap: 'absent',
   parcelsMinZoom: 16,
   riskLayers: [
-    { id: 'ppr-flood', label: 'Zonage des PPR inondation', url: 'https://wms', layers: 'PPRN_ZONE_INOND', attribution: 'G' },
-    { id: 'clay', label: 'Retrait-gonflement des argiles', url: 'https://wms', layers: 'ALEARG_REALISE', attribution: 'G' },
+    { id: 'ppr-flood', label: 'Zonage des PPR inondation', url: 'https://wms', layers: 'PPRN_ZONE_INOND', legendUrl: 'https://wms/legend-ppr', attribution: 'G' },
+    { id: 'clay', label: 'Retrait-gonflement des argiles', url: 'https://wms', layers: 'ALEARG_REALISE', legendUrl: 'https://wms/legend-clay', attribution: 'G' },
   ],
+  defaultRiskLayer: 'ppr-flood',
 };
 
 function api(routes: Record<string, unknown>) {
@@ -260,27 +261,48 @@ describe('page des risques', () => {
     expect(screen.queryByTestId('searching')).toBeNull();
   });
 
-  it('couches de risques : cochées, retenues dans le navigateur ; sans stockage, pour la visite', async () => {
+  it('une couche à la fois, PPR inondation d’abord, avec sa légende ; choix retenu dans le navigateur', async () => {
     api({ [`GET /api/studies/${ID}/risks`]: { status: 200, body: ready } });
     renderAt(`/studies/${ID}/risks`);
-    await userEvent.click(await screen.findByRole('checkbox', { name: 'Zonage des PPR inondation' }));
+    expect(await screen.findByRole('radio', { name: 'Zonage des PPR inondation' })).toBeChecked();
     expect(await screen.findByTestId('risk-map')).toHaveTextContent('ppr-flood');
-    expect(localStorage.getItem('ardha.risks.layers')).toBe('["ppr-flood"]');
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Zonage des PPR inondation' }));
+    const legend = screen.getByRole('region', { name: 'Légende' });
+    expect(within(legend).getByRole('img', { name: 'Légende : Zonage des PPR inondation' })).toHaveAttribute('src', 'https://wms/legend-ppr');
+    expect(legend).toHaveTextContent('Parcelles de l’étude');
+    expect(legend).toHaveTextContent('Alentours, à moins de 500 m');
+    expect(legend).toHaveTextContent('Borne incendie');
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Retrait-gonflement des argiles' }));
+    expect(screen.getByRole('radio', { name: 'Zonage des PPR inondation' })).not.toBeChecked();
+    expect(screen.getByTestId('risk-map')).toHaveTextContent('clay');
+    expect(within(legend).getByRole('img', { name: 'Légende : Retrait-gonflement des argiles' })).toBeInTheDocument();
+    expect(localStorage.getItem('ardha.risks.layer')).toBe('clay');
+
+    // Légende que le service ne sert pas : dite indisponible.
+    fireEvent.error(within(legend).getByRole('img'));
+    expect(legend).toHaveTextContent('Légende de « Retrait-gonflement des argiles » indisponible.');
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Aucune' }));
     expect(screen.getByTestId('risk-map')).toHaveTextContent('');
+    expect(within(legend).queryByRole('img')).toBeNull();
+    expect(localStorage.getItem('ardha.risks.layer')).toBe('none');
   });
 
-  it('préférence relue ; stockage bloqué sans effet', async () => {
-    localStorage.setItem('ardha.risks.layers', '["clay", 3]');
+  it('préférence relue (« Aucune » comprise) ; stockage bloqué sans effet', async () => {
+    localStorage.setItem('ardha.risks.layer', 'clay');
     api({ [`GET /api/studies/${ID}/risks`]: { status: 200, body: ready } });
+    const first = renderAt(`/studies/${ID}/risks`);
+    expect(await screen.findByRole('radio', { name: 'Retrait-gonflement des argiles' })).toBeChecked();
+    first.unmount();
+    localStorage.setItem('ardha.risks.layer', 'none');
     renderAt(`/studies/${ID}/risks`);
-    expect(await screen.findByRole('checkbox', { name: 'Retrait-gonflement des argiles' })).toBeChecked();
+    expect(await screen.findByRole('radio', { name: 'Aucune' })).toBeChecked();
     const blocked = () => {
       throw new Error('bloqué');
     };
     vi.stubGlobal('localStorage', { getItem: blocked, setItem: blocked, clear: () => undefined });
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Zonage des PPR inondation' }));
-    expect(screen.getByRole('checkbox', { name: 'Zonage des PPR inondation' })).toBeChecked();
+    await userEvent.click(screen.getByRole('radio', { name: 'Zonage des PPR inondation' }));
+    expect(screen.getByRole('radio', { name: 'Zonage des PPR inondation' })).toBeChecked();
   });
 
   it('périmée : bandeau et « Recalculer » ; recalcul forcé ; échec affiché', async () => {
@@ -332,8 +354,8 @@ describe('page des risques', () => {
     expect(await screen.findByText('Cette étude est dans la corbeille.')).toBeInTheDocument();
   });
 
-  it('résultat calme, une commune : aucun alentour, cote exacte, préférences illisibles ignorées', async () => {
-    localStorage.setItem('ardha.risks.layers', '{"pas":"une liste"}');
+  it('résultat calme, une commune : aucun alentour, cote exacte, préférence périmée ignorée', async () => {
+    localStorage.setItem('ardha.risks.layer', 'couche-retiree');
     const calm: NonNullable<StudyRisks['result']> = {
       ...result,
       communes: [{ ...result.communes[0]!, catnat: ok({ count: 1, truncated: false, latest: [{ id: 'Y', label: 'Tempête', start: null, published: null }] }) }],
@@ -351,11 +373,11 @@ describe('page des risques', () => {
     expect(nearby).toHaveTextContent('Aucun.');
     expect(nearby).toHaveTextContent('Aucune connue.');
     expect(screen.getByRole('region', { name: 'Surcoûts indicatifs' })).toHaveTextContent('Aucun surcoût de construction lié aux risques connus.');
-    expect(screen.getByRole('checkbox', { name: 'Zonage des PPR inondation' })).not.toBeChecked();
+    // Préférence qui ne désigne plus aucune couche : la couche par défaut.
+    expect(screen.getByRole('radio', { name: 'Zonage des PPR inondation' })).toBeChecked();
   });
 
-  it('cavités indisponibles : pas de point sur la carte ; préférence en JSON invalide', async () => {
-    localStorage.setItem('ardha.risks.layers', '{');
+  it('cavités indisponibles : pas de point sur la carte', async () => {
     api({ [`GET /api/studies/${ID}/risks`]: { status: 200, body: { ...ready, result: { ...result, cavities: off, hydrants: off } } } });
     renderAt(`/studies/${ID}/risks`);
     await screen.findByRole('region', { name: 'Alentours' });

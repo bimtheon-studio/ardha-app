@@ -25,6 +25,7 @@ import { createTestApp, type TestApp } from './test-app.ts';
 
 const AY96 = '94046000AY0096';
 const AY97 = '94046000AY0097';
+const AY95 = '94046000AY0095';
 const AY98 = '94046000AY0098';
 
 let t: TestApp;
@@ -51,7 +52,7 @@ async function analyzed(id: string): Promise<StudyMarket> {
 beforeAll(async () => {
   t = await createTestApp({ worker: true });
   await t.resetReference();
-  await seedParcels(t.worker!, [AY96, AY97, AY98]);
+  await seedParcels(t.worker!, [AY95, AY96, AY97, AY98]);
   // Le cadastre de Maisons-Alfort compte pour chargé : l'analyse ne le redemande pas en entier.
   const states = t.worker!.get(SourceStatesRepository);
   await states.markLoading(CADASTRE_SOURCE, '94046', new Date());
@@ -129,7 +130,7 @@ describe('analyse de marché', () => {
     expect(wider.computedAt).not.toBe(first.computedAt);
     expect(((await get(`/api/studies/${id}`)).body as Study).marketRadiusM).toBe(1000);
 
-    await http().put(`/api/studies/${id}/parcels/${AY98}`).set('Cookie', cookie);
+    await http().put(`/api/studies/${id}/parcels/${AY95}`).set('Cookie', cookie);
     expect((await get(`/api/studies/${id}/market`)).body).toMatchObject({ status: 'ready', stale: true });
     expect(((await get(`/api/studies/${id}`)).body as Study).steps.find((s) => s.key === 'land')!.state).toBe('todo');
 
@@ -146,9 +147,9 @@ describe('analyse de marché', () => {
     expect(all.sales.map((s) => s.date)).toEqual([...all.sales.map((s) => s.date)].sort().reverse());
     expect(all.sales.every((s) => s.distanceM <= 500)).toBe(true);
     expect(all.sales.filter((s) => s.category !== null)).toHaveLength(276);
-    // Les parcelles vendues présentes dans le cadastre en base (ici AY96 à AY98) viennent avec leur contour.
+    // Les parcelles vendues présentes dans le cadastre en base (ici AY95 à AY98) viennent avec leur contour.
     const withParcels = all.sales.filter((s) => s.parcels.length > 0);
-    expect(withParcels.every((s) => s.parcels.every((p) => [AY96, AY97, AY98].includes(p.id) && (p.geometry as { type: string }).type === 'MultiPolygon'))).toBe(true);
+    expect(withParcels.every((s) => s.parcels.every((p) => [AY95, AY96, AY97, AY98].includes(p.id) && (p.geometry as { type: string }).type === 'MultiPolygon'))).toBe(true);
 
     const houses = (await get(`/api/studies/${id}/market/sales?type=house&segment=existing&from=2025`)).body as MarketSales;
     expect(houses.sales.length).toBeGreaterThan(0);

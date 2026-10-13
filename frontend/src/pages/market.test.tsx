@@ -151,7 +151,7 @@ const sales = [
   sale(4, { propertyType: 'outbuilding', category: null, builtArea: null, pricePerM2: null, rooms: null }),
   ...Array.from({ length: 60 }, (_, i) => sale(5 + i, { date: '2024-06-01' })),
 ];
-const LAYERS = { basemaps: [{ id: 'osm', label: 'OSM', url: 'https://osm/{z}/{x}/{y}', attribution: 'OSM', maxZoom: 19 }], defaultBasemap: 'osm', parcelsMinZoom: 16, riskLayers: [] };
+const LAYERS = { basemaps: [{ id: 'osm', label: 'OSM', url: 'https://osm/{z}/{x}/{y}', attribution: 'OSM', maxZoom: 19 }], defaultBasemap: 'osm', parcelsMinZoom: 16, riskLayers: [], defaultRiskLayer: 'none' };
 
 function api(routes: Record<string, unknown>, s: Study = study) {
   return fakeApi({

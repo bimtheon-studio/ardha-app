@@ -1,5 +1,6 @@
-// Parcelles sélectionnées (F-01, #10 à #16) : liste, contenance et surface calculée, morceaux,
-// refus d'une parcelle qui ne touche pas la sélection.
+// Parcelles sélectionnées (F-01, #10 à #16) : liste, contenance et surface calculée, refus d'une
+// parcelle qui ne touche pas la sélection ou d'un retrait qui la couperait ; une sélection venue d'un
+// lien peut encore être en morceaux, ce qui se signale.
 import type { SelectionSummary } from '@domain';
 import { formatArea } from '@domain';
 import { AlertTriangle, LocateFixed, MapPin, Trash2, X } from 'lucide-react';
@@ -82,7 +83,7 @@ export function SelectionPanel({ selection, summary, pending, unknown, refusal, 
           {summary.pieces > 1 && (
             <p role="status" className="flex items-start gap-2 text-sm text-destructive">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-              La sélection est en {summary.pieces} morceaux : elle n’est plus d’un seul tenant.
+              La sélection est en {summary.pieces} morceaux : une étude doit être d’un seul tenant.
             </p>
           )}
           <div className="flex gap-2">

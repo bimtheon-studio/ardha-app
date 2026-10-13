@@ -14,6 +14,10 @@ export const ERRORS = {
   'study-in-trash': { status: 409, message: 'Cette étude est dans la corbeille : restaurez-la pour la modifier.' },
   'study-needs-parcel': { status: 400, message: 'Une étude garde au moins une parcelle.' },
   'study-limit-reached': { status: 400, message: 'Une étude compte au plus 50 parcelles.' },
+  // Parcelles d'un seul tenant (F-01, Q4 revu le 13/10/2026) ; mêmes textes que le refus au clic.
+  'study-not-contiguous': { status: 400, message: 'Les parcelles d’une étude doivent être d’un seul tenant.' },
+  'parcel-not-touching': { status: 400, message: 'Cette parcelle ne touche pas la sélection : une sélection est d’un seul tenant.' },
+  'parcel-would-split': { status: 400, message: 'Retirer cette parcelle couperait la sélection en deux : retirez d’abord celles d’un côté.' },
   'unknown-address': { status: 400, message: 'Cette adresse n’est pas rattachée aux parcelles de l’étude.' },
   'area-too-large': { status: 400, message: 'Zone trop étendue : rapprochez-vous pour afficher les parcelles.' },
   'lookup-unavailable': {

@@ -2,7 +2,7 @@
 // reçues (cases de la carte) ou demandées par identifiants au rechargement. Règles du domaine
 // (contiguïté, plafond) appliquées au clic, sans aller-retour.
 import type { ParcelFeature } from '@contracts';
-import { type AddRefusal, REFUSAL_MESSAGES, type SelectableParcel, summarize, toggle } from '@domain';
+import { REFUSAL_MESSAGES, removeRefusal, type SelectableParcel, type SelectionRefusal, summarize, toggle } from '@domain';
 import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
@@ -24,7 +24,7 @@ export function useSelection(visible: readonly ParcelFeature[]) {
   if (fresh.length > 0) setSeen(new Map([...seen, ...fresh.map((id) => [id, visibleById.get(id)!] as const)]));
   const missing = useMemo(() => ids.filter((id) => !visibleById.has(id) && !seen.has(id)), [ids, visibleById, seen]);
   const fetched = useParcelsByIds(missing);
-  const [refusal, setRefusal] = useState<{ reason: AddRefusal; at: number } | null>(null);
+  const [refusal, setRefusal] = useState<{ reason: SelectionRefusal; at: number } | null>(null);
 
   const selection = useMemo(() => {
     const fromIds = new Map((fetched.data ?? []).map((f) => [f.id, f]));
@@ -68,7 +68,12 @@ export function useSelection(visible: readonly ParcelFeature[]) {
     summary: summarize(selection),
     refusal: refusal && REFUSAL_MESSAGES[refusal.reason],
     click,
-    remove: (id: string) => write(ids.filter((i) => i !== id)),
+    remove: (id: string) => {
+      const reason = removeRefusal(selection, id);
+      if (reason) return setRefusal({ reason, at: Date.now() });
+      setRefusal(null);
+      write(ids.filter((i) => i !== id));
+    },
     clear: () => write([]),
     dismissRefusal: () => setRefusal(null),
   };

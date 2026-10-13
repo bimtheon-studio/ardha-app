@@ -18,6 +18,7 @@ import { dropKeys } from './test-app.ts';
 const config = testConfig();
 const AY96 = '94046000AY0096';
 const AY97 = '94046000AY0097';
+const AY95 = '94046000AY0095';
 const AY146 = '94046000AY0146';
 let pool: pg.Pool;
 let output: string[];
@@ -28,7 +29,7 @@ beforeAll(async () => {
   pool = new pg.Pool({ connectionString: config.DATABASE_URL });
   dir = await mkdtemp(path.join(tmpdir(), 'ardha-cli-'));
   const cli = await CommandTestFactory.createTestingCommand({ imports: [CliModule.forConfig(config)] }).compile();
-  await seedParcels(cli, [AY96, AY97, AY146]);
+  await seedParcels(cli, [AY95, AY96, AY97, AY146]);
   await cli.close();
 });
 afterAll(async () => {
@@ -74,8 +75,8 @@ it('study:create --inline, show, list, rename, address, parcelles, duplicate, th
   expect(await run('study:rename', s.id, 'Angle', 'Pasteur')).toMatch(/^Angle Pasteur — /);
   expect(await run('study:address', s.id, '94046_7120_00009')).toContain('  adresse : 9 Rue Pasteur 94700 Maisons-Alfort');
   // Sans --inline, adresse et vignette attendent le worker.
-  expect(await run('study:add-parcel', s.id, AY146)).toMatch(/adresse : en calcul[\s\S]*vignette : en calcul/);
-  expect(await run('study:remove-parcel', s.id, AY146)).toContain('parcelles : AY 96 (94046000AY0096, 2026-09-01), AY 97');
+  expect(await run('study:add-parcel', s.id, AY95)).toMatch(/adresse : en calcul[\s\S]*vignette : en calcul/);
+  expect(await run('study:remove-parcel', s.id, AY95)).toContain('parcelles : AY 96 (94046000AY0096, 2026-09-01), AY 97');
 
   expect(await run('study:duplicate', s.id)).toMatch(/^Angle Pasteur \(copie\) — /);
   const copy = (JSON.parse(await run('study:list', '-q', 'copie', '--json')) as Study[])[0]!;

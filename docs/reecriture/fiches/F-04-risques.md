@@ -42,7 +42,7 @@ fiche (provisoires cette nuit).
 | 13 | Altimétrie : centroïde + périmètre tous les ~15 m (≤ 160), grille ±500 m au pas de 75 m, isolignes à 1 m | `useElevationAPI.ts:68-173`, `utils/contourUtils.ts` | simplifier : points de la parcelle par le worker, stats par parcelle et globales ; grille et isolignes reportées (Q6) | `mean ||` à 0 m (B), grille décimée irrégulière |
 | 14 | Cavités : 1 km autour du centroïde de la 1ʳᵉ parcelle | `useGeorisquesAPI.ts:312-314` | corriger : autour du centre de l'emprise de toutes les parcelles (Q10) | |
 | 15 | Bornes incendie : OSM Overpass, 4 miroirs, rayons 400 m (carte) et « conforme ≤ 200 m » (PDF) | `useFireHydrants.ts`, `mapConfig.ts:69-84`, `risquesReport.ts:116` | simplifier : OSM par le worker, **indicatif** : bornes à moins de 400 m et distance de la plus proche ; pas de « conformité » (Q7) | |
-| 16 | Couches WMS d'affichage (zonage PPR inondation, argiles, cavités, SIS), `maxNativeZoom` 13 | `GeorisquesLayerControl.tsx:26-72`, `CadastreMap.tsx:877-904` | garder en tuiles dans le navigateur, comme les fonds (Q8) ; zoom natif non bridé | |
+| 16 | Couches WMS d'affichage (zonage PPR inondation, argiles, cavités, SIS), `maxNativeZoom` 13 | `GeorisquesLayerControl.tsx:26-72`, `CadastreMap.tsx:877-904` | garder en tuiles dans le navigateur, comme les fonds (Q8) ; zoom natif non bridé ; une couche à la fois, avec sa légende (Q15) | |
 | 17 | Clic sur la carte : HTML tiers de GetFeatureInfo injecté dans le popup | `CadastreMap.tsx:907-969` | abandonner (XSS) | |
 | 18 | Préférences de couches recopiées dans `donnees_risques.layerPreferences`, jamais relues | `Risques.tsx:138-158` | simplifier : préférence locale (`localStorage`) (Q13) | |
 | 19 | `georisquesContext` en `localStorage`, pont vers Faisabilité, Enveloppe, Urbanisme ; jamais purgé à bon escient | `Risques.tsx:279-303` | remplacer : l'analyse en base (Q1) | |
@@ -118,6 +118,7 @@ Q10 et Q12**.
 | Q12 | Géorisques v2 | **jeton créé par le porteur du produit** (choix du porteur du produit), gardé côté worker ; états et dates des PPR ajoutés à l'analyse |
 | Q13 | Préférences de couches | **dans le navigateur** |
 | Q14 | Altimétrie sur la carte de sélection | couverte par Q6 : **oui** |
+| Q15 | Carte des risques (retour du porteur du produit, 13/10/2026) | **une couche à la fois** (boutons radio, plus « Aucune »), **zonage des PPR inondation par défaut**, légende de la couche (image `GetLegendGraphic` du service) et des symboles ; carte **cadrée sur les alentours à 500 m**, dont le contour est dessiné en pointillés |
 
 ## Conception cible
 
@@ -133,8 +134,12 @@ Q10 et Q12**.
 - **CLI** : `risk:analyze <étude> [--inline]`, `risk:show <étude>`, `risk:commune <code>`,
   `risk:point <lon> <lat>`.
 - **Écran** : `/studies/:id/risks` : synthèse des 4 axes, par parcelle (argiles, inondation, altitudes),
-  commune (PPR et zones, CatNat), alentours (cavités, ICPE, SIS, CASIAS, bornes), carte avec couches,
-  sources et dates ; étape « Risques » de l'étude reliée.
+  commune (PPR et zones, CatNat), alentours (cavités, ICPE, SIS, CASIAS, bornes), carte avec une
+  couche au choix et sa légende, cadrée sur la zone des alentours (Q15), sources et dates ; étape
+  « Risques » de l'étude reliée.
+- **Zone des alentours** dessinée : enveloppe convexe des parcelles élargie de 500 m (polygone
+  circonscrit au cercle, donc jamais plus petit que la zone de recherche) ; pour une sélection d'un
+  seul tenant (F-01, Q4), elle ne déborde de la zone exacte que dans les creux du contour.
 
 ## Recette
 
@@ -178,6 +183,11 @@ Tours, synthèse à l'écran en 1,7 s, bornes à 3,7 s et 13,8 s.
 
 Constats : le TRI code la classe « plus de 2 m » par `ht_max = 10` (traité en classe ouverte, cote
 « au moins ») ; Overpass sature parfois (504) : l'axe le dit ; les tuiles WMS du BRGM sont lentes.
+
+Carte (13/10/2026, Q15) : le BRGM ne sert les hauteurs d'eau du TRI qu'entre 1:5 000 et 1:30 000
+(`GetCapabilities`, vérifié le 13/10/2026) ; l'ancien cadrage, jusqu'au zoom 18, les rendait
+invisibles. Cadrée sur les 500 m, la carte de AY96 + AY97 s'ouvre au zoom 15 (≈ 1:11 000). Les cinq
+couches servent leur légende par `GetLegendGraphic` (vérifié le 13/10/2026).
 
 ## Écarts assumés
 

@@ -280,3 +280,41 @@ export function perimeterPoints(g: Surface, stepM: number, max: number): Positio
   // Décimation régulière : on garde des points répartis sur tout le contour.
   return Array.from({ length: max }, (_, i) => points[Math.floor((i * points.length) / max)]!);
 }
+
+/** Enveloppe convexe (chaîne monotone d'Andrew), dans le sens direct, sans point répété. */
+function convexHull(points: readonly Point[]): Point[] {
+  const sorted = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (sorted.length < 3) return sorted;
+  const cross = (o: Point, a: Point, b: Point) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const half = (list: readonly Point[]) => {
+    const out: Point[] = [];
+    for (const p of list) {
+      while (out.length >= 2 && cross(out.at(-2)!, out.at(-1)!, p) <= 0) out.pop();
+      out.push(p);
+    }
+    return out.slice(0, -1);
+  };
+  return [...half(sorted), ...half([...sorted].reverse())];
+}
+
+/**
+ * Zone à `meters` mètres autour des surfaces, dessinée sur la carte des risques (F-04) : l'enveloppe
+ * convexe de leurs sommets, élargie d'un polygone à `steps` côtés circonscrit au cercle (somme de
+ * Minkowski). Elle contient donc tout ce qui est à moins de `meters` mètres ; pour une sélection d'un
+ * seul tenant, elle ne déborde de la zone exacte que dans les creux de son contour.
+ */
+export function zoneAround(surfaces: readonly Surface[], meters: number, steps = 64): Polygon | null {
+  const box = unionBbox(surfaces.map(bboxOf));
+  if (!box) return null;
+  const lon0 = (box[0] + box[2]) / 2;
+  const lat0 = (box[1] + box[3]) / 2;
+  const project = projector(lon0, lat0);
+  const { m, n } = radii(lat0);
+  const kx = n * Math.cos(lat0 * RAD) * RAD;
+  const ky = m * RAD;
+  const r = meters / Math.cos(Math.PI / steps);
+  const disc = Array.from({ length: steps }, (_, i): Point => [r * Math.cos((2 * Math.PI * (i + 0.5)) / steps), r * Math.sin((2 * Math.PI * (i + 0.5)) / steps)]);
+  const vertices = convexHull(surfaces.flatMap((g) => polygonsOf(g).flatMap((rings) => (rings[0] ?? []).map(project))));
+  const ring = convexHull(vertices.flatMap(([x, y]) => disc.map(([dx, dy]): Point => [x + dx, y + dy]))).map(([x, y]) => [lon0 + x / kx, lat0 + y / ky]);
+  return { type: 'Polygon', coordinates: [[...ring, ring[0]!]] };
+}

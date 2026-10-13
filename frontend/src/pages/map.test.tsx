@@ -53,6 +53,7 @@ const LAYERS = {
   defaultBasemap: 'osm',
   parcelsMinZoom: 16,
   riskLayers: [],
+  defaultRiskLayer: 'none',
 };
 
 function commune(status: Commune['cadastre']['status'], extra: Partial<Commune['cadastre']> = {}): Commune {
@@ -132,10 +133,11 @@ describe('carte : parcelles et sélection', () => {
     expect(screen.getByTestId('total-area').textContent).toMatch(/^1\d\d m²$/);
     expect(screen.getByTestId('url')).toHaveTextContent('parcels=94046000AB0000%2C94046000AB0001');
 
-    // Sélection libre (Q4) : une parcelle isolée s'ajoute, et la sélection est dite en morceaux.
+    // D'un seul tenant (Q4, revu le 13/10/2026) : une parcelle isolée est refusée.
     await userEvent.click(screen.getByRole('button', { name: 'parcelle AB 5' }));
-    expect(within(list).getAllByRole('listitem')).toHaveLength(3);
-    expect(screen.getByText('La sélection est en 2 morceaux : elle n’est plus d’un seul tenant.')).toBeInTheDocument();
+    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.getByRole('alert')).toHaveTextContent('Cette parcelle ne touche pas la sélection : une sélection est d’un seul tenant.');
+    expect(screen.getByTestId('url')).toHaveTextContent('parcels=94046000AB0000%2C94046000AB0001');
   });
 
   it('au-delà de 50 parcelles, refus expliqué', async () => {
@@ -155,14 +157,20 @@ describe('carte : parcelles et sélection', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('retirer la parcelle du milieu avertit que la sélection est en morceaux ; tout effacer', async () => {
+  it('retirer la parcelle du milieu est refusé, au clic comme dans la liste ; les bords se retirent ; tout effacer', async () => {
     api();
     await openMap('/map?parcels=94046000AB0000,94046000AB0001,94046000AB0002');
     viewAt(near);
     expect(await screen.findAllByRole('listitem')).toHaveLength(3);
+    const split = 'Retirer cette parcelle couperait la sélection en deux : retirez d’abord celles d’un côté.';
     await userEvent.click(screen.getByRole('button', { name: 'Retirer la parcelle AB 1' }));
-    expect(screen.getByText('La sélection est en 2 morceaux : elle n’est plus d’un seul tenant.')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(split);
+    await userEvent.click(screen.getByRole('button', { name: 'Fermer le message' }));
+    await userEvent.click(screen.getByRole('button', { name: 'parcelle AB 1' }));
+    expect(screen.getByRole('alert')).toHaveTextContent(split);
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
     await userEvent.click(screen.getByRole('button', { name: 'parcelle AB 0' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Retirer la parcelle AB 1' }));
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
     await userEvent.click(screen.getByRole('button', { name: /Tout effacer/ }));
     expect(screen.getByText('Aucune parcelle. Cliquez sur une parcelle de la carte.')).toBeInTheDocument();
@@ -177,6 +185,17 @@ describe('carte : parcelles et sélection', () => {
     expect(screen.getByText('Parcelle(s) introuvable(s) : 37023000ZZ9999.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Recentrer/ }));
     expect(lastProps.target).toMatchObject({ bounds: [expect.closeTo(2.4305, 4), 48.8, expect.closeTo(2.4306, 4), expect.closeTo(48.8001, 4)] });
+  });
+
+  it('un lien en morceaux : signalé, pas d’étude ; on le défait sans ajouter de morceau', async () => {
+    api();
+    await openMap('/map?parcels=94046000AB0000,94046000AB0005');
+    viewAt(near);
+    expect(await screen.findByText('La sélection est en 2 morceaux : une étude doit être d’un seul tenant.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Créer l’étude/ })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Retirer la parcelle AB 5' }));
+    expect(screen.queryByText(/morceaux/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Créer l’étude/ })).toBeEnabled();
   });
 
   it('zone trop étendue, parcelles en échec ou tronquées : un message sur la carte', async () => {

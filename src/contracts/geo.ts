@@ -128,11 +128,20 @@ export const RiskLayer = z.object({
   url: z.string(),
   /** Couches WMS, séparées par des virgules. */
   layers: z.string(),
+  /** Image de légende du service (`GetLegendGraphic`), chargée par le navigateur. */
+  legendUrl: z.string(),
   attribution: z.string(),
 });
 export type RiskLayer = z.infer<typeof RiskLayer>;
 
-export const MapLayers = z.object({ basemaps: z.array(Basemap), defaultBasemap: z.string(), parcelsMinZoom: z.number().int(), riskLayers: z.array(RiskLayer) });
+export const MapLayers = z.object({
+  basemaps: z.array(Basemap),
+  defaultBasemap: z.string(),
+  parcelsMinZoom: z.number().int(),
+  riskLayers: z.array(RiskLayer),
+  /** Couche de risques montrée tant que l'utilisateur n'en a pas choisi une autre. */
+  defaultRiskLayer: z.string(),
+});
 export type MapLayers = z.infer<typeof MapLayers>;
 
 const ElevationStats = z.object({ min: z.number(), max: z.number(), mean: z.number(), range: z.number(), points: z.number().int() });

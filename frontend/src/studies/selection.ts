@@ -1,7 +1,7 @@
 // Sélection de la carte d'une étude (F-02, Q8) : les parcelles de l'étude, et chaque clic
 // s'enregistre aussitôt. Même forme que la sélection de `/map` (`useSelection`), pour le même écran.
 import type { ParcelFeature, StudyParcel } from '@contracts';
-import { REFUSAL_MESSAGES, summarize, toggle } from '@domain';
+import { REFUSAL_MESSAGES, removeRefusal, summarize, toggle } from '@domain';
 import { useCallback, useMemo, useState } from 'react';
 
 import type { SelectedParcel } from '@/map/selection';
@@ -30,10 +30,12 @@ export function useStudySelection(id: string | null) {
   const change = useCallback(
     (f: ParcelFeature, action: 'add' | 'remove') => {
       if (action === 'remove' && selection.length === 1) return setRefusal(LAST_PARCEL);
+      const split = action === 'remove' && removeRefusal(selection, f.id);
+      if (split) return setRefusal(REFUSAL_MESSAGES[split]);
       setRefusal(null);
       parcel.mutate({ action, feature: f }, { onError: (e) => setRefusal(e.message) });
     },
-    [parcel, selection.length],
+    [parcel, selection],
   );
 
   const click = useCallback(

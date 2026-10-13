@@ -19,7 +19,7 @@ import { createTestApp, type TestApp } from './test-app.ts';
 
 const AY96 = '94046000AY0096';
 const AY97 = '94046000AY0097';
-const AY98 = '94046000AY0098';
+const AY95 = '94046000AY0095';
 const AY145 = '94046000AY0145';
 const ZA1 = '37023000ZA0001';
 
@@ -47,7 +47,7 @@ async function analyzed(id: string): Promise<StudyRisks> {
 beforeAll(async () => {
   t = await createTestApp({ worker: true });
   await t.resetReference();
-  await seedParcels(t.worker!, [AY96, AY97, AY98, AY145, ZA1]);
+  await seedParcels(t.worker!, [AY96, AY97, AY95, AY145, ZA1]);
   cookie = await signedIn(t);
 });
 afterAll(() => t.close());
@@ -124,7 +124,7 @@ describe('analyse des risques', () => {
     const id = await create([AY96, AY97]);
     await post(`/api/studies/${id}/risks`);
     await analyzed(id);
-    await http().put(`/api/studies/${id}/parcels/${AY98}`).set('Cookie', cookie);
+    await http().put(`/api/studies/${id}/parcels/${AY95}`).set('Cookie', cookie);
     const r = (await get(`/api/studies/${id}/risks`)).body as StudyRisks;
     expect(r).toMatchObject({ status: 'ready', stale: true });
     expect(((await get(`/api/studies/${id}`)).body as Study).steps.find((s) => s.key === 'risks')!.state).toBe('todo');

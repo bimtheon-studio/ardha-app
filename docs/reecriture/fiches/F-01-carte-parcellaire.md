@@ -39,7 +39,7 @@ le 01/10/2026 (Q4, Q8 et Q11 changés).
 | 8 | Recharge ±500 m autour de la sélection, fusion, 4 000 parcelles en mémoire | `src/pages/Cadastre.tsx:85-136` | abandonner | l'emprise visible suffit, la base répond vite |
 | 9 | `fitBounds` intempestif sur toutes les parcelles chargées | `src/components/CadastreMap.tsx:444-448` | corriger | la vue ne bouge que sur une adresse ou « Recentrer » |
 | 10 | Clic sur une parcelle : ajoute ou retire ; clic à vide : rien ; survol : `AB12` + commune | `src/components/CadastreMap.tsx:408-434`, `src/hooks/useParcelleSelection.ts:102-135` | garder | |
-| 11 | Une parcelle ajoutée doit toucher la sélection ; test **sommet à sommet**, tolérance 0,00005° | `src/hooks/useParcelleSelection.ts:111-129`, `src/utils/geometryUtils.ts:358-375` | simplifier : sélection **libre** (Q4) ; contiguïté jugée par distance entre bords, 1 m, pour compter les morceaux | l'ancien test rejetait deux parcelles qui partagent un bord sans sommet commun |
+| 11 | Une parcelle ajoutée doit toucher la sélection ; test **sommet à sommet**, tolérance 0,00005° | `src/hooks/useParcelleSelection.ts:111-129`, `src/utils/geometryUtils.ts:358-375` | garder la contiguïté exigée (Q4, revu le 13/10/2026), jugée par distance entre bords, 1 m ; un retrait qui couperait la sélection est refusé aussi | l'ancien test rejetait deux parcelles qui partagent un bord sans sommet commun |
 | 12 | Retirer une parcelle du milieu laisse une sélection en morceaux, sans avertissement | `src/hooks/useParcelleSelection.ts:106-108` | corriger : avertissement « en N morceaux », à l'ajout comme au retrait (Q4) | |
 | 13 | Aucun plafond de sélection | — | simplifier : 50 parcelles au plus (Q5) | |
 | 14 | Sélection sur plusieurs communes | implicite (`src/pages/Risques.tsx:84-95` déduplique les codes) | garder (Q6) | |
@@ -69,9 +69,12 @@ le 01/10/2026 (Q4, Q8 et Q11 changés).
   gauche) + numéro (4). Libellé affiché : section et numéro sans les zéros (`AB 12`), précédés du
   préfixe s'il n'est pas `000`.
 - **Contiguïté** : deux parcelles se touchent quand la distance entre leurs bords est d'au plus
-  **1 m** (tolérance aux imprécisions du plan cadastral). La sélection est libre (Q4) ; le nombre de
-  morceaux d'une sélection, signalé dès qu'il dépasse 1, est le nombre de composantes connexes de
-  cette relation.
+  **1 m** (tolérance aux imprécisions du plan cadastral). Une sélection est **d'un seul tenant** (Q4,
+  revu le 13/10/2026) : une parcelle qui ne touche aucune parcelle de la sélection est refusée, un
+  retrait qui ajouterait un morceau aussi (on retire par les bords) ; l'API refuse de même la création
+  d'une étude en morceaux et les ajouts ou retraits qui la couperaient. Le nombre de morceaux est le
+  nombre de composantes connexes de cette relation ; une sélection venue d'un lien peut encore être en
+  morceaux : c'est signalé, « Créer l'étude » est grisé, et elle se défait sans ajouter de morceau.
 - **Surfaces** : la *contenance* est la surface cadastrale (m², donnée de la DGFiP) ; la *surface
   calculée* est l'aire géodésique approchée du polygone, trous déduits (projection locale
   équirectangulaire, écart < 0,1 % à l'échelle d'une parcelle). Totaux : sommes.
@@ -117,7 +120,7 @@ Posées au porteur du produit le 01/10/2026 ; la colonne « Codé la nuit du 30/
 | Q1 | La recherche d'adresse passe par le worker (l'API attend sa réponse, 5 s au plus) : acceptable pour une autocomplétion ? | oui : ~50 ms de plus qu'un appel direct, cache 24 h, et « seul le worker sort » tient | **garder** : par le worker |
 | Q2 | Garder « Utiliser ma position » ? | garder | **garder** |
 | Q3 | Commune pas encore chargée quand on navigue : la charger d'elle-même ? | oui, au zoom ≥ 16 (une commune ≈ 0,5 à 3 Mo, une fois par trimestre) | **garder** : chargement automatique |
-| Q4 | Contiguïté exigée à l'ajout ; retrait libre avec avertissement ? | oui aux deux | **simplifier : sélection libre**, simple avertissement « en N morceaux » |
+| Q4 | Contiguïté exigée à l'ajout ; retrait libre avec avertissement ? | oui aux deux | ~~simplifier : sélection libre~~ ; **revu le 13/10/2026 : d'un seul tenant**, ajout d'une parcelle qui ne touche pas **et** retrait qui couperait la sélection refusés, sur la carte comme dans l'étude |
 | Q5 | Plafond de sélection ? | 50 parcelles | **garder** : 50 |
 | Q6 | Sélection sur plusieurs communes ? | permise | **garder** : permise |
 | Q7 | Où vit la sélection avant L2 ? | dans l'URL, partageable et rechargeable ; plus d'expiration | **garder** : dans l'URL |
@@ -169,8 +172,9 @@ case vide) ; la mesure des erreurs de tuiles (D-08) attend Sentry (reporté, que
 - Le cadastre vient du fichier Etalab de la commune (millésime trimestriel), chargé par le worker,
   et non plus du WFS de la Géoplateforme interrogé par le navigateur (PLAN §3-4) : il peut avoir
   jusqu'à un trimestre de retard sur le plan cadastral de la DGFiP ; le millésime est affiché.
-- La sélection est libre (Q4) : une parcelle qui ne touche pas la sélection s'ajoute, et la
-  sélection est dite « en N morceaux » ; l'ancienne application la refusait.
+- D'un seul tenant (Q4, revu le 13/10/2026) : comme l'ancienne application, une parcelle qui ne touche
+  pas la sélection est refusée ; en plus, le retrait qui couperait la sélection l'est aussi (l'ancienne
+  le permettait avec un avertissement).
 - Les morceaux se comptent à 1 m entre bords (#11) : deux parcelles qui se touchent par un bord
   sans sommet commun forment un seul morceau ; deux parcelles séparées d'un chemin de 1 m aussi.
 - Plafond de 50 parcelles (#13, Q5).

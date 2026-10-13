@@ -196,6 +196,20 @@ describe('modifier une étude', () => {
     expect((await me.put(`/api/studies/${s.id}/parcels/pas-une-parcelle`)).status).toBe(400);
   });
 
+  it('d’un seul tenant (F-01, Q4 revu le 13/10/2026) : création, ajout et retrait qui couperaient sont refusés', async () => {
+    const split = await me.post('/api/studies', { parcelIds: [AY146, AY96] });
+    expect(split.status).toBe(400);
+    expect(split.body.message).toBe('Les parcelles d’une étude doivent être d’un seul tenant.');
+    const s = await create([AY145, AY146, AY147]);
+    const far = await me.put(`/api/studies/${s.id}/parcels/${AY96}`);
+    expect(far.status).toBe(400);
+    expect(far.body.message).toBe('Cette parcelle ne touche pas la sélection : une sélection est d’un seul tenant.');
+    const middle = await me.delete(`/api/studies/${s.id}/parcels/${AY146}`);
+    expect(middle.status).toBe(400);
+    expect(middle.body.message).toBe('Retirer cette parcelle couperait la sélection en deux : retirez d’abord celles d’un côté.');
+    expect((await me.delete(`/api/studies/${s.id}/parcels/${AY147}`)).body.parcelCount).toBe(2);
+  });
+
   it('deux ajouts simultanés ne s’écrasent pas (verrou de l’étude)', async () => {
     const s = await create([AY146]);
     await Promise.all([me.put(`/api/studies/${s.id}/parcels/${AY145}`), me.put(`/api/studies/${s.id}/parcels/${AY147}`)]);

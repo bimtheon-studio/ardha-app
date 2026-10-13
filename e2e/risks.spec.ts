@@ -24,13 +24,21 @@ test('l’étape Risques de Maisons-Alfort AY96 + AY97 : synthèse, PPRI, hauteu
   await expect(page.getByRole('region', { name: 'Alentours' })).toContainText('7, la plus proche à 111 m');
   await expect(page.getByText('Indisponible (source muette)')).toHaveCount(0);
 
-  await page.getByRole('checkbox', { name: 'Zonage des PPR inondation' }).check();
+  // Une couche à la fois, PPR inondation d'abord, avec sa légende ; carte cadrée sur les alentours à
+  // 500 m (zoom 15), où les hauteurs d'eau du TRI sont servies.
+  await expect(page.getByRole('radio', { name: 'Zonage des PPR inondation' })).toBeChecked();
   await expect.poll(() => tiles.some((t) => t.includes('PPRN_ZONE_INOND'))).toBe(true);
+  const zooms = () => page.locator('.leaflet-tile-pane img').evaluateAll((imgs: HTMLImageElement[]) => [...new Set(imgs.map((i) => i.src).filter((u) => u.includes('openstreetmap')).map((u) => u.split('/')[3]))]);
+  await expect.poll(zooms).toEqual(['15']);
+  await expect(page.getByRole('img', { name: 'Légende : Zonage des PPR inondation' })).toBeVisible();
+  await page.getByRole('radio', { name: 'Hauteurs d’eau, crue moyenne (TRI)' }).check();
+  await expect.poll(() => tiles.some((t) => t.includes('ISO_HT_01_02MOY') && t.includes('GetMap'))).toBe(true);
+  await expect(page.getByRole('img', { name: 'Légende : Hauteurs d’eau, crue moyenne (TRI)' })).toBeVisible();
 
   // L'étape est faite ; une parcelle de plus la rend à refaire, et l'analyse périmée.
   await page.getByRole('link', { name: 'Retour à l’étude' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: 'Risques' })).toContainText('faite');
-  await page.request.put(`/api/studies/${id}/parcels/94046000AY0098`);
+  await page.request.put(`/api/studies/${id}/parcels/94046000AY0095`);
   await page.goto(`/studies/${id}/risks`);
   await expect(page.getByRole('alert')).toContainText('Les parcelles de l’étude ont changé depuis cette analyse');
 });
