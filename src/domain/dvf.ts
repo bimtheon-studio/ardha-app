@@ -168,11 +168,18 @@ export function dedupMutations(rows: readonly DvfRow[]): DvfMutation[] {
   return out;
 }
 
-export type SaleCategory = 'house' | 'apartment' | 'land';
+/**
+ * Version des règles qui classent les ventes (catégorie, prix au m²), enregistrées avec chaque vente :
+ * une autre version fait reclasser les ventes en base, sans recharger les fichiers.
+ * 2 : locaux d'activité (F-02b, Q7).
+ */
+export const DVF_RULES_VERSION = '2';
+
+export type SaleCategory = 'house' | 'apartment' | 'commercial' | 'land';
 /** Ancien, ou neuf vendu en VEFA. */
 export type SaleSegment = 'existing' | 'new';
 
-export const SALE_CATEGORIES: readonly SaleCategory[] = ['house', 'apartment', 'land'];
+export const SALE_CATEGORIES: readonly SaleCategory[] = ['house', 'apartment', 'commercial', 'land'];
 export const SALE_SEGMENTS: readonly SaleSegment[] = ['existing', 'new'];
 
 /** Valeur foncière minimale : en dessous, une cession symbolique. */
@@ -180,10 +187,11 @@ export const MIN_SALE_PRICE = 5000;
 /** Surface bâtie minimale : en dessous, une cave ou un parking. */
 export const MIN_BUILT_AREA = 9;
 
-/** Bornes du prix au m² (bâti pour les logements, terrain pour le terrain). */
+/** Bornes du prix au m² (bâti pour les logements et les locaux, terrain pour le terrain). */
 export const PRICE_M2_BOUNDS: Record<SaleCategory, { min: number; max: number }> = {
   apartment: { min: 500, max: 25_000 },
   house: { min: 500, max: 20_000 },
+  commercial: { min: 200, max: 15_000 },
   land: { min: 1, max: 20_000 },
 };
 
@@ -202,7 +210,8 @@ export interface ComparableSale {
 
 /**
  * Ce que la vente apporte aux prix (Q3), ou `null` : une seule maison ou un seul appartement
- * (dépendances admises, pas de local d'activité), ou un terrain urbain sans aucun local.
+ * (dépendances admises, pas de local d'activité), un seul local d'activité sans logement
+ * (dépendances admises, F-02b Q7), ou un terrain urbain sans aucun local.
  */
 export function comparableOf(m: Pick<DvfMutation, 'nature' | 'vefa' | 'price' | 'locals' | 'dwellingCount' | 'builtArea' | 'landArea' | 'cultures'>): ComparableSale | null {
   if (!isComparableNature(m.nature) || m.price < MIN_SALE_PRICE) return null;
@@ -212,6 +221,11 @@ export function comparableOf(m: Pick<DvfMutation, 'nature' | 'vefa' | 'price' | 
     if (m.vefa || !m.cultures.some((c) => URBAN_LAND_CULTURES.includes(c))) return null;
     category = 'land';
     area = m.landArea;
+  } else if (m.dwellingCount === 0 && m.locals.some((l) => l.type === 'commercial')) {
+    const shops = m.locals.filter((l) => l.type === 'commercial');
+    if (shops.length !== 1 || shops[0]!.area === null || shops[0]!.area < MIN_BUILT_AREA) return null;
+    category = 'commercial';
+    area = shops[0]!.area;
   } else {
     const dwelling = m.locals.find((l) => l.type === 'house' || l.type === 'apartment');
     if (m.dwellingCount !== 1 || !dwelling || m.locals.some((l) => l.type === 'commercial')) return null;

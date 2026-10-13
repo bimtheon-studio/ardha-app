@@ -1,6 +1,7 @@
 // Données de référence du marché (F-05), tenues à jour par le worker à la demande d'une analyse :
 //  - DVF par département (Q1) : les millésimes publiés par geo-DVF, rechargés quand la date d'un
-//    fichier change ; l'index n'est relu qu'après une publication (1ᵉʳ avril, 1ᵉʳ octobre) ;
+//    fichier change ; l'index n'est relu qu'après une publication (1ᵉʳ avril, 1ᵉʳ octobre) ; les
+//    ventes en base se reclassent sans réseau quand les règles de classement changent (F-02b) ;
 //  - ECLN (Q6) et indices INSEE (Q8) : tout d'un coup, relus au bout de 30 jours ;
 //  - Sitadel (Q7) : par commune, relu au bout de 30 jours.
 // Une donnée déjà chargée sert quand sa source se tait ; l'état de chaque chargement vit dans
@@ -8,7 +9,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { CONFIG, type Config } from '../config/config.ts';
-import { comparableOf, DVF_EXCLUDED_DEPARTMENTS, dedupMutations, dvfCheckDue, INDEX_SERIES } from '../domain/index.ts';
+import { comparableOf, DVF_EXCLUDED_DEPARTMENTS, DVF_RULES_VERSION, dedupMutations, dvfCheckDue, INDEX_SERIES } from '../domain/index.ts';
 import { MarketRepository, type StoredMutation } from '../geo/market.repository.ts';
 import { SourceStatesRepository } from '../geo/source-states.repository.ts';
 import type { SourceStateRow } from '../db/schema.ts';
@@ -18,6 +19,8 @@ import { type DvfFile, GeoDvf } from '../sources/dvf.ts';
 import { Insee } from '../sources/insee.ts';
 
 export const DVF_SOURCE = 'dvf';
+/** Version des règles de classement appliquées aux ventes d'un département (F-02b). */
+export const DVF_RULES_SOURCE = 'dvf-rules';
 export const ECLN_SOURCE = 'ecln';
 export const INDEX_SOURCE = 'insee-bdm';
 export const SITADEL_SOURCE = 'sitadel';
@@ -131,6 +134,14 @@ export class MarketData {
         }
       }
     }
+    for (const code of covered) {
+      const hadSales = before.get(code)!.some((s) => s.status === 'ready');
+      try {
+        await this.ensureDvfRules(code, hadSales);
+      } catch (error) {
+        this.logger.warn(`DVF ${code} : reclassement impossible (${message(error)})`);
+      }
+    }
     return Promise.all(
       covered.map(async (code) => ({
         code,
@@ -142,6 +153,31 @@ export class MarketData {
         failed: failed.has(code),
       })),
     );
+  }
+
+  /**
+   * Ventes d'un département classées par les règles actuelles : reclassées si elles l'ont été par
+   * d'autres, sauf si elles viennent toutes d'être chargées (`hadSales` faux).
+   */
+  private async ensureDvfRules(code: string, hadSales: boolean): Promise<void> {
+    const rules = await this.states.get(DVF_RULES_SOURCE, code);
+    if (rules?.version === DVF_RULES_VERSION) return;
+    if (hadSales || rules) await this.reclassifyDvf(code);
+    else {
+      const now = this.clock.now();
+      await this.states.markLoading(DVF_RULES_SOURCE, code, now);
+      await this.states.markReady(DVF_RULES_SOURCE, code, DVF_RULES_VERSION, 0, now);
+    }
+  }
+
+  /** Reclasse les ventes d'un département selon les règles actuelles, sans réseau ; rend le nombre de ventes changées. */
+  async reclassifyDvf(code: string): Promise<number> {
+    const now = this.clock.now();
+    await this.states.markLoading(DVF_RULES_SOURCE, code, now);
+    const changed = await this.repository.reclassify(code, comparableOf);
+    await this.states.markReady(DVF_RULES_SOURCE, code, DVF_RULES_VERSION, changed, now);
+    if (changed > 0) this.logger.log(`DVF ${code} : ${changed} vente(s) reclassée(s), règles ${DVF_RULES_VERSION}`);
+    return changed;
   }
 
   /** Recharge si la copie a plus de 30 jours (ou une autre version), sinon la garde ; vieille copie si la source se tait. */

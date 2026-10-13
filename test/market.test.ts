@@ -85,7 +85,7 @@ describe('analyse de marché', () => {
       ['parcels', 'done'],
     ]);
     expect(r.progress[1]!.detail).toBe('2024 à 2025, 2 millésime(s) chargé(s) à l’instant');
-    expect(r.progress[2]!.detail!.replace(/\u202f/g, ' ')).toBe('276 vente(s) comparable(s) sur 331 dans 500 m ; appartements anciens 5 465 €/m², maisons anciennes 6 056 €/m²');
+    expect(r.progress[2]!.detail!.replace(/\u202f/g, ' ')).toBe('287 vente(s) comparable(s) sur 331 dans 500 m ; appartements anciens 5 465 €/m², maisons anciennes 6 056 €/m²');
 
     const res = r.result!;
     expect(res).toMatchObject({ radiusM: 500, covered: true });
@@ -95,7 +95,7 @@ describe('analyse de marché', () => {
       from: '2024-01-12',
       horizon: '2025-12-31',
       saleCount: 331,
-      comparableCount: 276,
+      comparableCount: 287,
     });
     const apartment = res.dvf.data.indicators.find((i) => i.category === 'apartment' && i.segment === 'existing')!;
     expect(apartment).toMatchObject({ current: { count: 131, median: 5465 }, trendPct: -1.3, lowSample: false });
@@ -115,6 +115,33 @@ describe('analyse de marché', () => {
     expect(study.marketRadiusM).toBe(500);
     expect(study.steps.find((s) => s.key === 'land')).toEqual({ key: 'land', label: 'Foncier et marché', state: 'done', lot: null });
     expect((await post(`/api/studies/${id}/market`)).body.computedAt).toBe(r.computedAt);
+  }, 20_000);
+
+  it('locaux d’activité (F-02b, Q7) ; les ventes déjà en base se reclassent sans réseau', async () => {
+    const id = await create([AY96, AY97]);
+    await post(`/api/studies/${id}/market`);
+    const first = await analyzed(id);
+    if (first.result!.dvf.status !== 'ok') throw new Error('DVF indisponible');
+    const commercial = first.result!.dvf.data.indicators.find((i) => i.category === 'commercial' && i.segment === 'existing')!;
+    // Recette du 13/10/2026 : 6 ventes d'un seul local d'activité sur 12 mois dans 500 m.
+    expect(commercial).toMatchObject({ current: { count: 6, median: 3656, p25: 3109, p75: 4206 }, trendPct: -9.5, lowSample: true });
+    expect(first.result!.dvf.data.history.year.some((p) => p.category === 'commercial')).toBe(true);
+    const count = async () => (await t.pool.query(`SELECT count(*)::int AS n FROM dvf_mutations WHERE category = 'commercial'`)).rows[0].n as number;
+    const classified = await count();
+    expect((await t.pool.query(`SELECT version FROM source_states WHERE source = 'dvf-rules' AND scope = '94'`)).rows).toEqual([{ version: '2' }]);
+
+    // Des ventes classées par les règles d'avant : la version en base n'est pas la bonne, le worker
+    // les reclasse depuis les locaux enregistrés, sans recharger les fichiers.
+    await t.pool.query(`UPDATE dvf_mutations SET category = NULL, price_per_sqm = NULL WHERE category = 'commercial'`);
+    await t.pool.query(`UPDATE source_states SET version = '1' WHERE source = 'dvf-rules'`);
+    const loads = vi.spyOn(t.worker!.get(MarketData), 'loadDvf');
+    await post(`/api/studies/${id}/market`, { force: true });
+    const again = await analyzed(id);
+    expect(again.status).toBe('ready');
+    expect(loads).not.toHaveBeenCalled();
+    expect(await count()).toBe(classified);
+    expect(again.result!.dvf.status === 'ok' && again.result!.dvf.data.indicators.find((i) => i.category === 'commercial' && i.segment === 'existing')).toEqual(commercial);
+    loads.mockRestore();
   }, 20_000);
 
   it('le rayon change : l’étude le garde, l’analyse est refaite ; des parcelles changées la périment', async () => {
@@ -146,7 +173,7 @@ describe('analyse de marché', () => {
     expect(all.sales).toHaveLength(331);
     expect(all.sales.map((s) => s.date)).toEqual([...all.sales.map((s) => s.date)].sort().reverse());
     expect(all.sales.every((s) => s.distanceM <= 500)).toBe(true);
-    expect(all.sales.filter((s) => s.category !== null)).toHaveLength(276);
+    expect(all.sales.filter((s) => s.category !== null)).toHaveLength(287);
     // Les parcelles vendues présentes dans le cadastre en base (ici AY95 à AY98) viennent avec leur contour.
     const withParcels = all.sales.filter((s) => s.parcels.length > 0);
     expect(withParcels.every((s) => s.parcels.every((p) => [AY95, AY96, AY97, AY98].includes(p.id) && (p.geometry as { type: string }).type === 'MultiPolygon'))).toBe(true);

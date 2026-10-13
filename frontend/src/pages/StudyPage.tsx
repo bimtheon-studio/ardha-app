@@ -2,7 +2,7 @@
 // cadrée sur les parcelles, les étapes ; renommer, changer d'adresse, modifier les parcelles,
 // dupliquer, mettre à la corbeille. Une seule colonne sur mobile.
 import type { Study } from '@contracts';
-import { formatArea } from '@domain';
+import { describeDestinations, formatArea } from '@domain';
 import { ArrowLeft, Check, Circle, Copy, LoaderCircle, MapPinned, Pencil, Trash2, Undo2 } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -14,6 +14,7 @@ import { formatDate } from '@/lib/dates';
 import { useMapLayers } from '@/map/api';
 import type { TrashedState } from '@/pages/Home';
 import { useDuplicateStudy, useRestoreStudy, useStudy, useTrashStudy, useUpdateStudy } from '@/studies/api';
+import { DestinationPicker } from '@/studies/DestinationPicker';
 
 const StudyMap = lazy(() => import('@/map/leaflet/StudyMap'));
 
@@ -81,6 +82,36 @@ function AddressChoice({ study, onDone }: { study: Study; onDone: () => void }) 
   );
 }
 
+/** Destinations de l'étude (F-02b, Q3) : modifiées d'un coup, la principale en tête. */
+function DestinationChoice({ study, onDone }: { study: Study; onDone: () => void }) {
+  const update = useUpdateStudy(study.id);
+  const [destinations, setDestinations] = useState(study.destinations);
+  return (
+    <form
+      className="space-y-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        update.mutate({ destinations }, { onSuccess: onDone });
+      }}
+    >
+      <DestinationPicker value={destinations} onChange={setDestinations} disabled={update.isPending} hideLegend />
+      {update.error && (
+        <p role="alert" className="text-sm text-destructive">
+          {update.error.message}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <Button type="submit" size="sm" disabled={update.isPending}>
+          Enregistrer
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={onDone}>
+          Annuler
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 function AddressValue({ study }: { study: Study }) {
   if (study.addressPending) return <span className="text-muted-foreground">Recherche de l’adresse…</span>;
   return <span>{study.address?.label ?? 'Aucune adresse trouvée sur ces parcelles'}</span>;
@@ -94,7 +125,7 @@ export function StudyPage() {
   const duplicate = useDuplicateStudy();
   const trash = useTrashStudy();
   const restore = useRestoreStudy();
-  const [editing, setEditing] = useState<'name' | 'address' | null>(null);
+  const [editing, setEditing] = useState<'name' | 'address' | 'destination' | null>(null);
 
   if (study.isError) {
     return (
@@ -162,6 +193,21 @@ export function StudyPage() {
                   {!inTrash && s.addresses.length > 1 && (
                     <button type="button" className="block text-primary underline-offset-2 hover:underline" onClick={() => setEditing('address')}>
                       Changer d’adresse ({s.addresses.length} trouvées)
+                    </button>
+                  )}
+                </>
+              )}
+            </dd>
+            <dt className="text-muted-foreground">Destination</dt>
+            <dd className="min-w-0 space-y-1">
+              {editing === 'destination' ? (
+                <DestinationChoice study={s} onDone={() => setEditing(null)} />
+              ) : (
+                <>
+                  <span data-testid="study-destinations">{describeDestinations(s.destinations)}</span>
+                  {!inTrash && (
+                    <button type="button" className="block text-primary underline-offset-2 hover:underline" onClick={() => setEditing('destination')}>
+                      Modifier la destination
                     </button>
                   )}
                 </>

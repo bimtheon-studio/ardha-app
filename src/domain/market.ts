@@ -1,4 +1,4 @@
-import type { SaleCategory, SaleSegment } from './dvf.ts';
+import { SALE_CATEGORIES, type SaleCategory, type SaleSegment } from './dvf.ts';
 import { bboxOf, type Position, type Surface, unionBbox } from './geometry.ts';
 
 // Marché autour d'une étude (F-05) : médianes, tendance sur 12 mois glissants, historique, calendrier
@@ -138,7 +138,7 @@ export function priceIndicators(sales: readonly PricedSale[], horizon: string): 
   const yearAgo = shiftMonths(horizon, -12);
   const twoYearsAgo = shiftMonths(horizon, -24);
   const out: PriceIndicator[] = [];
-  for (const category of ['house', 'apartment', 'land'] as const) {
+  for (const category of SALE_CATEGORIES) {
     for (const segment of ['existing', 'new'] as const) {
       const of = sales.filter((s) => s.category === category && s.segment === segment);
       const current = summarizePrices(of.filter((s) => s.date > yearAgo && s.date <= horizon).map((s) => s.pricePerM2));

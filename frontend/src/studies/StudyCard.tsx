@@ -1,7 +1,7 @@
 // Une étude dans la grille de l'accueil (F-02, Q5) : vignette, nom, commune, parcelles, surface,
 // dernière modification ; menu Ouvrir, Dupliquer, Mettre à la corbeille.
 import type { StudySummary } from '@contracts';
-import { formatArea } from '@domain';
+import { formatArea, mainDestination } from '@domain';
 import { Copy, ExternalLink, ImageOff, MoreVertical, Trash2 } from 'lucide-react';
 import { Link } from 'react-router';
 
@@ -15,11 +15,11 @@ interface Props {
   onTrash: () => void;
 }
 
-type Described = Pick<StudySummary, 'communeName' | 'communeCode' | 'parcelCount' | 'contenance' | 'area'>;
+type Described = Pick<StudySummary, 'communeName' | 'communeCode' | 'parcelCount' | 'contenance' | 'area' | 'destinations'>;
 
-/** Commune, nombre de parcelles, surface (contenance, à défaut surface calculée). */
+/** Commune, nombre de parcelles, surface (contenance, à défaut surface calculée), destination principale. */
 export function describeParts(s: Described): string[] {
-  return [s.communeName ?? s.communeCode, `${s.parcelCount} parcelle${s.parcelCount > 1 ? 's' : ''}`, formatArea(s.contenance || s.area)];
+  return [s.communeName ?? s.communeCode, `${s.parcelCount} parcelle${s.parcelCount > 1 ? 's' : ''}`, formatArea(s.contenance || s.area), mainDestination(s.destinations)];
 }
 
 export function describe(s: Described): string {

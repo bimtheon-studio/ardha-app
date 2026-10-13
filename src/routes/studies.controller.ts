@@ -33,7 +33,7 @@ export class StudiesController {
   @Post(path(r.studyCreate.path))
   @HttpCode(r.studyCreate.status)
   create(@CurrentUser() user: User, @Req() req: Request, @Body(new Validate(r.studyCreate.body)) body: BodyOf<'studyCreate'>): Promise<Study> {
-    return this.studies.create(actor(user, req), body.parcelIds);
+    return this.studies.create(actor(user, req), body.parcelIds, body.destinations);
   }
 
   @Get(path(r.study.path))

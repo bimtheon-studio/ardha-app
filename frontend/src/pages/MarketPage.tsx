@@ -1,10 +1,11 @@
 // Foncier et marché d'une étude (F-05) : prix au m² des ventes comparables autour des parcelles
-// (maisons, appartements, terrains ; ancien et neuf), tendance sur un an, historique, prix du neuf du
+// (maisons, appartements, locaux d'activité, terrains ; ancien et neuf), dans l'ordre qui sert la
+// destination de l'étude (F-02b, Q8), tendance sur un an, historique, prix du neuf du
 // département (ECLN), logements autorisés (Sitadel), indices INSEE ; carte et liste des ventes, avec
 // les parcelles vendues. L'analyse se lance d'elle-même à la première ouverture ; le rayon se choisit
 // (Q2) ; une source muette est dite « indisponible ».
 import type { MarketResult, MarketSale, StudyMarket } from '@contracts';
-import { MARKET_RADII, newBuildPremiumPct, PRICE_GRADIENT, priceColor, priceScale, type SaleCategory, type SaleSegment } from '@domain';
+import { destinationLabel, MARKET_RADII, type MarketFocus, marketFocus, newBuildPremiumPct, PRICE_GRADIENT, priceColor, priceScale, type SaleCategory, type SaleSegment } from '@domain';
 import { AlertTriangle, ArrowLeft, LoaderCircle, RefreshCw } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
@@ -25,7 +26,7 @@ type Radius = MarketResult['radiusM'];
 type Dvf = Extract<Result['dvf'], { status: 'ok' }>['data'];
 type Indicator = Dvf['indicators'][number];
 
-const CATEGORY: Record<SaleCategory, string> = { apartment: 'Appartements', house: 'Maisons', land: 'Terrains à bâtir' };
+const CATEGORY: Record<SaleCategory, string> = { apartment: 'Appartements', house: 'Maisons', commercial: 'Locaux d’activité', land: 'Terrains à bâtir' };
 const SEGMENT: Record<SaleSegment, string> = { existing: 'Ancien', new: 'Neuf (VEFA)' };
 const PROPERTY: Record<MarketSale['propertyType'], string> = {
   house: 'Maison',
@@ -47,6 +48,7 @@ const SERIES: Series[] = [
   { key: 'house-existing', label: 'Maisons anciennes', color: '#C1272D', match: (p) => p.category === 'house' && p.segment === 'existing' },
   { key: 'apartment-new', label: 'Appartements neufs (VEFA)', color: '#2E9E6A', match: (p) => p.category === 'apartment' && p.segment === 'new' },
   { key: 'house-new', label: 'Maisons neuves (VEFA)', color: '#D98E04', match: (p) => p.category === 'house' && p.segment === 'new' },
+  { key: 'commercial-existing', label: 'Locaux d’activité anciens', color: '#6B7280', match: (p) => p.category === 'commercial' && p.segment === 'existing' },
 ];
 
 const perM2 = (v: number) => `${Math.round(v).toLocaleString('fr-FR')} €/m²`;
@@ -92,19 +94,27 @@ function PriceCard({ category, indicators }: { category: SaleCategory; indicator
   );
 }
 
-function Prices({ dvf, radiusM, next, onWiden }: { dvf: Dvf; radiusM: number; next: Radius | null; onWiden: ((r: Radius) => void) | null }) {
-  const main = dvf.indicators.filter((i) => i.category !== 'land' && i.segment === 'existing');
+function Prices({ dvf, radiusM, next, onWiden, focus, destination }: { dvf: Dvf; radiusM: number; next: Radius | null; onWiden: ((r: Radius) => void) | null; focus: MarketFocus; destination: string }) {
+  // Peu de ventes : celles qui servent la destination (les locaux pour une activité, les logements sinon).
+  const activity = focus.categories[0] === 'commercial';
+  const main = dvf.indicators.filter((i) => (activity ? i.category === 'commercial' : i.category === 'house' || i.category === 'apartment') && i.segment === 'existing');
   const few = main.every((i) => i.lowSample);
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
         Médianes des ventes des 12 mois jusqu’au {dvf.horizon ? dayMonthYear(dvf.horizon) : '—'}, dans {meters(radiusM)} : {dvf.comparableCount} vente{dvf.comparableCount > 1 ? 's' : ''} comparable
-        {dvf.comparableCount > 1 ? 's' : ''} sur {dvf.saleCount} (ventes d’une seule maison ou d’un seul appartement, terrains à bâtir).
+        {dvf.comparableCount > 1 ? 's' : ''} sur {dvf.saleCount} (ventes d’une seule maison, d’un seul appartement ou d’un seul local d’activité ; terrains à bâtir).
       </p>
+      {focus.notice && (
+        <p role="status" aria-label="Destination" className="border-l-2 border-primary bg-muted/40 px-3 py-2 text-sm">
+          <span className="font-medium">{destination} : </span>
+          {focus.notice}
+        </p>
+      )}
       {few && (
         <div role="note" className="flex flex-wrap items-center gap-3 border border-orange-300 bg-orange-50 px-3 py-2 text-sm text-orange-900">
           <AlertTriangle className="size-4" />
-          <p className="flex-1">Moins de 20 ventes de logements anciens sur 12 mois dans ce rayon.</p>
+          <p className="flex-1">Moins de 20 ventes de {activity ? 'locaux d’activité' : 'logements'} anciens sur 12 mois dans ce rayon.</p>
           {next && onWiden && (
             <Button size="sm" variant="outline" onClick={() => onWiden(next)}>
               Élargir à {meters(next)}
@@ -112,12 +122,14 @@ function Prices({ dvf, radiusM, next, onWiden }: { dvf: Dvf; radiusM: number; ne
           )}
         </div>
       )}
-      <ul className="grid gap-2 sm:grid-cols-3">
-        {(['apartment', 'house', 'land'] as const).map((c) => (
+      <ul className="grid gap-2 sm:grid-cols-2">
+        {focus.categories.map((c) => (
           <PriceCard key={c} category={c} indicators={dvf.indicators} />
         ))}
       </ul>
-      <p className="text-xs text-muted-foreground">Prix au m² de surface bâtie (le terrain d’une maison est compris), au m² de terrain pour les terrains. Fourchette : 1er et 3e quartiles.</p>
+      <p className="text-xs text-muted-foreground">
+        Prix au m² de surface bâtie (le terrain d’une maison est compris), au m² de terrain pour les terrains. Locaux d’activité : commerces, bureaux, ateliers et entrepôts confondus. Fourchette : 1er et 3e quartiles.
+      </p>
     </div>
   );
 }
@@ -495,7 +507,7 @@ export function MarketPage() {
                 {!result.covered ? (
                   <p className="border bg-muted px-3 py-2 text-sm">DVF ne couvre pas l’Alsace-Moselle ni Mayotte (livre foncier) : pas de prix de vente pour cette étude.</p>
                 ) : (
-                  <Value of={result.dvf}>{(dvf) => <Prices dvf={dvf} radiusM={result.radiusM} next={next} onWiden={widen} />}</Value>
+                  <Value of={result.dvf}>{(dvf) => <Prices dvf={dvf} radiusM={result.radiusM} next={next} onWiden={widen} focus={marketFocus(s.destinations)} destination={destinationLabel(s.destinations[0] ?? 'housing')} />}</Value>
                 )}
               </Section>
               {result.dvf.status === 'ok' && (

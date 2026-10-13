@@ -385,6 +385,7 @@ Les arbitrages fonctionnels, rendus le 01/10/2026, sont dans [F-01](fiches/F-01-
 | DT-39 | **Analyse des risques au fil de l'eau** : communes, parcelles, alentours et bornes interrogés **en même temps** ; chaque partie du résultat est enregistrée dès qu'elle est prête (`study_analyses.partial`) et la page la montre aussitôt, la synthèse dès que communes et parcelles sont là ; bornes de toutes les cases à charger en **une seule requête Overpass** | étapes à la suite, résultat montré à la fin ; une requête Overpass par case | « le chargement des bornes est trop lent » (porteur du produit, 02/10/2026) : Overpass coûte autant pour 9 cases que pour 1 (3 à 5 s, mesuré), répond 504 une fois sur deux après 9 à 12 s, et passait en dernier, case par case, avec 3 tentatives de 20 s ; mesuré après : Maisons-Alfort 2,3 s en tout, Tours + Annecy tout affiché en 1,2 s, bornes à 17,6 s (10 cases, un appel) |
 | DT-40 | **DVF en base par département, à la demande** (`dvf_mutations`, une ligne par mutation dédoublonnée, remplacée par département et millésime, millésimes passés gardés), depuis geo-DVF d'Etalab ; version = date du fichier lue dans l'index | toute la France d'un coup ; par commune ; Cerema | F-05 Q1, arbitré le 02/10/2026 ; Cerema en 503 depuis le 27/09 ; 1 à 2 Mo par département et par an contre 93 Mo pour la France |
 | DT-41 | **Prix de marché = médiane des ventes simples sur 12 mois** dans un rayon fixe autour des parcelles (250 m à 2 km, gardé dans l'étude), tendance sur 12 mois glissants ; pas de rayon adaptatif ni de projection en L5 | régression pondérée mêlée à l'INSEE, projections à 5 ans | F-05 Q2 à Q5 ; les deux séries INSEE de l'ancien code étaient fausses (coût du travail, balance commerciale) |
+| DT-42 | **Destination de l'étude** : `studies.destinations text[]`, la principale en tête, clés produit adossées aux codes CNIG (`src/domain/destinations.ts`, nomenclature dans `src/domain/cnig.ts`) ; **ventes DVF reclassées sans réseau** quand les règles de classement changent : version des règles par département dans `source_states` (`dvf-rules`), vérifiée par le worker à chaque analyse, `dvf:reclassify` à la demande | une table de destinations ; recharger les fichiers DVF | F-02b, arbitrée le 13/10/2026 ; la catégorie d'une vente est enregistrée au chargement, les locaux enregistrés suffisent à la recalculer (test d'intégration, reclassement des ventes du 94 et nouvelle analyse : 1,3 s) |
 
 ## 12. Questions ouvertes
 
@@ -409,6 +410,12 @@ vers des comptes pas encore recréés) ; aucune migration ne les a réinjectées
     retrait qui couperait refusés, au clic comme par l'API) ;
   - F-04 Q15 : carte des risques cadrée sur les alentours à 500 m, contour en pointillés ; une couche
     à la fois (PPR inondation par défaut), avec sa légende.
+- **13/10/2026** — F-02b (destination de l'étude) scannée, arbitrée (Q1 à Q9), codée et recettée en
+  local sur `study-destination` : liste produit adossée aux codes CNIG, plusieurs destinations dont
+  une principale, Logement par défaut ; prix des locaux d'activité sur la page Foncier et marché,
+  dans l'ordre de la destination ; alerte de zonage reportée à L3 (sur 9 villes mesurées, seul le
+  PLUi de Grand Paris Sud Est Avenir renseigne les destinations dans le GPU) ; DT-42.
+
 - **02/10/2026** — L5 codé et recetté en local sur `l5-land-market` :
   - ventes DVF par département (DT-40), ECLN, Sitadel, indices INSEE ;
   - analyse « market » par étude ;

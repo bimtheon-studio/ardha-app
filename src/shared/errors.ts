@@ -19,6 +19,7 @@ export const ERRORS = {
   'parcel-not-touching': { status: 400, message: 'Cette parcelle ne touche pas la sélection : une sélection est d’un seul tenant.' },
   'parcel-would-split': { status: 400, message: 'Retirer cette parcelle couperait la sélection en deux : retirez d’abord celles d’un côté.' },
   'unknown-address': { status: 400, message: 'Cette adresse n’est pas rattachée aux parcelles de l’étude.' },
+  'invalid-destination': { status: 400, message: 'Choisissez au moins une destination.' },
   'area-too-large': { status: 400, message: 'Zone trop étendue : rapprochez-vous pour afficher les parcelles.' },
   'lookup-unavailable': {
     status: 503,

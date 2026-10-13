@@ -38,6 +38,7 @@ const study: Study = {
   updatedAt: '2026-10-01T10:00:00Z',
   deletedAt: null,
   purgeAt: null,
+  destinations: ['housing'],
   marketRadiusM: 500,
   parcels: [
     {

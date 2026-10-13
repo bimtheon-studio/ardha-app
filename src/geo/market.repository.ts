@@ -6,10 +6,13 @@ import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 
 import { DB, type Db } from '../db/db.ts';
 import { housingPermit, indexValue, newBuildPrice } from '../db/schema.ts';
-import type { DvfMutation, IndexValue, NewBuildRow, PermitRow, PricedSale, SaleCategory } from '../domain/index.ts';
+import type { ComparableSale, DvfMutation, IndexValue, NewBuildRow, PermitRow, PricedSale, SaleCategory } from '../domain/index.ts';
 
 /** Une vente chargée : la mutation, son millésime, et ce qu'elle apporte aux prix. */
 export type StoredMutation = DvfMutation & { year: number; departmentCode: string; category: SaleCategory | null; pricePerM2: number | null };
+
+/** Ce que le classement d'une vente lit (`comparableOf`). */
+export type Classifiable = Pick<DvfMutation, 'nature' | 'vefa' | 'price' | 'locals' | 'dwellingCount' | 'builtArea' | 'landArea' | 'cultures'>;
 
 export type SaleRecord = {
   id: string;
@@ -78,6 +81,33 @@ export class MarketRepository {
         inserted += r.rowCount ?? 0;
       }
       return inserted;
+    });
+  }
+
+  /**
+   * Reclasse les ventes d'un département depuis ce qui est enregistré (locaux, surfaces, cultures),
+   * sans recharger les fichiers ; n'écrit que les ventes dont le classement change. Rend leur nombre.
+   */
+  async reclassify(departmentCode: string, classify: (m: Classifiable) => ComparableSale | null): Promise<number> {
+    return this.db.transaction(async (tx) => {
+      const r = await tx.execute<Classifiable & { id: string; category: SaleCategory | null; pricePerM2: number | null }>(sql`
+        SELECT id, nature, vefa, price, locals, dwelling_count AS "dwellingCount", built_area AS "builtArea",
+               land_area AS "landArea", cultures, category, price_per_sqm AS "pricePerM2"
+        FROM dvf_mutations WHERE department_code = ${departmentCode}`);
+      const changed = r.rows.flatMap((m) => {
+        const c = classify(m);
+        const category = c?.category ?? null;
+        const pricePerM2 = c?.pricePerM2 ?? null;
+        return category === m.category && pricePerM2 === m.pricePerM2 ? [] : [{ id: m.id, category, pricePerM2 }];
+      });
+      for (let i = 0; i < changed.length; i += INSERT_CHUNK) {
+        const rows = JSON.stringify(changed.slice(i, i + INSERT_CHUNK));
+        await tx.execute(sql`
+          UPDATE dvf_mutations m SET category = r.category, price_per_sqm = r."pricePerM2"
+          FROM jsonb_to_recordset(${rows}::jsonb) AS r(id text, category text, "pricePerM2" float8)
+          WHERE m.id = r.id`);
+      }
+      return changed.length;
     });
   }
 

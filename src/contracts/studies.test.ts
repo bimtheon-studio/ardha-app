@@ -17,6 +17,19 @@ describe('contrat de l’étude', () => {
     );
   });
 
+  it('création : destinations facultatives, normalisées, la principale en tête (F-02b)', () => {
+    expect(StudyCreate.parse({ parcelIds: [AY96], destinations: ['31', 'housing', 'retail'] })).toEqual({ parcelIds: [AY96], destinations: ['retail', 'housing'] });
+    const message = (v: unknown) => StudyCreate.safeParse(v).error?.issues[0]?.message;
+    expect(message({ parcelIds: [AY96], destinations: [] })).toBe('Choisissez au moins une destination.');
+    expect(message({ parcelIds: [AY96], destinations: ['bureaux'] })).toBe('Destination inconnue : bureaux.');
+    expect(message({ parcelIds: [AY96], destinations: 'housing' })).toBe('Destinations invalides.');
+  });
+
+  it('modification : les destinations seules suffisent', () => {
+    expect(StudyUpdate.parse({ destinations: ['office', '53', 'retail'] })).toEqual({ destinations: ['office', 'retail'] });
+    expect(StudyUpdate.safeParse({ destinations: [] }).error?.issues[0]?.message).toBe('Choisissez au moins une destination.');
+  });
+
   it('modification : un nom non vide d’au plus 120 caractères, ou une adresse', () => {
     expect(StudyUpdate.parse({ name: '  Ma parcelle ' })).toEqual({ name: 'Ma parcelle' });
     expect(StudyUpdate.parse({ addressId: '94046_7120_00009' })).toEqual({ addressId: '94046_7120_00009' });

@@ -1,6 +1,6 @@
 // Contrat de l'étude (F-02) : créer depuis une sélection, lister, rouvrir, renommer, choisir
 // l'adresse, modifier les parcelles, dupliquer, corbeille.
-import { isParcelId, SELECTION_MAX, STUDY_NAME_MAX } from '../domain/index.ts';
+import { isParcelId, normalizeDestinations, SELECTION_MAX, STUDY_NAME_MAX } from '../domain/index.ts';
 import { z } from 'zod';
 
 import { Address, Surface } from './geo.ts';
@@ -9,6 +9,19 @@ import { route } from './routes.ts';
 const studyId = z.uuid('Étude inconnue.');
 const parcelId = z.string().refine(isParcelId, 'Identifiant de parcelle invalide.');
 const dateTime = z.iso.datetime();
+
+/**
+ * Destinations de l'étude (F-02b), la principale en tête : clés produit (`housing`, `office`…) ou
+ * sous-destinations CNIG (`33`) ; une sous-destination couverte devient sa clé, sans doublon.
+ */
+export const StudyDestinations = z.array(z.string('Destinations invalides.'), 'Destinations invalides.').transform((values, ctx) => {
+  try {
+    return normalizeDestinations(values);
+  } catch (error) {
+    ctx.addIssue({ code: 'custom', message: (error as Error).message });
+    return z.NEVER;
+  }
+});
 
 export const StudyParcel = z.object({
   /** IDU, 14 caractères. */
@@ -48,6 +61,8 @@ export const StudySummary = z.object({
   deletedAt: dateTime.nullable(),
   /** Date de la purge, pour une étude dans la corbeille. */
   purgeAt: dateTime.nullable(),
+  /** Destinations (F-02b), la principale en tête. */
+  destinations: z.array(z.string()),
 });
 export type StudySummary = z.infer<typeof StudySummary>;
 
@@ -88,6 +103,8 @@ export const StudyCreate = z.object({
     .min(1, 'Sélectionnez au moins une parcelle.')
     .max(SELECTION_MAX, `Une étude compte au plus ${SELECTION_MAX} parcelles.`)
     .refine((ids) => new Set(ids).size === ids.length, 'Parcelle en double.'),
+  /** Logement si absent (F-02b, Q3). */
+  destinations: StudyDestinations.optional(),
 });
 
 export const StudyUpdate = z
@@ -95,8 +112,10 @@ export const StudyUpdate = z
     name: z.string('Nom invalide.').trim().min(1, 'Donnez un nom à l’étude.').max(STUDY_NAME_MAX, `Au plus ${STUDY_NAME_MAX} caractères.`).optional(),
     /** Identifiant BAN d'une des adresses trouvées. */
     addressId: z.string().min(1).optional(),
+    /** Toutes les destinations, la principale en tête. */
+    destinations: StudyDestinations.optional(),
   })
-  .refine((u) => u.name !== undefined || u.addressId !== undefined, 'Rien à modifier.');
+  .refine((u) => u.name !== undefined || u.addressId !== undefined || u.destinations !== undefined, 'Rien à modifier.');
 
 const byId = z.object({ id: studyId });
 const byParcel = z.object({ id: studyId, parcelId });
@@ -134,7 +153,7 @@ export const studyRoutes = {
   studyUpdate: route({
     method: 'PATCH',
     path: '/api/studies/:id',
-    summary: 'Renomme l’étude ou change son adresse',
+    summary: 'Renomme l’étude, change son adresse ou ses destinations',
     body: StudyUpdate,
     params: byId,
     response: Study,

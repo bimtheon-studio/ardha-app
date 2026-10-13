@@ -10,6 +10,8 @@ import type { StudyRow } from '../db/schema.ts';
 import {
   areaM2,
   copyName,
+  DEFAULT_DESTINATIONS,
+  normalizeDestinations,
   parcelLabel,
   parcelsKey,
   principalCommune,
@@ -41,6 +43,15 @@ export interface Actor {
 }
 
 export const thumbnailFile = (studyId: string) => `studies/${studyId}/thumbnail.png`;
+
+/** Destinations normalisées (F-02b) ; la CLI n'a pas le contrat, le service vérifie aussi. */
+function checkedDestinations(values: readonly string[]): string[] {
+  try {
+    return normalizeDestinations(values);
+  } catch (error) {
+    throw new DomainError('invalid-destination', (error as Error).message);
+  }
+}
 
 function toNewParcel(p: ParcelRecord): NewStudyParcel {
   return {
@@ -89,6 +100,7 @@ export class StudiesService {
       updatedAt: r.updatedAt.toISOString(),
       deletedAt: r.deletedAt?.toISOString() ?? null,
       purgeAt: r.deletedAt ? new Date(r.deletedAt.getTime() + TRASH_RETENTION_DAYS * DAY_MS).toISOString() : null,
+      destinations: r.destinations,
     };
   }
 
@@ -165,7 +177,8 @@ export class StudiesService {
   }
 
   /** Crée l'étude à partir de parcelles chargées ; le nom est provisoire jusqu'à l'adresse (Q2). */
-  async create(actor: Actor & { userId: string }, parcelIds: readonly string[]): Promise<Study> {
+  async create(actor: Actor & { userId: string }, parcelIds: readonly string[], destinations: readonly string[] = DEFAULT_DESTINATIONS): Promise<Study> {
+    const kept = checkedDestinations(destinations);
     const ids = [...new Set(parcelIds)];
     if (ids.length === 0) throw new DomainError('study-needs-parcel');
     if (ids.length > SELECTION_MAX) throw new DomainError('study-limit-reached');
@@ -185,6 +198,7 @@ export class StudiesService {
         communeCode,
         communeName,
         parcelsKey: key,
+        destinations: kept,
       },
       parcels,
     );
@@ -196,10 +210,11 @@ export class StudiesService {
     return created;
   }
 
-  /** Renommer fige le nom (Q2) ; l'adresse se choisit parmi celles trouvées (Q3). */
-  async update(actor: Actor, id: string, patch: { name?: string; addressId?: string }): Promise<Study> {
+  /** Renommer fige le nom (Q2) ; l'adresse se choisit parmi celles trouvées (Q3) ; destinations (F-02b). */
+  async update(actor: Actor, id: string, patch: { name?: string; addressId?: string; destinations?: readonly string[] }): Promise<Study> {
     const row = this.editable(actor, await this.studies.get(id));
     const changes: Partial<StudyRow> = {};
+    if (patch.destinations !== undefined) changes.destinations = checkedDestinations(patch.destinations);
     if (patch.name !== undefined) Object.assign(changes, { name: patch.name.trim(), nameIsProvisional: false });
     if (patch.addressId !== undefined) {
       const address = row.addresses.find((a) => a.id === patch.addressId);
@@ -269,6 +284,7 @@ export class StudiesService {
         addressKey: source.addressKey,
         thumbnailKey: thumbnail ? source.thumbnailKey : null,
         marketRadiusM: source.marketRadiusM,
+        destinations: source.destinations,
       },
       parcels,
     );

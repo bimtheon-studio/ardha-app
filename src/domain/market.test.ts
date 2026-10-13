@@ -87,9 +87,19 @@ describe('priceIndicators', () => {
     expect(apartment.lowSample).toBe(true);
   });
 
-  it('sans tendance sous 5 ventes par période ; six indicateurs, vides sans ventes', () => {
+  it('sans tendance sous 5 ventes par période ; huit indicateurs, vides sans ventes', () => {
     const out = priceIndicators([sale('2025-06-01', 5000), sale('2024-06-01', 4000)], '2025-12-31');
-    expect(out).toHaveLength(6);
+    expect(out).toHaveLength(8);
+    expect(out.map((i) => `${i.category}-${i.segment}`)).toEqual([
+      'house-existing',
+      'house-new',
+      'apartment-existing',
+      'apartment-new',
+      'commercial-existing',
+      'commercial-new',
+      'land-existing',
+      'land-new',
+    ]);
     expect(out[2]).toMatchObject({ category: 'apartment', segment: 'existing', trendPct: null });
     expect(out[0]).toEqual({ category: 'house', segment: 'existing', current: null, previous: null, trendPct: null, lowSample: true });
   });

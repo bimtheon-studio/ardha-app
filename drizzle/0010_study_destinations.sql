@@ -1,0 +1,1 @@
+ALTER TABLE "studies" ADD COLUMN "destinations" text[] DEFAULT '{"housing"}' NOT NULL;
