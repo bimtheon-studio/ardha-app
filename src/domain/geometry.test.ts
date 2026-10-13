@@ -139,4 +139,11 @@ describe('zoneAround', () => {
     expect(bboxOf(zone)[2]).toBeCloseTo(expandBbox([2.44, 48.8, 2.442, 48.801], 100)[2], 4);
     expect(zoneAround([], 500)).toBeNull();
   });
+
+  it('contours dégénérés : un segment s’élargit en ovale, un polygone sans anneau ne compte pas', () => {
+    const segment: Polygon = { type: 'Polygon', coordinates: [[[2.44, 48.8], [2.441, 48.8]]] };
+    const zone = zoneAround([segment, { type: 'Polygon', coordinates: [] }], 100)!;
+    expandBbox([2.44, 48.8, 2.441, 48.8], 100).forEach((v, i) => expect(bboxOf(zone)[i]).toBeCloseTo(v, 4));
+    expect(containsPoint(zone, [2.4405, 48.8005])).toBe(true);
+  });
 });
