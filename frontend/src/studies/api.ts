@@ -44,7 +44,7 @@ function useSaved() {
 export function useCreateStudy() {
   const saved = useSaved();
   return useMutation({
-    mutationFn: (parcelIds: string[]) => callApi(studyRoutes.studyCreate, { body: { parcelIds } }),
+    mutationFn: (input: { parcelIds: string[]; destinations: string[] }) => callApi(studyRoutes.studyCreate, { body: input }),
     onSuccess: saved,
   });
 }
@@ -52,7 +52,7 @@ export function useCreateStudy() {
 export function useUpdateStudy(id: string) {
   const saved = useSaved();
   return useMutation({
-    mutationFn: (patch: { name?: string; addressId?: string }) => callApi(studyRoutes.studyUpdate, { params: { id }, body: patch }),
+    mutationFn: (patch: { name?: string; addressId?: string; destinations?: string[] }) => callApi(studyRoutes.studyUpdate, { params: { id }, body: patch }),
     onSuccess: saved,
   });
 }

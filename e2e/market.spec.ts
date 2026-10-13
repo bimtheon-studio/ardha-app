@@ -12,14 +12,17 @@ test('l’étape Foncier et marché de Maisons-Alfort AY96 + AY97 : prix, neuf, 
   test.setTimeout(60_000);
   await offlineTiles(page);
   await signUp(page);
-  const r = await page.request.post('/api/studies', { data: { parcelIds: ['94046000AY0096', '94046000AY0097'] } });
+  // Une étude de commerce en rez-de-chaussée et de logements (F-02b) : les locaux d'activité en tête.
+  const r = await page.request.post('/api/studies', { data: { parcelIds: ['94046000AY0096', '94046000AY0097'], destinations: ['retail', 'housing'] } });
   const { id } = (await r.json()) as { id: string };
 
   await page.goto(`/studies/${id}`);
   await page.getByRole('link', { name: 'Foncier et marché' }).click();
   const prices = page.getByRole('region', { name: 'Prix au m²' });
-  await expect(prices).toContainText('276 ventes comparables sur 331', { timeout: 30_000 });
+  await expect(prices).toContainText('287 ventes comparables sur 331', { timeout: 30_000 });
   expect(plain(await prices.textContent())).toContain('Ancien5 465 €/m²');
+  await expect(prices.getByRole('listitem').first()).toHaveAttribute('data-category', 'commercial');
+  await expect(prices.getByRole('status', { name: 'Destination' })).toContainText('DVF ne distingue pas commerces, bureaux et locaux d’activité');
   expect(plain(await page.getByRole('region', { name: 'Neuf' }).textContent())).toContain('2026-T2Collectif5 739 €/m²957');
   await expect(page.getByRole('region', { name: 'Logements autorisés (Sitadel)' })).toContainText('Maisons-Alfort');
   await expect(page.getByRole('region', { name: 'Indices INSEE' })).toContainText('Prix des appartements anciens, Val-de-Marne');
@@ -35,7 +38,7 @@ test('l’étape Foncier et marché de Maisons-Alfort AY96 + AY97 : prix, neuf, 
 
   // Un rayon plus large : l'analyse se refait, l'étude le garde.
   await page.getByRole('group', { name: 'Rayon des ventes comparables' }).getByRole('button', { name: '1 km' }).click();
-  await expect(prices).toContainText('783 ventes comparables sur 1010', { timeout: 30_000 });
+  await expect(prices).toContainText('811 ventes comparables sur 1010', { timeout: 30_000 });
   await expect(page.getByText('1010 ventes dans 1 km')).toBeVisible();
 
   await page.getByRole('link', { name: 'Retour à l’étude' }).click();

@@ -35,6 +35,10 @@ test('créer une étude depuis la carte, la renommer, en modifier les parcelles,
     await page.mouse.click(x, y);
   }
   await expect(page.getByRole('list', { name: 'Parcelles' }).getByRole('listitem')).toHaveCount(2);
+  // La destination se choisit avant de créer : Logement par défaut, plus un commerce (F-02b).
+  const destination = page.getByRole('group', { name: 'Destination' });
+  await expect(destination.getByRole('button', { name: 'Logement' })).toHaveAttribute('aria-pressed', 'true');
+  await destination.getByRole('button', { name: 'Commerce et services' }).click();
   await page.getByRole('button', { name: 'Créer l’étude' }).click();
 
   // Nom provisoire, puis proposé d'après l'adresse trouvée par le worker (Q2, Q3).
@@ -42,6 +46,7 @@ test('créer une étude depuis la carte, la renommer, en modifier les parcelles,
   await expect(page.getByRole('heading', { name: '6 Rue Pasteur, Maisons-Alfort (+1 parcelle)' })).toBeVisible();
   await expect(page.getByText('6 Rue Pasteur 94700 Maisons-Alfort')).toBeVisible();
   await expect(page.getByTestId('study-contenance')).toHaveText('510 m²');
+  await expect(page.getByTestId('study-destinations')).toHaveText('Logement (principale), Commerce et services');
   await expect(page.locator('.leaflet-container')).toBeVisible();
 
   await page.getByRole('button', { name: 'Renommer l’étude' }).click();
@@ -72,6 +77,7 @@ test('créer une étude depuis la carte, la renommer, en modifier les parcelles,
   const card = page.getByRole('list', { name: 'Études' }).getByRole('listitem');
   await expect(card).toHaveCount(1);
   await expect(card).toContainText('Maisons-Alfort · 3 parcelles');
+  await expect(card).toContainText('Logement (+1)');
   await expect.poll(() => card.locator('img').evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth), { timeout: 10_000 }).toBe(480);
   await page.getByRole('searchbox', { name: 'Rechercher une étude' }).fill('rue pasteur');
   await expect(card).toHaveCount(1);

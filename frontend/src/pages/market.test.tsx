@@ -41,6 +41,7 @@ const study: Study = {
   updatedAt: '2026-10-01T10:00:00Z',
   deletedAt: null,
   purgeAt: null,
+  destinations: ['housing'],
   marketRadiusM: 500,
   parcels: [],
   address: null,
@@ -55,7 +56,7 @@ const study: Study = {
 const summary = (median: number, count: number) => ({ count, median, p25: median - 500, p75: median + 500 });
 type Result = NonNullable<StudyMarket['result']>;
 const result: Result = {
-  version: 1,
+  version: 2,
   center: [2.43, 48.8],
   radiusM: 500,
   covered: true,
@@ -70,6 +71,8 @@ const result: Result = {
       { category: 'house', segment: 'new', current: null, previous: null, trendPct: null, lowSample: true },
       { category: 'apartment', segment: 'existing', current: summary(5465, 131), previous: summary(5540, 116), trendPct: -1.3, lowSample: false },
       { category: 'apartment', segment: 'new', current: summary(7131, 1), previous: null, trendPct: null, lowSample: true },
+      { category: 'commercial', segment: 'existing', current: summary(3200, 7), previous: summary(3000, 6), trendPct: 6.7, lowSample: true },
+      { category: 'commercial', segment: 'new', current: null, previous: null, trendPct: null, lowSample: true },
       { category: 'land', segment: 'existing', current: summary(1068, 1), previous: null, trendPct: 2, lowSample: true },
       { category: 'land', segment: 'new', current: null, previous: null, trendPct: null, lowSample: true },
     ],
@@ -78,6 +81,7 @@ const result: Result = {
         { period: '2024', category: 'apartment', segment: 'existing', count: 116, median: 5539 },
         { period: '2025', category: 'apartment', segment: 'existing', count: 131, median: 5465 },
         { period: '2025', category: 'house', segment: 'existing', count: 11, median: 6056 },
+        { period: '2025', category: 'commercial', segment: 'existing', count: 7, median: 3200 },
       ],
       quarter: [{ period: '2025-T4', category: 'apartment', segment: 'existing', count: 30, median: 5400 }],
     },
@@ -187,6 +191,12 @@ describe('page Foncier et marché', () => {
     const house = within(prices).getByText('Maisons').closest('li')!;
     expect(house).toHaveTextContent('Peu de ventes');
     expect(house).toHaveTextContent('Neuf (VEFA) : aucune vente sur 12 mois');
+    // Étude de logement (F-02b, Q8) : appartements, maisons, locaux d'activité, terrains ; sans avertissement.
+    expect(within(prices).getAllByRole('listitem').map((li) => li.dataset.category)).toEqual(['apartment', 'house', 'commercial', 'land']);
+    const commercial = within(prices).getByText('Locaux d’activité').closest('li')!;
+    expect(nbsp(commercial.textContent)).toContain('Ancien3 200 €/m²');
+    expect(commercial).toHaveTextContent('Neuf (VEFA) : aucune vente sur 12 mois');
+    expect(within(prices).queryByRole('status', { name: 'Destination' })).toBeNull();
     const land = within(prices).getByText('Terrains à bâtir').closest('li')!;
     expect(nbsp(land.textContent)).toContain('Prix du terrain1 068 €/m²');
     expect(land).toHaveTextContent('+2 % sur un an');
@@ -196,6 +206,7 @@ describe('page Foncier et marché', () => {
     const history = screen.getByRole('region', { name: 'Historique' });
     expect(within(history).getByRole('img', { name: 'Prix médian au m² par année' })).toBeInTheDocument();
     expect(history).toHaveTextContent('Appartements anciensMaisons anciennes');
+    expect(history).toHaveTextContent('Locaux d’activité anciens');
     await userEvent.click(within(history).getByRole('button', { name: 'Par trimestre' }));
     expect(within(history).getByRole('img', { name: 'Prix médian au m² par trimestre' })).toBeInTheDocument();
     expect(within(history).getByRole('table')).toHaveTextContent('2025-T4');
@@ -220,6 +231,26 @@ describe('page Foncier et marché', () => {
     expect(indices).toHaveTextContent('138,9 (2026-07)');
     expect(screen.getByText(/Déroulé de l’analyse \(3 étapes, dont certaines sans réponse\)/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Demandes de valeurs foncières' })).toHaveAttribute('href', 'https://dvf');
+  });
+
+  it('destination d’activité : les locaux d’abord, et ce que DVF ne distingue pas ; sans prix DVF : le dire (F-02b, Q8)', async () => {
+    api({ [`GET /api/studies/${ID}/market`]: { status: 200, body: ready } }, { ...study, destinations: ['office', 'housing'] });
+    const { unmount } = renderAt(`/studies/${ID}/market`);
+    const prices = await screen.findByRole('region', { name: 'Prix au m²' });
+    expect(within(prices).getAllByRole('listitem').map((li) => li.dataset.category)).toEqual(['commercial', 'apartment', 'house', 'land']);
+    expect(within(prices).getByRole('status', { name: 'Destination' })).toHaveTextContent(
+      'Bureaux : DVF ne distingue pas commerces, bureaux et locaux d’activité : un seul prix, celui des locaux d’activité.',
+    );
+    expect(within(prices).getByRole('note')).toHaveTextContent('Moins de 20 ventes de locaux d’activité anciens sur 12 mois dans ce rayon.');
+    unmount();
+
+    api({ [`GET /api/studies/${ID}/market`]: { status: 200, body: ready } }, { ...study, destinations: ['hotel'] });
+    renderAt(`/studies/${ID}/market`);
+    const other = await screen.findByRole('region', { name: 'Prix au m²' });
+    expect(within(other).getAllByRole('listitem').map((li) => li.dataset.category)).toEqual(['apartment', 'house', 'commercial', 'land']);
+    expect(within(other).getByRole('status', { name: 'Destination' })).toHaveTextContent(
+      'Hôtellerie : DVF n’a pas de prix pour « Hôtellerie » : les prix affichés sont ceux des logements et des locaux d’activité.',
+    );
   });
 
   it('ventes : carte, échelle, liste, choix d’une vente, filtres, ordre, suite de la liste', async () => {

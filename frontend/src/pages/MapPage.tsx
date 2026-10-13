@@ -3,7 +3,7 @@
 // Deux usages : `/map`, une sélection libre (dans l'URL) dont on crée une étude ; `/studies/:id/map`,
 // la sélection d'une étude, enregistrée à chaque clic (F-02, Q1 et Q8).
 import type { Address } from '@contracts';
-import { type Bbox, bboxOf, gridCells, unionBbox } from '@domain';
+import { type Bbox, bboxOf, DEFAULT_DESTINATIONS, gridCells, unionBbox } from '@domain';
 import { useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Check, FilePlus2, LoaderCircle } from 'lucide-react';
@@ -20,6 +20,7 @@ import { SelectionPanel } from '@/map/SelectionPanel';
 import { useSelection } from '@/map/selection';
 import { FRANCE, formatView, parseView } from '@/map/url-state';
 import { useCreateStudy } from '@/studies/api';
+import { DestinationPicker } from '@/studies/DestinationPicker';
 import { useStudySelection } from '@/studies/selection';
 
 const MapView = lazy(() => import('@/map/leaflet/MapView'));
@@ -63,6 +64,8 @@ export function MapPage() {
   const study = ofStudy.study.data;
   const selectedIds = useMemo(() => new Set(sel.ids), [sel.ids]);
   const create = useCreateStudy();
+  // Destination choisie avant de créer l'étude ; Logement par défaut (F-02b, Q3).
+  const [destinations, setDestinations] = useState<string[]>([...DEFAULT_DESTINATIONS]);
   const navigate = useNavigate();
 
   // Carte d'une étude ouverte sans position : cadrée sur ses parcelles, une fois.
@@ -204,12 +207,13 @@ export function MapPage() {
               </Link>
             </Button>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-3">
+              <DestinationPicker value={destinations} onChange={setDestinations} disabled={create.isPending} />
               <Button
                 type="button"
                 className="w-full"
                 disabled={create.isPending || sel.summary.pieces > 1}
-                onClick={() => create.mutate(free.ids, { onSuccess: (s) => void navigate(`/studies/${s.id}`) })}
+                onClick={() => create.mutate({ parcelIds: free.ids, destinations }, { onSuccess: (s) => void navigate(`/studies/${s.id}`) })}
               >
                 <FilePlus2 /> {create.isPending ? 'Création…' : 'Créer l’étude'}
               </Button>

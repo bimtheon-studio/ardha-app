@@ -321,6 +321,8 @@ export const study = pgTable(
     thumbnailKey: text(),
     /** Rayon des ventes comparables, en mètres (F-05 Q2). */
     marketRadiusM: integer().notNull().default(500),
+    /** Destinations (F-02b), la principale en tête : clés produit ou sous-destinations CNIG. */
+    destinations: text().array().notNull().default(['housing']),
     /** Dans la corbeille depuis (Q9). */
     deletedAt: timestampTz(),
     createdAt: timestampTz().notNull().defaultNow(),

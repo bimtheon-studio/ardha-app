@@ -28,7 +28,7 @@ describe('describeMarket', () => {
   });
 
   it('hors DVF, sources muettes ; puis sans prix ni ventes publiées', () => {
-    const result = { version: 1 as const, center: [6.17, 49.11] as [number, number], radiusM: 500 as const, covered: false, dvf: down, newBuild: down, permits: down, indices: down };
+    const result = { version: 2 as const, center: [6.17, 49.11] as [number, number], radiusM: 500 as const, covered: false, dvf: down, newBuild: down, permits: down, indices: down };
     const text = describeMarket({ ...base, status: 'ready', stale: false, newerData: false, error: null, computedAt: null, result });
     expect(text.split('\n')).toEqual([
       'Analyse de marché : prête, rayon 1000 m',

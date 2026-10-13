@@ -3,7 +3,7 @@
 import { Command, Option } from 'nest-commander';
 
 import type { AnalysisStep, MarketResult, MarketSales, PriceIndicatorJson, StudyMarket } from '../contracts/index.ts';
-import { departmentOf, isMarketRadius, MARKET_RADII, priceIndicators, type SaleCategory, type SaleSegment } from '../domain/index.ts';
+import { departmentOf, DVF_RULES_VERSION, isMarketRadius, MARKET_RADII, priceIndicators, type SaleCategory, type SaleSegment } from '../domain/index.ts';
 import { MarketRepository } from '../geo/market.repository.ts';
 import { SourceStatesRepository } from '../geo/source-states.repository.ts';
 import { MarketAnalyses } from '../ingestion/market-analyses.ts';
@@ -16,7 +16,7 @@ import { describeStep } from './risk.commands.ts';
 
 const CLI: Actor = { userId: null, origin: 'cli' };
 const STATUS = { none: 'jamais demandée', queued: 'en file', running: 'en cours', ready: 'prête', failed: 'en échec' } as const;
-const CATEGORY: Record<SaleCategory, string> = { house: 'Maisons', apartment: 'Appartements', land: 'Terrains' };
+const CATEGORY: Record<SaleCategory, string> = { house: 'Maisons', apartment: 'Appartements', commercial: 'Locaux d’activité', land: 'Terrains' };
 const SEGMENT: Record<SaleSegment, string> = { existing: 'ancien', new: 'neuf (VEFA)' };
 
 const euros = (v: number) => `${Math.round(v).toLocaleString('fr-FR')} €`;
@@ -109,6 +109,18 @@ export class DvfLoadCommand extends JsonCommand {
     print(options.json, d, () =>
       [`${d.code} : ${d.years.map((y) => `${y.year} (fichier du ${y.modifiedAt.slice(0, 10)})`).join(', ') || 'rien en base'}`, d.loaded.length ? `  chargé(s) à l’instant : ${d.loaded.join(', ')}` : '  rien à recharger', ...(d.failed ? ['  une partie n’a pas pu être chargée'] : [])].join('\n'),
     );
+  }
+}
+
+@Command({ name: 'dvf:reclassify', arguments: '<department>', description: 'Reclasse les ventes DVF en base d’un département selon les règles actuelles, sans réseau' })
+export class DvfReclassifyCommand extends JsonCommand {
+  constructor(private readonly data: MarketData) {
+    super();
+  }
+
+  async run([department]: string[], options: JsonOption): Promise<void> {
+    const changed = await this.data.reclassifyDvf(department!);
+    print(options.json, { department, changed, rules: DVF_RULES_VERSION }, () => `${department} : ${changed} vente(s) reclassée(s), règles version ${DVF_RULES_VERSION}`);
   }
 }
 
@@ -306,6 +318,7 @@ export class SitadelShowCommand extends JsonCommand {
 export const MARKET_COMMANDS = [
   DvfLoadCommand,
   DvfStatusCommand,
+  DvfReclassifyCommand,
   DvfSalesCommand,
   MarketAnalyzeCommand,
   MarketShowCommand,

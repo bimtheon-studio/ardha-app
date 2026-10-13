@@ -7,7 +7,7 @@ import { Command, Option } from 'nest-commander';
 
 import { UsersRepository } from '../accounts/users.repository.ts';
 import type { Study, StudySummary } from '../contracts/index.ts';
-import { formatArea, normalizeEmail } from '../domain/index.ts';
+import { CNIG_DESTINATIONS, CNIG_SUB_DESTINATIONS, cnigLabel, describeDestinations, formatArea, formatCnigDestination, mainDestination, normalizeEmail, OTHER_DESTINATIONS, STUDY_DESTINATIONS } from '../domain/index.ts';
 import { StudyDerivations } from '../ingestion/study-derivations.ts';
 import { type Actor, StudiesService } from '../studies/studies.service.ts';
 import { frenchDate, InlineCommand, type InlineOption, JsonCommand, type JsonOption, print } from './geo.commands.ts';
@@ -17,7 +17,7 @@ const CLI: Actor = { userId: null, origin: 'cli' };
 const STEP_STATE = { done: 'faite', todo: 'à faire', upcoming: 'à venir' } as const;
 
 function describeSummary(s: StudySummary): string {
-  const where = [s.communeName ?? s.communeCode, `${s.parcelCount} parcelle${s.parcelCount > 1 ? 's' : ''}`, formatArea(s.contenance || s.area)];
+  const where = [s.communeName ?? s.communeCode, `${s.parcelCount} parcelle${s.parcelCount > 1 ? 's' : ''}`, formatArea(s.contenance || s.area), mainDestination(s.destinations)];
   const trash = s.deletedAt ? `\tcorbeille, purge le ${frenchDate(s.purgeAt)}` : '';
   return `${s.id}\t${s.name}\t${where.join(' · ')}\tmodifiée le ${frenchDate(s.updatedAt)}${trash}`;
 }
@@ -26,6 +26,7 @@ function describeStudy(s: Study): string {
   return [
     `${s.name}${s.nameIsProvisional ? ' (nom provisoire)' : ''} — ${s.id}`,
     `  commune : ${s.communeName ?? '?'} (${s.communeCode})`,
+    `  destination : ${describeDestinations(s.destinations)}`,
     `  adresse : ${s.addressPending ? 'en calcul' : (s.address?.label ?? 'aucune trouvée')}`,
     ...s.addresses.slice(1).map((a) => `            ou ${a.label} [${a.id}]`),
     `  parcelles : ${s.parcels.map((p) => `${p.label} (${p.id}, ${p.version})`).join(', ')}`,
@@ -108,10 +109,18 @@ export class StudyCreateCommand extends UserCommand {
     return true;
   }
 
-  async run(parcelIds: string[], options: InlineOption & { user?: string }): Promise<void> {
+  @Option({ flags: '-d, --destination <clés>', description: 'Destinations, la principale d’abord, séparées par des virgules (destination:list) ; Logement par défaut' })
+  parseDestination(value: string): string[] {
+    return value
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
+  }
+
+  async run(parcelIds: string[], options: InlineOption & { user?: string; destination?: string[] }): Promise<void> {
     const userId = await this.userId(options.user);
     if (!userId) throw new Error('Indiquez l’auteur : --user <email>');
-    let s = await this.studies.create({ userId, origin: 'cli' }, parcelIds);
+    let s = await this.studies.create({ userId, origin: 'cli' }, parcelIds, options.destination);
     if (options.inline) {
       await this.derivations.deriveNow(s.id);
       s = await this.studies.get(CLI, s.id);
@@ -129,6 +138,36 @@ export class StudyRenameCommand extends JsonCommand {
   async run([id, ...name]: string[], options: JsonOption): Promise<void> {
     const s = await this.studies.update(CLI, id!, { name: name.join(' ') });
     print(options.json, s, () => describeStudy(s));
+  }
+}
+
+@Command({ name: 'study:destination', arguments: '<id> <destinations...>', description: 'Change les destinations d’une étude, la principale d’abord (destination:list)' })
+export class StudyDestinationCommand extends JsonCommand {
+  constructor(private readonly studies: StudiesService) {
+    super();
+  }
+
+  async run([id, ...destinations]: string[], options: JsonOption): Promise<void> {
+    const s = await this.studies.update(CLI, id!, { destinations });
+    print(options.json, s, () => describeStudy(s));
+  }
+}
+
+@Command({ name: 'destination:list', description: 'Destinations d’une étude et leurs sous-destinations CNIG' })
+export class DestinationListCommand extends JsonCommand {
+  async run(_: string[], options: JsonOption): Promise<void> {
+    const cnig = (code: string) => ({ code, label: cnigLabel(code) });
+    const list = {
+      destinations: STUDY_DESTINATIONS.map((d) => ({ key: d.key, label: d.label, cnig: d.cnig.map(cnig) })),
+      other: OTHER_DESTINATIONS.map(cnig),
+    };
+    print(options.json, list, () =>
+      [
+        ...list.destinations.map((d) => `${d.key}\t${d.label}\tCNIG ${d.cnig.map(formatCnigDestination).join(', ')}`),
+        `Autre (sous-destinations CNIG) : ${list.other.map(formatCnigDestination).join(', ')}`,
+        `Nomenclature CNIG : ${Object.keys(CNIG_DESTINATIONS).length - CNIG_SUB_DESTINATIONS.length} destinations, ${CNIG_SUB_DESTINATIONS.length} sous-destinations (art. R151-27 et R151-28 du code de l’urbanisme).`,
+      ].join('\n'),
+    );
   }
 }
 
@@ -270,6 +309,8 @@ export const STUDY_COMMANDS = [
   StudyCreateCommand,
   StudyRenameCommand,
   StudyAddressCommand,
+  StudyDestinationCommand,
+  DestinationListCommand,
   StudyAddParcelCommand,
   StudyRemoveParcelCommand,
   StudyDuplicateCommand,

@@ -69,7 +69,7 @@ it('study:create --inline, show, list, rename, address, parcelles, duplicate, th
   expect(shown).toContain('  contenance : 510 m² ; surface calculée : 507 m²');
   expect(shown).toContain('  étapes : Parcelles faite, Urbanisme à venir (L3)');
 
-  expect(await run('study:list', '--user', 'etude@ardha.test')).toMatch(new RegExp(`^${s.id}\\t6 Rue Pasteur, Maisons-Alfort \\(\\+1 parcelle\\)\\tMaisons-Alfort · 2 parcelles · 510 m²\\tmodifiée le `));
+  expect(await run('study:list', '--user', 'etude@ardha.test')).toMatch(new RegExp(`^${s.id}\\t6 Rue Pasteur, Maisons-Alfort \\(\\+1 parcelle\\)\\tMaisons-Alfort · 2 parcelles · 510 m² · Logement\\tmodifiée le `));
   expect(await run('study:list', '-q', 'lyon')).toBe('Aucune étude.');
 
   expect(await run('study:rename', s.id, 'Angle', 'Pasteur')).toMatch(/^Angle Pasteur — /);
@@ -87,10 +87,30 @@ it('study:create --inline, show, list, rename, address, parcelles, duplicate, th
   expect(await run('study:refresh', s.id, '--inline')).toContain('  adresse : 9 Rue Pasteur 94700 Maisons-Alfort');
 });
 
+it('destination:list, study:create --destination, study:destination, show et list (F-02b)', async () => {
+  const list = await run('destination:list');
+  expect(list).toContain('housing\tLogement\tCNIG 21 — Logement');
+  expect(list).toContain('retail\tCommerce et services\tCNIG 31 — Artisanat et commerce de détail, 32 — Restauration, 34 — Activités de services où s’effectue l’accueil d’une clientèle');
+  expect(list).toContain('Autre (sous-destinations CNIG) : 11 — Exploitation agricole, 12 — Exploitation forestière, 33 — Commerce de gros');
+  expect(list).toContain('Nomenclature CNIG : 5 destinations, 23 sous-destinations');
+  expect(JSON.parse(await run('destination:list', '--json')).destinations).toHaveLength(7);
+
+  const s = await json('study:create', '--user', 'etude@ardha.test', '--destination', '31,office', AY146);
+  expect(s.destinations).toEqual(['retail', 'office']);
+  expect(await run('study:show', s.id)).toContain('  destination : Commerce et services (principale), Bureaux');
+  expect(await run('study:list')).toMatch(/\tMaisons-Alfort · 1 parcelle · 344 m² · Commerce et services \(\+1\)\t/);
+  expect(await run('study:destination', s.id, 'housing', '54')).toContain('  destination : Logement (principale), Centre de congrès et d’exposition');
+  expect((await json('study:show', s.id)).destinations).toEqual(['housing', '54']);
+  await run('study:destination', s.id, 'bureaux');
+  await run('study:create', '--user', 'etude@ardha.test', '--destination', '', AY146);
+  expect(errors.join('\n')).toMatch(/Destination inconnue : bureaux\.[\s\S]*Choisissez au moins une destination\./);
+  process.exitCode = 0;
+});
+
 it('study:delete, list --trash, restore, purge', async () => {
   expect(await run('study:create', '--user', 'etude@ardha.test', AY146)).toMatch(/^Maisons-Alfort — AY 146 \(nom provisoire\) — /);
   const s = (JSON.parse(await run('study:list', '--json')) as Study[])[0]!;
-  expect(await run('study:list')).toMatch(/\tMaisons-Alfort · 1 parcelle · 344 m²\t/);
+  expect(await run('study:list')).toMatch(/\tMaisons-Alfort · 1 parcelle · 344 m² · Logement\t/);
   expect(await run('study:delete', s.id)).toMatch(/^Étude « Maisons-Alfort — AY 146 » mise à la corbeille ; purge le \d{2}\/\d{2}\/\d{4}/);
   expect(await run('study:list')).toBe('Aucune étude.');
   expect(await run('study:list', '--trash')).toContain('\tcorbeille, purge le ');

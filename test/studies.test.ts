@@ -257,6 +257,36 @@ describe('dupliquer (Q10)', () => {
   });
 });
 
+describe('destination (F-02b)', () => {
+  it('Logement par défaut ; choisie à la création, normalisée, la principale en tête ; dans la liste', async () => {
+    expect((await create([AY146])).destinations).toEqual(['housing']);
+    const r = await me.post('/api/studies', { parcelIds: [AY96], destinations: ['31', 'office', 'retail'] });
+    expect(r.status).toBe(201);
+    expect((r.body as Study).destinations).toEqual(['retail', 'office']);
+    const list = (await me.get('/api/studies')).body.studies as StudySummary[];
+    expect(list.map((x) => x.destinations)).toEqual([['retail', 'office'], ['housing']]);
+  });
+
+  it('refuse une destination inconnue ou une liste vide', async () => {
+    const bad = await me.post('/api/studies', { parcelIds: [AY146], destinations: ['bureaux'] });
+    expect(bad.status).toBe(400);
+    expect(JSON.stringify(bad.body)).toContain('Destination inconnue : bureaux.');
+    expect((await me.post('/api/studies', { parcelIds: [AY146], destinations: [] })).status).toBe(400);
+  });
+
+  it('se modifie ensuite (Q3), se copie avec l’étude, pas dans la corbeille', async () => {
+    const s = await create([AY146]);
+    const r = await me.patch(`/api/studies/${s.id}`, { destinations: ['33', 'housing'] });
+    expect(r.status).toBe(200);
+    expect((r.body as Study).destinations).toEqual(['33', 'housing']);
+    expect((await me.patch(`/api/studies/${s.id}`, { destinations: ['20'] })).status).toBe(400);
+    const copy = (await me.post(`/api/studies/${s.id}/duplicate`)).body as Study;
+    expect(copy.destinations).toEqual(['33', 'housing']);
+    await me.delete(`/api/studies/${s.id}`);
+    expect((await me.patch(`/api/studies/${s.id}`, { destinations: ['office'] })).status).toBe(409);
+  });
+});
+
 describe('corbeille (Q9)', () => {
   it('supprimer met à la corbeille ; restaurable ; non modifiable entre-temps', async () => {
     const s = await create([AY146]);

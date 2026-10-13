@@ -13,3 +13,5 @@ export * from './tiles.ts';
 export * from './risks.ts';
 export * from './dvf.ts';
 export * from './market.ts';
+export * from './cnig.ts';
+export * from './destinations.ts';

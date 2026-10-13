@@ -61,6 +61,8 @@ it('dvf:load, dvf:status, dvf:sales, market:analyze --inline, market:show, marke
   expect(await plain('dvf:status', '94')).toMatch(/^94\/2024 {2}ready {6}16328 vente\(s\), fichier du 2026-05-18, vérifié le /);
   expect(JSON.parse(await run('dvf:status', '94', '--json')).counts).toEqual([{ year: 2024, mutations: 16_328 }, { year: 2025, mutations: 19_047 }]);
   expect(await plain('dvf:status', '75')).toBe('Aucune vente DVF en base.');
+  // Ventes classées par les règles actuelles : rien à reclasser (F-02b).
+  expect(await plain('dvf:reclassify', '94')).toBe('94 : 0 vente(s) reclassée(s), règles version 2');
   const sales = await plain('dvf:sales', '2.42983', '48.79999', '--limit', '2');
   expect(sales).toMatch(/^332 vente\(s\) dans 500 m de 2\.42983, 48\.79999\n {2}2025-12-22 {3}327 m {2}apartment {6}545 000 € {2}92 m²/);
   expect(sales).toContain('  … 330 autre(s) (--limit)');
@@ -82,7 +84,7 @@ it('dvf:load, dvf:status, dvf:sales, market:analyze --inline, market:show, marke
   expect(analyzed).toMatch(/^ {2}… Départements du cercle\n {2}✓ Départements du cercle : Département 94, dans 500 m/);
   expect(analyzed).toContain('  ✓ Ventes DVF (DGFiP, Etalab) : 2024 à 2025, déjà en base');
   expect(analyzed).toMatch(/\nAnalyse de marché : prête, rayon 500 m, calculée le /);
-  expect(analyzed).toContain('  DVF : 276 vente(s) comparable(s) sur 331, du 2024-01-12 au 2025-12-31 ; millésimes 94 2024, 2025');
+  expect(analyzed).toContain('  DVF : 287 vente(s) comparable(s) sur 331, du 2024-01-12 au 2025-12-31 ; millésimes 94 2024, 2025');
   expect(analyzed).toContain('  Neuf (ECLN) : 2026-T2 collectif 5 739 €/m²');
   expect(analyzed).toContain('  Sitadel : 2025 95 autorisé(s)/0 commencé(s)');
   expect(analyzed).toContain('Indice du coût de la construction (ICC) 2 103 (2026-Q2, +0,8 % sur un an)');

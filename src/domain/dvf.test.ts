@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { comparableOf, dedupMutations, type DvfMutation, type DvfRow, isComparableNature, isDvfCovered, isVefaNature } from './dvf.ts';
+import { comparableOf, dedupMutations, DVF_RULES_VERSION, type DvfMutation, type DvfRow, isComparableNature, isDvfCovered, isVefaNature } from './dvf.ts';
 
 // Repris de l'ancien `_shared/__tests__/dvf.test.ts` @2a7f9a0, et complété des ventes retenues (Q3).
 
@@ -136,6 +136,27 @@ describe('comparableOf', () => {
     expect(comparableOf(sale({ locals: [], dwellingCount: 0, builtArea: null, landArea: 600, cultures: ['AB'] }))).toEqual({ category: 'land', segment: 'existing', pricePerM2: 500 });
   });
 
+  it('un seul local d’activité, sans logement : prix au m² de sa surface (F-02b, Q7)', () => {
+    const shop = (over: Partial<DvfMutation> = {}) =>
+      sale({ price: 200_000, locals: [{ type: 'commercial', area: 80, rooms: null }], dwellingCount: 0, builtArea: null, ...over });
+    expect(comparableOf(shop())).toEqual({ category: 'commercial', segment: 'existing', pricePerM2: 2500 });
+    expect(comparableOf(shop({ locals: [{ type: 'commercial', area: 80, rooms: null }, { type: 'outbuilding', area: null, rooms: null }] }))).toEqual({
+      category: 'commercial',
+      segment: 'existing',
+      pricePerM2: 2500,
+    });
+    expect(comparableOf(shop({ vefa: true, nature: 'Vente en l’état futur d’achèvement' }))).toMatchObject({ category: 'commercial', segment: 'new' });
+    const rejected = [
+      shop({ locals: [{ type: 'commercial', area: 80, rooms: null }, { type: 'commercial', area: 40, rooms: null }] }),
+      shop({ locals: [{ type: 'commercial', area: 8, rooms: null }] }),
+      shop({ locals: [{ type: 'commercial', area: null, rooms: null }] }),
+      shop({ price: 15_000 }),
+      shop({ price: 1_300_000 }),
+      shop({ nature: 'Echange' }),
+    ];
+    expect(rejected.map(comparableOf)).toEqual(rejected.map(() => null));
+  });
+
   it('écarte nature, prix symbolique, terrain agricole ou en VEFA, plusieurs logements, local d’activité, petite surface, hors bornes', () => {
     const rejected = [
       sale({ nature: 'Adjudication' }),
@@ -152,5 +173,11 @@ describe('comparableOf', () => {
       sale({ price: 30_000 }),
     ];
     expect(rejected.map(comparableOf)).toEqual(rejected.map(() => null));
+  });
+});
+
+describe('version des règles de classement', () => {
+  it('2 depuis les locaux d’activité : les ventes en base se reclassent', () => {
+    expect(DVF_RULES_VERSION).toBe('2');
   });
 });

@@ -75,6 +75,7 @@ function summary(over: Partial<StudySummary> = {}): StudySummary {
     updatedAt: ago(2 * 3600_000),
     deletedAt: null,
     purgeAt: null,
+    destinations: ['housing'],
     ...over,
   };
 }
@@ -108,15 +109,15 @@ const base = { 'GET /api/auth/me': { status: 200, body: alice }, 'GET /api/map/l
 
 describe('accueil', () => {
   it('mes études : vignette, nom, commune, parcelles, surface, date ; vignette en préparation', async () => {
-    fakeApi({ ...base, 'GET /api/studies': { status: 200, body: { studies: [summary(), summary({ id: COPY, name: 'Sans vignette', thumbnailUrl: null, parcelCount: 1, contenance: 0, area: 79, communeName: null })] } } });
+    fakeApi({ ...base, 'GET /api/studies': { status: 200, body: { studies: [summary(), summary({ id: COPY, name: 'Sans vignette', thumbnailUrl: null, parcelCount: 1, contenance: 0, area: 79, communeName: null, destinations: ['retail', 'office'] })] } } });
     renderAt('/');
     const cards = within(await screen.findByRole('list', { name: 'Études' })).getAllByRole('listitem');
     expect(cards).toHaveLength(2);
     expect(within(cards[0]!).getByRole('link', { name: '2 Rue Pasteur, Maisons-Alfort (+1 parcelle)' })).toHaveAttribute('href', `/studies/${ID}`);
-    expect(cards[0]).toHaveTextContent('Maisons-Alfort · 2 parcelles · 160 m²');
+    expect(cards[0]).toHaveTextContent('Maisons-Alfort · 2 parcelles · 160 m² · Logement');
     expect(cards[0]).toHaveTextContent('Modifiée il y a 2 h');
     expect(cards[0]!.querySelector('img')).toHaveAttribute('src', summary().thumbnailUrl);
-    expect(cards[1]).toHaveTextContent('94046 · 1 parcelle · 79 m²');
+    expect(cards[1]).toHaveTextContent('94046 · 1 parcelle · 79 m² · Commerce et services (+1)');
     expect(cards[1]).toHaveTextContent('Vignette en préparation');
   });
 
@@ -245,6 +246,46 @@ describe('page de l’étude', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
     expect(await screen.findByRole('heading', { name: 'Maison des fondateurs' })).toBeInTheDocument();
     expect(calls.at(-1)).toEqual({ key: `PATCH /api/studies/${ID}`, body: { name: 'Maison des fondateurs' } });
+  });
+
+  it('destination : affichée, la principale en tête ; modifiée (bascule, autre, principale) ; refus ; annuler (F-02b)', async () => {
+    let current = study({ destinations: ['housing'] });
+    const calls = fakeApi({
+      ...base,
+      [`GET /api/studies/${ID}`]: () => ({ status: 200, body: current }),
+      [`PATCH /api/studies/${ID}`]: (body) => {
+        const { destinations } = body as { destinations: string[] };
+        if (destinations.includes('office')) return { status: 400, body: { message: 'Destination inconnue : office.' } };
+        current = study({ destinations });
+        return { status: 200, body: current };
+      },
+    });
+    renderAt(`/studies/${ID}`);
+    expect(await screen.findByTestId('study-destinations')).toHaveTextContent(/^Logement$/);
+    await userEvent.click(screen.getByRole('button', { name: 'Modifier la destination' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Annuler' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Modifier la destination' }));
+    const picker = screen.getByRole('group', { name: 'Destination' });
+    // La dernière destination cochée ne se décoche pas.
+    expect(within(picker).getByRole('button', { name: 'Logement' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(picker).getByRole('button', { name: 'Logement' })).toBeDisabled();
+    expect(within(picker).queryByLabelText('Destination principale')).toBeNull();
+    await userEvent.click(within(picker).getByRole('button', { name: 'Commerce et services' }));
+    await userEvent.selectOptions(within(picker).getByLabelText('Autre destination'), '33');
+    // Une sous-destination couverte revient à sa destination produit, sans doublon.
+    await userEvent.selectOptions(within(picker).getByLabelText('Autre destination'), '31');
+    expect(within(picker).getByRole('button', { name: 'Commerce de gros' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.selectOptions(within(picker).getByLabelText('Destination principale'), 'retail');
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+    expect(calls.at(-1)).toEqual({ key: `PATCH /api/studies/${ID}`, body: { destinations: ['retail', 'housing', '33'] } });
+    expect(await screen.findByTestId('study-destinations')).toHaveTextContent('Commerce et services (principale), Logement, Commerce de gros');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Modifier la destination' }));
+    const again = screen.getByRole('group', { name: 'Destination' });
+    await userEvent.click(within(again).getByRole('button', { name: 'Commerce de gros' }));
+    await userEvent.click(within(again).getByRole('button', { name: 'Bureaux' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+    expect(await screen.findByText('Destination inconnue : office.')).toBeInTheDocument();
   });
 
   it('changer d’adresse parmi celles trouvées ; sans adresse, le dire', async () => {
@@ -398,7 +439,19 @@ describe('créer une étude depuis la carte (Q1)', () => {
     fail = false;
     await userEvent.click(screen.getByRole('button', { name: 'Créer l’étude' }));
     expect(await screen.findByRole('heading', { name: study().name })).toBeInTheDocument();
-    expect(calls.find((c) => c.key === 'POST /api/studies')?.body).toEqual({ parcelIds: ['94046000AB0000', '94046000AB0001'] });
+    expect(calls.find((c) => c.key === 'POST /api/studies')?.body).toEqual({ parcelIds: ['94046000AB0000', '94046000AB0001'], destinations: ['housing'] });
+  });
+
+  it('la destination se choisit avant de créer : Logement par défaut (F-02b, Q3)', async () => {
+    const calls = fakeApi({ ...mapApi, 'POST /api/studies': { status: 201, body: study() }, [`GET /api/studies/${ID}`]: { status: 200, body: study() } });
+    renderAt('/map?at=48.8,2.43,18&parcels=94046000AB0000');
+    const picker = await screen.findByRole('group', { name: 'Destination' });
+    await userEvent.click(within(picker).getByRole('button', { name: 'Bureaux' }));
+    await userEvent.click(within(picker).getByRole('button', { name: 'Logement' }));
+    expect(within(picker).getByRole('button', { name: 'Bureaux' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Créer l’étude' }));
+    await screen.findByRole('heading', { name: study().name });
+    expect(calls.find((c) => c.key === 'POST /api/studies')?.body).toEqual({ parcelIds: ['94046000AB0000'], destinations: ['office'] });
   });
 });
 

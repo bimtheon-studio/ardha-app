@@ -41,6 +41,7 @@ export interface NewStudy {
   addressKey?: string | null;
   thumbnailKey?: string | null;
   marketRadiusM?: number;
+  destinations?: string[];
 }
 
 const parcelColumns = sql`parcel_id AS id, position, commune_code AS "communeCode", prefix, section, number, contenance, area,

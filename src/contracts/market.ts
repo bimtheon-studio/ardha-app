@@ -7,10 +7,10 @@ import { AnalysisStep, known } from './risks.ts';
 import { route } from './routes.ts';
 
 /** Version du schéma du résultat : un changement incompatible l'augmente, et l'analyse se refait. */
-export const MARKET_VERSION = 1;
+export const MARKET_VERSION = 2;
 
 const lonLat = z.tuple([z.number(), z.number()]);
-export const SaleCategorySchema = z.enum(['house', 'apartment', 'land']);
+export const SaleCategorySchema = z.enum(['house', 'apartment', 'commercial', 'land']);
 export const SaleSegmentSchema = z.enum(['existing', 'new']);
 export const PropertyTypeSchema = z.enum(['house', 'apartment', 'commercial', 'outbuilding', 'land', 'other']);
 export const MarketRadius = z.union([z.literal(250), z.literal(500), z.literal(1000), z.literal(2000)]);
