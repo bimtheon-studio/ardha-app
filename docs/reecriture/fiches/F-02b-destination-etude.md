@@ -220,6 +220,53 @@ et 2025) :
 Écarts constatés : aucun bloquant. Les locaux d'activité ont presque toujours peu de ventes dans
 un rayon de 500 m (6 à Maisons-Alfort) : l'écran le dit et propose d'élargir.
 
+## Effets en aval
+
+Ce que la destination change, aujourd'hui et dans les lots suivants. Chaque lot reprend sa ligne
+au moment de sa fiche ; rien de ce qui est reporté n'est arbitré.
+
+### En place (cette fiche)
+
+| Où | Effet |
+|---|---|
+| Création de l'étude | Logement coché par défaut ; plusieurs possibles, la première est la principale |
+| Page de l'étude | Ligne « Destination », modifiable (pas dans la corbeille) |
+| Accueil, corbeille | Destination principale sur la carte : « Commerce et services (+1) » |
+| Duplication | La copie garde les destinations |
+| Foncier et marché : ordre des prix | Logement : appartements, maisons, locaux d'activité, terrains. Commerce, bureaux, activités, CNIG 33, 54 et 55 : les locaux d'activité en tête |
+| Foncier et marché : avertissements | Activité : « DVF ne distingue pas commerces, bureaux et locaux d'activité ». Hôtellerie, résidence gérée, équipement, agricole, cinéma : « DVF n'a pas de prix pour… » |
+| Foncier et marché : « peu de ventes » | Le seuil de 20 ventes porte sur les locaux pour une activité, sur les logements sinon |
+| CLI | `study:show`, `study:list` ; `study:destination` la modifie, `destination:list` liste les choix |
+
+Les prix des locaux d'activité sont calculés pour toutes les études : seuls leur ordre et
+l'avertissement dépendent de la destination.
+
+### Reportés
+
+- **L3 · Urbanisme**
+  - Confronter la destination au zonage (autorisée, sous conditions, interdite), en s'appuyant sur
+    le règlement extrait : le GPU ne renseigne presque jamais `destoui` (Q6, mesure ci-dessus).
+  - Terrain à cheval sur plusieurs zones : signaler une destination autorisée dans l'une et
+    interdite dans l'autre.
+  - Stationnement : lire la règle de la bonne destination (par logement, par m² de bureau ou de
+    commerce). L'ancien code ne retenait que la règle « par logement » (`Faisabilite.tsx:85-92`
+    @ `2a7f9a0`).
+  - Hauteur, recul : certains PLU les font varier selon la destination.
+- **L5 · Marché** (compléments possibles, non arbitrés)
+  - L'ECLN (prix du neuf) et Sitadel (logements autorisés) ne parlent que du logement : les
+    masquer ou les relativiser pour une étude d'activité.
+  - Sitadel : les locaux autorisés, pour une étude d'activité, ne sont pas branchés.
+- **L7 · Faisabilité et bilan**
+  - Répartition des surfaces entre destinations, hypothèse de chaque variante (Q2).
+  - Paramètres propres à chaque destination : surface moyenne et nombre de logements, densité
+    (logement seulement) ; types de lots du bilan (appartement, commerce, bureau…) ; prix de
+    sortie (VEFA ou ancien pour le logement, prix des locaux pour l'activité).
+  - Stationnement requis, calculé par destination.
+  - TVA et certains coûts de construction, qui varient selon la destination.
+- **L8 · Exports** : la destination dans le rapport PDF et sur sa page de garde.
+- **L6 · Estimation** : aucun effet, l'estimation porte sur un bien existant (maison ou
+  appartement), pas sur un programme.
+
 ## Écarts assumés
 
 - Nouveau : l'ancienne application ne demandait aucune destination ; `typeProgramme` (figé à
