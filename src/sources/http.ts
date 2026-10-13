@@ -1,5 +1,5 @@
-// Accès HTTP aux sources publiques. Seul le worker (et la CLI, pour le débogage) s'en sert : l'API ne
-// sort jamais (PLAN §3), et le lint l'interdit ailleurs.
+// Accès HTTP aux sources publiques. Seul le worker (et la CLI, pour le débogage) s'en sert, plus les
+// recherches à la demande de l'API (`src/geo/lookups.ts`, DT-20) : le lint l'interdit ailleurs (PLAN §3).
 //
 // Trois implémentations :
 //  - `LiveHttp` : l'appel réel, avec délai maximal et reprises sur les erreurs passagères ;
@@ -27,6 +27,8 @@ export interface HttpRequest {
    * sont jamais écrits dans `fixtures/http`.
    */
   headers?: Record<string, string>;
+  /** Abandon de l'appel par l'appelant (recherche à la demande hors délai, DT-20) : ni reprise ni nouvelle tentative. */
+  signal?: AbortSignal;
 }
 
 /** Une source injoignable, qui répond mal, ou dont la réponse ne se lit pas. */
@@ -67,16 +69,23 @@ export class LiveHttp extends Http {
     this.fetch = options.fetch ?? globalThis.fetch;
   }
 
-  async get({ url, timeoutMs = 15_000, headers = {} }: HttpRequest): Promise<HttpResponse> {
+  async get({ url, timeoutMs = 15_000, headers = {}, signal }: HttpRequest): Promise<HttpResponse> {
     const host = new URL(url).host;
+    const abandoned = () => {
+      const reason: unknown = signal?.reason;
+      return new SourceError(host, 'unavailable', `${host} : appel abandonné (${reason instanceof Error ? reason.message : String(reason)})`);
+    };
     let last = '';
     for (let attempt = 1; attempt <= this.attempts; attempt++) {
-      if (attempt > 1) await sleep(this.backoffMs * 2 ** (attempt - 2));
+      if (signal?.aborted) throw abandoned();
+      if (attempt > 1) await sleep(this.backoffMs * 2 ** (attempt - 2), undefined, { signal }).catch(() => undefined);
+      if (signal?.aborted) throw abandoned();
       try {
+        const deadline = AbortSignal.timeout(timeoutMs);
         const r = await this.fetch(url, {
           headers: { 'User-Agent': USER_AGENT, Accept: '*/*', ...headers },
           redirect: 'follow',
-          signal: AbortSignal.timeout(timeoutMs),
+          signal: signal ? AbortSignal.any([deadline, signal]) : deadline,
         });
         const body = Buffer.from(await r.arrayBuffer());
         if (RETRIABLE.has(r.status)) {
@@ -85,6 +94,7 @@ export class LiveHttp extends Http {
         }
         return { url, status: r.status, contentType: r.headers.get('content-type') ?? '', body };
       } catch (error) {
+        if (signal?.aborted) throw abandoned();
         last = error instanceof Error && error.name === 'TimeoutError' ? `délai de ${timeoutMs} ms dépassé` : String(error);
       }
     }

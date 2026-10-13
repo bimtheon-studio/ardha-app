@@ -1,10 +1,18 @@
 // Intégration de la carte et du parcellaire (F-01) : l'API réelle et le worker dans le même
 // processus, sur les réponses enregistrées des sources (sans Internet).
+import type { Redis } from 'ioredis';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { Lookups } from '../src/geo/lookups.ts';
 import { MAP_LAYERS } from '../src/geo/map-layers.ts';
 import { CadastreLoader } from '../src/ingestion/cadastre-loader.ts';
+import { REDIS } from '../src/shared/redis.ts';
+import { Communes } from '../src/sources/communes.ts';
+import { Elevation } from '../src/sources/elevation.ts';
+import { Geocoding, GEOCODING_BASE } from '../src/sources/geocoding.ts';
+import { Http, type HttpRequest, SourceError } from '../src/sources/http.ts';
+import { FakeHttp } from './fake-http.ts';
 import { type TestApp, createTestApp } from './test-app.ts';
 import { signedIn } from './session.ts';
 
@@ -115,7 +123,7 @@ describe('parcelles', () => {
   });
 });
 
-describe('recherches par le worker', () => {
+describe('recherches : l’API interroge la source (DT-20)', () => {
   it('suggère des adresses, puis répond depuis le cache', async () => {
     const r = await get('/api/addresses/search?q=Beaumont-Village');
     expect(r.status).toBe(200);
@@ -137,7 +145,7 @@ describe('recherches par le worker', () => {
     expect((await get('/api/addresses/reverse?lon=200&lat=48.8')).body.fields).toEqual({ lon: 'Longitude invalide.' });
   });
 
-  it('commune d’un point : d’abord parmi les communes chargées, sinon par le worker', async () => {
+  it('commune d’un point : d’abord parmi les communes chargées, sinon à la source', async () => {
     expect((await get('/api/communes/locate?lon=1.2065&lat=47.1824')).body).toEqual({ commune: { code: '37023', name: 'Beaumont-Village' } });
     expect((await get('/api/communes/locate?lon=2.43&lat=48.8')).body).toEqual({ commune: { code: '94046', name: 'Maisons-Alfort' } });
     expect((await get('/api/communes/locate?lon=-3.5&lat=47')).body).toEqual({ commune: null });
@@ -150,15 +158,61 @@ describe('recherches par le worker', () => {
   });
 });
 
-describe('sans worker', () => {
-  it('la recherche échoue proprement au bout du délai', async () => {
+describe('recherches sans worker (DT-20)', () => {
+  it('l’API répond seule, sans file ni worker', async () => {
     const alone = await createTestApp({ config: { LOOKUP_TIMEOUT_MS: '200' } });
     try {
       const c = await signedIn(alone);
-      const r = await request(alone.app.getHttpServer()).get('/api/addresses/search?q=Tours%20centre').set('Cookie', c);
-      expect(r.status).toBe(503);
+      const r = await request(alone.app.getHttpServer()).get('/api/addresses/search?q=Beaumont-Village').set('Cookie', c);
+      expect(r.status).toBe(200);
+      expect(r.body.addresses[0]).toMatchObject({ label: 'Beaumont-Village', communeCode: '37023' });
     } finally {
       await alone.close();
     }
+  });
+
+  const feature = { geometry: { coordinates: [1.2, 47.18] }, properties: { id: '37023', label: 'Beaumont-Village', type: 'municipality', citycode: '37023', city: 'Beaumont-Village' } };
+  const lookupsOn = (http: Http, timeoutMs = 200) =>
+    new Lookups(new Geocoding(http), new Communes(http), new Elevation(http), t.app.get<Redis>(REDIS), { ...t.config, LOOKUP_TIMEOUT_MS: timeoutMs });
+
+  it('une source en panne : erreur pour l’utilisateur, rien en cache, la suivante réussit', async () => {
+    const http = new FakeHttp({ [GEOCODING_BASE]: new SourceError('Géocodage', 'unavailable', 'HTTP 502') });
+    const lookups = lookupsOn(http);
+    await expect(lookups.run('address:search', { q: 'panne passagère', limit: 1 })).rejects.toMatchObject({ code: 'lookup-unavailable' });
+    http.replies = { [GEOCODING_BASE]: { json: { features: [feature] } } };
+    expect(await lookups.run('address:search', { q: 'panne passagère', limit: 1 })).toHaveLength(1);
+    expect(http.calls).toHaveLength(2);
+  });
+
+  it('une source trop lente : erreur au bout du délai', async () => {
+    const silent = new (class extends Http {
+      get = () => new Promise<never>(() => {});
+    })();
+    const started = Date.now();
+    await expect(lookupsOn(silent, 100).run('address:search', { q: 'source muette', limit: 1 })).rejects.toMatchObject({ code: 'lookup-unavailable' });
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
+  it('au plus 8 appels à la source à la fois ; hors délai, l’appel en cours est coupé', async () => {
+    const signals: AbortSignal[] = [];
+    let running = 0;
+    let peak = 0;
+    const slow = new (class extends Http {
+      get = ({ signal }: HttpRequest) =>
+        new Promise<never>((_, reject) => {
+          signals.push(signal!);
+          peak = Math.max(peak, ++running);
+          signal!.addEventListener('abort', () => {
+            running--;
+            reject(signal!.reason as Error);
+          });
+        });
+    })();
+    const lookups = lookupsOn(slow, 100);
+    const asked = Array.from({ length: 10 }, (_, i) => lookups.run('address:search', { q: `encombrement ${i} ${Date.now()}`, limit: 1 }));
+    for (const r of asked) await expect(r).rejects.toMatchObject({ code: 'lookup-unavailable' });
+    expect(peak).toBe(8);
+    expect(signals.length).toBeGreaterThanOrEqual(8);
+    expect(signals.every((s) => s.aborted)).toBe(true);
   });
 });

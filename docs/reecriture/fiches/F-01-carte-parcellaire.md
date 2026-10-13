@@ -80,7 +80,8 @@ le 01/10/2026 (Q4, Q8 et Q11 changés).
 
 ## Données
 
-- **Sources externes**, appelées par le worker seul :
+- **Sources externes**, appelées par le worker, sauf les recherches à la demande, appelées par l'API
+  (DT-20 amendée ; au plus 40 par seconde et 8 à la fois par processus, appel coupé au délai de 5 s) :
   - géocodage Géoplateforme `https://data.geopf.fr/geocodage/search` et `/reverse` (BAN) ; limite
     publiée : 50 requêtes/s par IP ; réponses gardées 24 h en cache ;
   - `https://geo.api.gouv.fr/communes/{code}` (nom, codes postaux, centre, contour) et
@@ -114,7 +115,7 @@ Posées au porteur du produit le 01/10/2026 ; la colonne « Codé la nuit du 30/
 
 | # | Question | Codé la nuit du 30/09 | Arbitrage |
 |---|---|---|---|
-| Q1 | La recherche d'adresse passe par le worker (l'API attend sa réponse, 5 s au plus) : acceptable pour une autocomplétion ? | oui : ~50 ms de plus qu'un appel direct, cache 24 h, et « seul le worker sort » tient | **garder** : par le worker |
+| Q1 | La recherche d'adresse passe par le worker (l'API attend sa réponse, 5 s au plus) : acceptable pour une autocomplétion ? | oui : ~50 ms de plus qu'un appel direct, cache 24 h, et « seul le worker sort » tient | **garder** : par le worker. *Revu le 09/10/2026 (DT-20 amendée) : appel direct par l'API, cache 24 h* |
 | Q2 | Garder « Utiliser ma position » ? | garder | **garder** |
 | Q3 | Commune pas encore chargée quand on navigue : la charger d'elle-même ? | oui, au zoom ≥ 16 (une commune ≈ 0,5 à 3 Mo, une fois par trimestre) | **garder** : chargement automatique |
 | Q4 | Contiguïté exigée à l'ajout ; retrait libre avec avertissement ? | oui aux deux | **simplifier : sélection libre**, simple avertissement « en N morceaux » |
@@ -133,7 +134,7 @@ Posées au porteur du produit le 01/10/2026 ; la colonne « Codé la nuit du 30/
   MultiPolygon 4326, millésime) ; `source_states` (source, périmètre, état `queued` / `loading` /
   `ready` / `failed`, millésime, date, nombre d'éléments, erreur, tentatives).
 - **Worker** : file `cadastre` (`cadastre:load-commune`, idempotent, une commune à la fois par
-  commune, remplacement en une transaction) ; file `lookups` (`address:search`, `address:reverse`,
+  commune, remplacement en une transaction) ; file `lookups` (supprimée le 13/10/2026, DT-20 amendée ; `address:search`, `address:reverse`,
   `commune:locate`, en requête-réponse, débit limité) ; réconciliation toutes les 5 min (réenfile ce
   qui est resté `queued` ou `loading`).
 - **API** : `GET /api/addresses/search`, `GET /api/addresses/reverse`, `GET /api/communes/locate`,

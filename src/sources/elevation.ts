@@ -23,7 +23,7 @@ export interface ElevationPoint {
 export class Elevation {
   constructor(private readonly http: Http) {}
 
-  async points(points: readonly Position[]): Promise<ElevationPoint[]> {
+  async points(points: readonly Position[], signal?: AbortSignal): Promise<ElevationPoint[]> {
     const out: ElevationPoint[] = [];
     for (let i = 0; i < points.length; i += BATCH) {
       const batch = points.slice(i, i + BATCH);
@@ -33,7 +33,7 @@ export class Elevation {
         resource: ELEVATION_RESOURCE,
         zonly: 'false',
       });
-      const r = await this.http.get({ url: `${ELEVATION_URL}?${params}`, timeoutMs: 15_000 });
+      const r = await this.http.get({ url: `${ELEVATION_URL}?${params}`, timeoutMs: 15_000, signal });
       if (r.status !== 200) throw new SourceError(SOURCE, 'unavailable', `Altimétrie IGN : HTTP ${r.status}`);
       let parsed;
       try {

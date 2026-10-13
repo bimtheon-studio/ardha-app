@@ -16,7 +16,6 @@ import { FilesModule } from '../shared/files.ts';
 import { RedisModule } from '../shared/redis.ts';
 import { StudiesModule } from '../studies/studies.module.ts';
 import { CadastreProcessor } from './cadastre.processor.ts';
-import { LookupsProcessor } from './lookups.processor.ts';
 import { MaintenanceProcessor, MaintenanceScheduler, Reconciliation } from './maintenance.ts';
 import { StudiesProcessor } from './studies.processor.ts';
 
@@ -38,7 +37,7 @@ export class WorkerModule {
         IngestionModule,
         BullModule.registerQueue({ name: MAINTENANCE_QUEUE }),
       ],
-      providers: [MaintenanceProcessor, MaintenanceScheduler, Reconciliation, CadastreProcessor, LookupsProcessor, StudiesProcessor],
+      providers: [MaintenanceProcessor, MaintenanceScheduler, Reconciliation, CadastreProcessor, StudiesProcessor],
     };
   }
 }

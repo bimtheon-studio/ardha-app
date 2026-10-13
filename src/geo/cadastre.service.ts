@@ -1,6 +1,6 @@
 // Le cadastre vu par l'API et la CLI : état d'une commune, demande de chargement (le worker charge),
 // parcelles d'une emprise ou par identifiants, commune d'un point. Rien ici ne sort vers
-// l'extérieur : la base, ou un job pour le worker.
+// l'extérieur : la base, un job pour le worker, ou une recherche à la demande (`Lookups`, DT-20).
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import type { Queue } from 'bullmq';
@@ -108,7 +108,7 @@ export class CadastreService {
     return p ? toFeature(p) : null;
   }
 
-  /** Parmi les communes chargées d'abord ; sinon par le worker (geo.api.gouv.fr). */
+  /** Parmi les communes chargées d'abord ; sinon à la source (geo.api.gouv.fr, DT-20). */
   async locate(lon: number, lat: number): Promise<CommuneRef | null> {
     const local = await this.communes.locate(lon, lat);
     if (local) return { code: local.code, name: local.name };

@@ -96,7 +96,7 @@ export function useParcelsByIds(ids: readonly string[]) {
   });
 }
 
-/** Altitudes de la sélection (F-04, Q6), une fois la sélection stable : mesurées par le worker, en cache. */
+/** Altitudes de la sélection (F-04, Q6), une fois la sélection stable : mesurées par l'API sur l'IGN (DT-20), en cache. */
 export function useSelectionElevation(ids: readonly string[]) {
   const key = [...ids].sort().join(',');
   return useQuery({

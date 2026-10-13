@@ -73,7 +73,7 @@ La CLI pilote et débogue la chaîne sans le front :
 | `commune:show <code>` · `commune:list` | état du cadastre (millésime, parcelles, erreur) |
 | `parcel:show <IDU…>` · `parcel:at <lon> <lat>` | une parcelle : libellé, contenance, surface calculée, emprise |
 | `parcel:selection <IDU…>` | rejoue une sélection clic par clic (contiguïté, plafond), avec son résumé |
-| `address:search <texte…> [--inline]` · `address:reverse <lon> <lat>` | géocodage, par le worker ou sur place |
+| `address:search <texte…>` · `address:reverse <lon> <lat>` | géocodage, à la source (en cache 24 h) |
 | `source:record <url…>` | enregistre la réponse réelle d'une source dans `fixtures/http` |
 | `seed [codes…]` | sème les communes de référence, ou celles données |
 | `study:create --user <e-mail> <IDU…> [--inline]` | crée une étude ; adresse et vignette par le worker, ou sur place avec `--inline` |
@@ -83,7 +83,7 @@ La CLI pilote et débogue la chaîne sans le front :
 | `study:refresh <id> [--inline]` · `study:thumbnail <id> --out <png>` | recalcule adresse et vignette ; écrit la vignette dans un fichier |
 | `risk:analyze <étude> [--inline] [--force]` · `risk:show <étude>` | analyse des risques (par le worker, ou sur place) ; lecture |
 | `risk:commune <code>` · `risk:point <lon> <lat>` | interroge Géorisques sur une commune, argiles et hauteurs d'eau TRI en un point |
-| `parcel:elevation <IDU…> [--inline]` | altitudes IGN d'une sélection (min, max, moyenne, dénivelé), par le worker ou sur place |
+| `parcel:elevation <IDU…>` | altitudes IGN d'une sélection (min, max, moyenne, dénivelé), à la source (en cache 24 h) |
 
 Pour enregistrer d'un coup tout ce dont une commande a besoin :
 `ARDHA_SOURCES=record pnpm cli commune:load --inline 74010`, ou, pour l'adresse et la vignette d'une

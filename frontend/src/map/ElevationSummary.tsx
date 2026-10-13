@@ -1,5 +1,5 @@
 // Altitudes de la sélection (F-04, Q6) : min, max, moyenne et dénivelé, en m NGF, mesurés par le
-// worker sur l'IGN une fois la sélection stable (comme l'ancienne page Cadastre).
+// l'API sur l'IGN (DT-20) une fois la sélection stable (comme l'ancienne page Cadastre).
 import { Mountain, RefreshCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';

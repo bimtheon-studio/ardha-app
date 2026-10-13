@@ -1,4 +1,4 @@
-// Carte et parcellaire (F-01) de bout en bout, dans Chromium : recherche d'adresse (par le worker,
+// Carte et parcellaire (F-01) de bout en bout, dans Chromium : recherche d'adresse (par l'API, DT-20,
 // réponses enregistrées), cadastre semé de Maisons-Alfort, sélection au clic sur la carte.
 import { expect, test } from '@playwright/test';
 
@@ -51,7 +51,7 @@ test('sélectionner des parcelles au clic, signaler une sélection en morceaux, 
   await expect(list).toContainText('AY 97');
   await expect(page.getByTestId('total-contenance')).toHaveText('510 m²');
   await expect(page).toHaveURL(/parcels=94046000AY0096%2C94046000AY0097/);
-  // Altitudes de la sélection (F-04, Q6), mesurées par le worker (réponses IGN enregistrées).
+  // Altitudes de la sélection (F-04, Q6), mesurées par l'API (DT-20, réponses IGN enregistrées).
   await expect(page.getByTestId('elevation')).toHaveText('31,88 m à 32,55 m NGF · moyenne 32,2 m · dénivelé 0,67 m');
 
   // Sélection libre (Q4) : une parcelle isolée s'ajoute, et la sélection est dite en morceaux.

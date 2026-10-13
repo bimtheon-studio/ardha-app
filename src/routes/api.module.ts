@@ -1,4 +1,5 @@
-// Point d'entrée API : REST pour le front. Ne sort jamais vers l'extérieur (PLAN §3).
+// Point d'entrée API : REST pour le front. Ne sort vers l'extérieur que pour les recherches à la
+// demande (`Lookups`, DT-20) ; le reste passe par le worker (PLAN §3).
 import { type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';

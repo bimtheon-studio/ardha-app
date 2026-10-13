@@ -12,7 +12,6 @@ import { POOL } from '../src/db/db.ts';
 import { CADASTRE_SOURCE, CadastreService, loadJobId } from '../src/geo/cadastre.service.ts';
 import { SourceStatesRepository } from '../src/geo/source-states.repository.ts';
 import { CadastreLoader, userMessage } from '../src/ingestion/cadastre-loader.ts';
-import { LookupHandlers } from '../src/ingestion/lookup-handlers.ts';
 import { ReferenceSeed } from '../src/ingestion/reference-seed.ts';
 import { Clock } from '../src/shared/clock.ts';
 import { CADASTRE_QUEUE } from '../src/shared/queues.ts';
@@ -21,7 +20,6 @@ import { CADASTRE_BASE, parcelsUrl } from '../src/sources/cadastre.ts';
 import { GEO_API_BASE } from '../src/sources/communes.ts';
 import { Http, SourceError } from '../src/sources/http.ts';
 import { CadastreProcessor } from '../src/worker/cadastre.processor.ts';
-import { LookupsProcessor } from '../src/worker/lookups.processor.ts';
 import { MaintenanceProcessor, RECONCILE_JOB } from '../src/worker/maintenance.ts';
 import { WorkerModule } from '../src/worker/worker.module.ts';
 import { testConfig } from './env.ts';
@@ -105,14 +103,6 @@ describe('processeurs', () => {
     await expect(p.process({ name: 'cadastre:load-commune', data: { code: '99999' }, opts: { attempts: 3 }, attemptsMade: 0 } as never)).rejects.toBeInstanceOf(UnrecoverableError);
     fake.replies = { [GEO_API_BASE]: new SourceError('geo.api.gouv.fr', 'unavailable', 'HTTP 502') };
     await expect(p.process({ name: 'cadastre:load-commune', data: { code: '37023' }, opts: {}, attemptsMade: 0 } as never)).rejects.toBeInstanceOf(SourceError);
-  });
-
-  it('lookups : un job trop vieux n’est plus traité ; les autres le sont', async () => {
-    const p = worker.get(LookupsProcessor);
-    expect(await p.process({ name: 'address:search', data: { q: 'x', limit: 1 }, timestamp: Date.now() - 60_000 } as never)).toBeNull();
-    fake.replies = { [GEO_API_BASE]: { json: [{ code: '37023', nom: 'Beaumont-Village' }] } };
-    expect(await p.process({ name: 'commune:locate', data: { lon: 1.2, lat: 47.18 }, timestamp: Date.now() } as never)).toEqual({ code: '37023', name: 'Beaumont-Village' });
-    await expect(worker.get(LookupHandlers).handle('inconnu' as never, {} as never)).rejects.toThrow('Recherche inconnue');
   });
 });
 

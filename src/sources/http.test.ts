@@ -37,6 +37,23 @@ describe('LiveHttp', () => {
     await expect(new LiveHttp({ fetch: timeouts, attempts: 1 }).get({ url: 'https://exemple.fr/a', timeoutMs: 5 })).rejects.toThrow('délai de 5 ms dépassé');
   });
 
+  it('un appel abandonné (signal) s’arrête : ni reprise ni nouvelle tentative', async () => {
+    const abandon = new AbortController();
+    const fetch = vi.fn((_url: string, init: RequestInit) => {
+      abandon.abort(new Error('recherche abandonnée'));
+      return Promise.reject(init.signal!.reason as Error);
+    });
+    const e = await new LiveHttp({ fetch: fetch as typeof globalThis.fetch, backoffMs: 1 })
+      .get({ url: 'https://exemple.fr/a', signal: abandon.signal })
+      .catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(SourceError);
+    expect(e).toMatchObject({ kind: 'unavailable', message: 'exemple.fr : appel abandonné (recherche abandonnée)' });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const never = vi.fn(async () => ok());
+    await expect(new LiveHttp({ fetch: never }).get({ url: 'https://exemple.fr/a', signal: AbortSignal.abort(new Error('déjà')) })).rejects.toThrow('appel abandonné');
+    expect(never).not.toHaveBeenCalled();
+  });
+
   it('utilise le fetch global par défaut', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ok('global')));
     expect((await new LiveHttp().get({ url: 'https://exemple.fr/' })).body.toString()).toBe('global');

@@ -1,5 +1,5 @@
 // Routes de la carte et du parcellaire (F-01), conformes à `geoRoutes` du contrat. L'API ne lit que
-// la base ; les recherches passent par le worker (`Lookups`).
+// la base ; seules les recherches à la demande interrogent la source (`Lookups`, DT-20).
 import { Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
 import { z } from 'zod';
 

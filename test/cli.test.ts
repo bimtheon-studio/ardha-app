@@ -152,10 +152,10 @@ describe('CLI de la carte et du parcellaire', () => {
     process.exitCode = 0;
   });
 
-  it('address:search et address:reverse en --inline (sans worker), et commune de référence', async () => {
-    await run('address:search', '--inline', '9', 'rue', 'Pasteur', 'Maisons-Alfort');
+  it('address:search et address:reverse (sans worker), et commune de référence', async () => {
+    await run('address:search', '9', 'rue', 'Pasteur', 'Maisons-Alfort');
     expect(output[0]).toMatch(/^9 Rue Pasteur 94700 Maisons-Alfort\t94046\t2\.4\d+,48\.8\d+\thousenumber/);
-    await run('address:reverse', '--inline', '--json', '2.43', '48.8');
+    await run('address:reverse', '--json', '2.43', '48.8');
     expect(JSON.parse(output[1]!)).toMatchObject({ communeCode: '94046' });
   });
 });

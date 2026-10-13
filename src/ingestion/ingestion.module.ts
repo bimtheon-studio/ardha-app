@@ -5,7 +5,6 @@ import { Module } from '@nestjs/common';
 import { GeoModule } from '../geo/geo.module.ts';
 import { SourcesModule } from '../sources/sources.module.ts';
 import { CadastreLoader } from './cadastre-loader.ts';
-import { LookupHandlers } from './lookup-handlers.ts';
 import { ReferenceSeed } from './reference-seed.ts';
 import { StudiesModule } from '../studies/studies.module.ts';
 import { StudyDerivations } from './study-derivations.ts';
@@ -19,7 +18,7 @@ import { MarketData } from './market-data.ts';
 
 @Module({
   imports: [SourcesModule, GeoModule, StudiesModule],
-  providers: [CadastreLoader, LookupHandlers, ReferenceSeed, StudyDerivations, RiskAnalyzer, RiskAnalyses, HydrantCache, CommuneRiskCache, MarketData, MarketAnalyzer, MarketAnalyses],
-  exports: [CadastreLoader, LookupHandlers, ReferenceSeed, StudyDerivations, RiskAnalyzer, RiskAnalyses, HydrantCache, CommuneRiskCache, MarketData, MarketAnalyzer, MarketAnalyses, SourcesModule],
+  providers: [CadastreLoader, ReferenceSeed, StudyDerivations, RiskAnalyzer, RiskAnalyses, HydrantCache, CommuneRiskCache, MarketData, MarketAnalyzer, MarketAnalyses],
+  exports: [CadastreLoader, ReferenceSeed, StudyDerivations, RiskAnalyzer, RiskAnalyses, HydrantCache, CommuneRiskCache, MarketData, MarketAnalyzer, MarketAnalyses, SourcesModule],
 })
 export class IngestionModule {}
