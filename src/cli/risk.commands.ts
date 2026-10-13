@@ -6,8 +6,6 @@ import type { AnalysisStep, StudyRisks } from '../contracts/index.ts';
 import { clayLevel, floodClassLabel, FLOOD_SCENARIO_LABELS, FLOOD_TYPE_LABELS, floodHazard, floodScenarios } from '../domain/index.ts';
 import { RiskAnalyses } from '../ingestion/risk-analyses.ts';
 import { ElevationService } from '../geo/elevation.service.ts';
-import { ParcelsRepository } from '../geo/parcels.repository.ts';
-import { LookupHandlers } from '../ingestion/lookup-handlers.ts';
 import { FloodHeights } from '../sources/flood-heights.ts';
 import { Georisques } from '../sources/georisques.ts';
 import { RisksService } from '../studies/risks.service.ts';
@@ -152,22 +150,14 @@ export class RiskPointCommand extends JsonCommand {
   }
 }
 
-@Command({ name: 'parcel:elevation', arguments: '<parcels...>', description: 'Altitudes de parcelles (IGN) : par le worker, ou sur place avec --inline' })
-export class ParcelElevationCommand extends InlineCommand {
-  constructor(
-    private readonly elevation: ElevationService,
-    private readonly parcels: ParcelsRepository,
-    private readonly handlers: LookupHandlers,
-  ) {
+@Command({ name: 'parcel:elevation', arguments: '<parcels...>', description: 'Altitudes de parcelles (IGN)' })
+export class ParcelElevationCommand extends JsonCommand {
+  constructor(private readonly elevation: ElevationService) {
     super();
   }
 
-  async run(ids: string[], options: InlineOption): Promise<void> {
-    // --inline : la recherche du worker est faite dans la CLI.
-    const service = options.inline
-      ? new ElevationService(this.parcels, { run: (name: 'elevation:points', input: { points: [number, number][] }) => this.handlers.handle(name, input) } as never)
-      : this.elevation;
-    const r = await service.ofParcels(ids);
+  async run(ids: string[], options: JsonOption): Promise<void> {
+    const r = await this.elevation.ofParcels(ids);
     const line = (s: { min: number; max: number; mean: number; range: number; points: number } | null) =>
       s ? `${s.min} à ${s.max} m NGF, moyenne ${s.mean}, dénivelé ${s.range} m (${s.points} points)` : 'aucune altitude';
     print(options.json, r, () => [`Sélection : ${line(r.overall)}`, ...r.parcels.map((p) => `  ${p.id} : ${line(p.stats)}`), `Source : ${r.source}`].join('\n'));

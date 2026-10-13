@@ -1,5 +1,5 @@
-// Accès HTTP aux sources publiques. Seul le worker (et la CLI, pour le débogage) s'en sert : l'API ne
-// sort jamais (PLAN §3), et le lint l'interdit ailleurs.
+// Accès HTTP aux sources publiques. Seul le worker (et la CLI, pour le débogage) s'en sert, plus les
+// recherches à la demande de l'API (`src/geo/lookups.ts`, DT-20) : le lint l'interdit ailleurs (PLAN §3).
 //
 // Trois implémentations :
 //  - `LiveHttp` : l'appel réel, avec délai maximal et reprises sur les erreurs passagères ;

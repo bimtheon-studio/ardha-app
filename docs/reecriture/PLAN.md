@@ -58,7 +58,7 @@ l'écran.
 │   API                    Worker                        CLI         │
 │   e-mail + mot de passe  SEUL à sortir :               commandes   │
 │   études, estimations    API publiques, PDF, LLM       métier      │
-│   jamais d'appel externe un adaptateur par source      prod en     │
+│   + recherches (DT-20)   un adaptateur par source      prod en     │
 │                          fraîcheur par source          lecture     │
 └─────┬───────── enfile ───► Redis ───► consomme ─────────┬──────────┘
       │                                                    │
@@ -72,13 +72,17 @@ l'écran.
 
 Seul le worker franchit la frontière vers l'extérieur. L'API ne lit que la base ; elle dépose des jobs
 dans Redis, que le worker consomme. Une étude pointe vers la *version* des données de référence qu'elle
-a utilisées. Seule exception : les tuiles des fonds de carte, chargées directement chez IGN par le
-navigateur, avec leurs erreurs mesurées (D-08).
+a utilisées. Deux exceptions : les tuiles des fonds de carte, chargées directement chez IGN par le
+navigateur, avec leurs erreurs mesurées (D-08) ; les recherches à la demande (adresse, commune d'un
+point, altitudes), appelées par l'API elle-même avec un cache de 24 h, toutes dans `src/geo/lookups.ts`
+(DT-20, amendée le 09/10/2026).
 
 ### Les règles qui tiennent l'ensemble
 
 - **Seul le worker sort.** Reprises, disjoncteur, limite de débit et métriques vivent en un seul
-  endroit. Une panne d'IGN ne casse plus un écran : on sert la dernière copie, avec sa date.
+  endroit. Une panne d'IGN ne casse plus un écran : on sert la dernière copie, avec sa date. Seule
+  exception côté serveur : les recherches à la demande de l'API (DT-20), confinées par le lint à
+  `src/geo/lookups.ts`.
 - **La base est « bête ».** Tables, types, index, clés primaires et étrangères, `UNIQUE`, `NOT NULL`.
   Aucun trigger, aucune fonction SQL, aucune policy, aucun `pg_cron`. La CI refuse une migration qui en
   contient.
@@ -98,7 +102,7 @@ navigateur, avec leurs erreurs mesurées (D-08).
 | Backend | NestJS · TypeScript | API, worker et CLI sur les mêmes services ; module officiel pour BullMQ (D-04) |
 | Accès aux données | Drizzle | SQL spatial dans des requêtes typées, pgvector natif, migrations en SQL ; confiné aux repositories, donc réversible (D-06) |
 | Base | PostgreSQL 18 · PostGIS 3.6 · pgvector 0.8 | « Dans quelle zone tombe cette parcelle ? » devient une requête locale ; supportée jusqu'en novembre 2030 (D-10) |
-| Jobs | BullMQ · Redis | toute la logique dans Node, une limite de débit par source, des flux parent-enfant pour la chaîne PLU (D-05) |
+| Jobs | BullMQ · Redis | empiler, relancer, planifier, avec une limite de débit par source ; toute la logique dans Node (D-05) |
 | Fichiers | S3 (MinIO en local) | n'importe quel fournisseur, URL signées |
 | Front | React · Vite · TanStack Query | client généré depuis le contrat OpenAPI de l'API |
 | Carte | Leaflet | conservé en L1, parcelles et zonage servis en GeoJSON par l'API ; MapLibre GL si les tuiles vectorielles deviennent nécessaires (D-08) |
@@ -315,7 +319,7 @@ sur un fait nouveau, pas sur une préférence.
 | D-02 | v1 gratuite, connexion par e-mail et mot de passe | OAuth, SSO, organisations, facturation dès la v1 | des bases stables d'abord ; ces briques s'ajoutent ensuite |
 | D-03 | Réécriture intégrale, fonctionnalité par fonctionnalité, en repartant de zéro | migrer le code ou les données | 0 étude et 0 estimation en base ; la référence se reconstruit depuis les sources |
 | D-04 | NestJS, avec API, worker et CLI sur le même code | Sails.js | injection de dépendances, TypeScript natif, module BullMQ officiel ; Waterline ne connaît pas PostGIS |
-| D-05 | Base « bête », jobs par BullMQ et Redis | pg-boss | pg-boss 12.35 installe son schéma et 5 fonctions SQL et fait de la base la file |
+| D-05 | Base « bête », jobs par BullMQ et Redis (*amendée le 13/10/2026 par le porteur du produit : la file ne fait qu'empiler, relancer et planifier ; pas de flux parent-enfant, une chaîne s'enchaîne job par job, son état dans Postgres*) | pg-boss | pg-boss 12.35 installe son schéma et 5 fonctions SQL et fait de la base la file |
 | D-06 | Drizzle pour l'accès aux données | Prisma | SQL spatial dans des requêtes typées, pgvector natif ; Prisma 7.10 sans type géométrique. Risque accepté : Drizzle en 0.45, version épinglée, accès confiné aux repositories |
 | D-07 | L'estimation entre dans la v1 (L6), migrée et terminée | la reporter avec le volet agent | partie clé du produit ; les mutations DVF en base règlent une partie de ce qui manque |
 | D-08 | Fonds de carte chez IGN en accès direct, sous surveillance (*amendée le 01/10/2026 par le porteur du produit : OpenStreetMap par défaut, fonds IGN au choix, F-01 Q8*) ; cartes des PDF et vignettes composées par le worker | un proxy de tuiles dès maintenant | aucune panne des tuiles de fond dans l'historique, contrairement aux API de données ; erreurs mesurées dans Sentry, proxy déclenché sur critère ; Leaflet conservé en L1 |
@@ -363,7 +367,7 @@ Les arbitrages fonctionnels, rendus le 01/10/2026, sont dans [F-01](fiches/F-01-
 
 | N° | Décision | Plutôt que | Sur quoi elle repose |
 |---|---|---|---|
-| DT-20 | Recherches à la demande (adresse, commune d'un point) **par le worker en requête-réponse** : l'API dépose un job `lookups` et attend sa réponse 5 s au plus ; cache Redis 24 h ; débit limité à 40/s | l'API qui appelle la BAN | « seul le worker sort » (PLAN §3) tient sans exception ; ~50 ms de plus mesurés, sans effet sur l'autocomplétion (F-01, Q1) |
+| DT-20 | *Amendée le 09/10/2026 par le porteur du produit : les recherches à la demande (adresse, géocodage inverse, commune d'un point, altitudes) sont **appelées directement par l'API**, avec le cache Redis de 24 h, sans file ni worker ; seule exception à « seul le worker sort », confinée à `src/geo/lookups.ts` par le lint. Texte d'origine :* Recherches à la demande (adresse, commune d'un point) **par le worker en requête-réponse** : l'API dépose un job `lookups` et attend sa réponse 5 s au plus ; cache Redis 24 h ; débit limité à 40/s | l'API qui appelle la BAN | « seul le worker sort » (PLAN §3) tient sans exception ; ~50 ms de plus mesurés, sans effet sur l'autocomplétion (F-01, Q1) |
 | DT-21 | Cadastre : fichier **Etalab par commune et par millésime**, remplacé en une transaction ; IDU officiel à 14 caractères comme clé ; tables `communes`, `parcels`, `source_states` | WFS de la Géoplateforme par emprise | PLAN §4 ; une commune pèse 0,5 à 3 Mo et se charge en 1 à 3 s ; millésime connu, donc version citable par l'étude (L2) |
 | DT-22 | Adaptateurs de sources dans `src/sources`, chargeurs dans `src/ingestion`, **interdits hors du worker et de la CLI par le lint** (`fetch` compris) ; réponses réelles enregistrées dans `fixtures/http` (`pnpm cli source:record`, ou `ARDHA_SOURCES=record` devant n'importe quelle commande), rejouées par `ARDHA_SOURCES=recorded` | simulations écrites à la main | D-09 : seed, tests et e2e sans Internet, sur le format réellement servi |
 | DT-23 | Règles de sélection et aire géodésique **dans le domaine**, en TypeScript pur (écart < 10⁻⁵ avec PostGIS), partagées par le front et le back | calculs PostGIS seulement | réponse immédiate au clic, sans aller-retour ; mêmes règles à l'enregistrement de l'étude (L2) |
@@ -404,6 +408,11 @@ vers des comptes pas encore recréés) ; aucune migration ne les a réinjectées
 
 ## Journal
 
+- **13/10/2026** — Deux décisions amendées par le porteur du produit :
+  - DT-20 : les recherches à la demande sont appelées directement par l'API, sans file ni worker ;
+  - D-05 : la file ne fait qu'empiler, relancer et planifier, sans flux parent-enfant.
+
+  La file `lookups` est supprimée (branche `dt-20-direct-lookups`).
 - **02/10/2026** — L5 codé et recetté en local sur `l5-land-market` :
   - ventes DVF par département (DT-40), ECLN, Sitadel, indices INSEE ;
   - analyse « market » par étude ;

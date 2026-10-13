@@ -1,5 +1,5 @@
-// Altitudes d'une sélection de parcelles (F-04, Q6), pour la carte : mesurées par le worker
-// (IGN, file `lookups`, en cache 24 h), sur le même échantillon que l'analyse des risques.
+// Altitudes d'une sélection de parcelles (F-04, Q6), pour la carte : mesurées à la demande
+// (IGN, interrogé par l'API, en cache 24 h : DT-20), sur le même échantillon que l'analyse des risques.
 import { Injectable } from '@nestjs/common';
 
 import type { SelectionElevation } from '../contracts/index.ts';

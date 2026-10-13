@@ -1,4 +1,5 @@
-// Les sources publiques, pour le worker et la CLI seulement (le lint l'interdit ailleurs). En
+// Les sources publiques, pour le worker et la CLI, et pour les recherches à la demande de l'API
+// (`src/geo/lookups.ts`, DT-20) ; le lint l'interdit ailleurs. En
 // `ARDHA_SOURCES=recorded`, les réponses viennent de `fixtures/http` : aucun appel à Internet ; en
 // `record`, les réponses réelles y sont enregistrées au passage.
 import { Module } from '@nestjs/common';

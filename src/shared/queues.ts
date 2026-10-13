@@ -6,7 +6,6 @@ import { type DynamicModule, Module } from '@nestjs/common';
 import { CONFIG, type Config } from '../config/config.ts';
 
 export const CADASTRE_QUEUE = 'cadastre';
-export const LOOKUPS_QUEUE = 'lookups';
 export const MAINTENANCE_QUEUE = 'maintenance';
 export const STUDIES_QUEUE = 'studies';
 

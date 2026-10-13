@@ -3,7 +3,8 @@
 //  - le contrat (`src/contracts`) ne dépend que du domaine et de zod ;
 //  - Drizzle ne sort pas de `src/db` et des repositories (D-06) ;
 //  - seuls le worker et la CLI touchent aux sources publiques (`src/sources`, `src/ingestion`) :
-//    l'API ne sort jamais (PLAN §3), et `fetch` n'existe que dans `src/sources/http.ts` ;
+//    l'API ne sort pas (PLAN §3), sauf pour les recherches à la demande, toutes dans
+//    `src/geo/lookups.ts` (DT-20) ; `fetch` n'existe que dans `src/sources/http.ts` ;
 //  - le front n'importe du back que le contrat et le domaine (`@contracts`, `@domain`).
 import js from '@eslint/js';
 import reactHooks from 'eslint-plugin-react-hooks';
@@ -17,8 +18,8 @@ const SOURCES = {
   group: ['**/sources/*', '**/ingestion/*'],
   message: 'Seuls le worker et la CLI appellent les sources publiques (PLAN §3) : l’API dépose un job.',
 };
-/** Ce qui a le droit de sortir vers l'extérieur, ou de piloter ce qui sort. */
-const OUTBOUND = ['src/worker/**/*.ts', 'src/cli/**/*.ts', 'src/ingestion/**/*.ts', 'src/sources/**/*.ts'];
+/** Ce qui a le droit de sortir vers l'extérieur, ou de piloter ce qui sort ; `lookups.ts` : DT-20. */
+const OUTBOUND = ['src/worker/**/*.ts', 'src/cli/**/*.ts', 'src/ingestion/**/*.ts', 'src/sources/**/*.ts', 'src/geo/lookups.ts'];
 
 export default tseslint.config(
   { ignores: ['**/dist/**', '**/coverage/**', 'node_modules/**', 'frontend/node_modules/**', 'docs/**', 'tools/inventaire-ancien.mjs', 'tools/rendre-inventaire.mjs'] },

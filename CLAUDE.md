@@ -35,11 +35,14 @@ sur ce qui n'en dépend pas.
 - PostgreSQL 18 + PostGIS 3.6 + pgvector, accès par **Drizzle**, confiné aux repositories.
 - **Base « bête »** : tables, types, index, clés, `UNIQUE`, `NOT NULL`. Jamais de trigger, de fonction
   SQL, de policy, de `pg_cron`. Une migration qui en contient doit faire échouer la CI.
-- Jobs : **BullMQ + Redis**. L'état du travail vit dans Postgres ; Redis se reconstruit.
-- **Seul le worker appelle l'extérieur** (API publiques, PDF, LLM). L'API ne lit que la base. Les
-  adaptateurs vivent dans `src/sources`, les chargeurs dans `src/ingestion` : le lint les interdit
-  hors du worker et de la CLI. Les tests rejouent des réponses réelles enregistrées
-  (`fixtures/http`, `pnpm cli source:record`), jamais Internet.
+- Jobs : **BullMQ + Redis**, pour empiler, relancer et planifier, sans flux parent-enfant (D-05).
+  L'état du travail vit dans Postgres ; Redis se reconstruit.
+- **Seul le worker appelle l'extérieur** (API publiques, PDF, LLM). L'API ne lit que la base, sauf
+  pour les recherches à la demande (adresse, commune d'un point, altitudes), toutes dans
+  `src/geo/lookups.ts` (DT-20). Les adaptateurs vivent dans `src/sources`, les chargeurs dans
+  `src/ingestion` : le lint les interdit hors du worker, de la CLI et de ce fichier. Les tests
+  rejouent des réponses réelles enregistrées (`fixtures/http`, `pnpm cli source:record`), jamais
+  Internet.
 - Chaque fonctionnalité livre l'API, le front **et** des commandes CLI pour la piloter et la
   déboguer, avec tests unitaires, d'intégration et e2e (`pnpm test`, `pnpm test:e2e`).
 - **La performance des tests se surveille** : à chaque compte rendu, donner les durées par suite et

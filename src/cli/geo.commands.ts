@@ -1,6 +1,7 @@
 // Carte et parcellaire en ligne de commande (F-01) : piloter et déboguer la chaîne sans le front.
-// Par défaut, les commandes passent par le worker comme l'API (`commune:load` dépose un job,
-// `address:search` attend sa réponse) ; `--inline` appelle la source depuis la CLI, sans worker.
+// Par défaut, les commandes passent par le worker comme l'API (`commune:load` dépose un job) ;
+// `--inline` appelle la source depuis la CLI, sans worker. Les recherches d'adresse interrogent la
+// source directement, comme l'API (DT-20).
 // `--json` rend une sortie lisible par une machine (Claude, MCP).
 import { Inject } from '@nestjs/common';
 import { Command, CommandRunner, Option } from 'nest-commander';
@@ -25,7 +26,6 @@ import { CommunesRepository } from '../geo/communes.repository.ts';
 import { Lookups } from '../geo/lookups.ts';
 import { SourceStatesRepository } from '../geo/source-states.repository.ts';
 import { CadastreLoader } from '../ingestion/cadastre-loader.ts';
-import { LookupHandlers } from '../ingestion/lookup-handlers.ts';
 import { LiveHttp, RecordingHttp } from '../sources/http.ts';
 
 export interface JsonOption {
@@ -230,12 +230,9 @@ export class ParcelSelectionCommand extends JsonCommand {
   }
 }
 
-@Command({ name: 'address:search', arguments: '<query...>', description: 'Suggestions d’adresses (BAN), par le worker ou --inline' })
-export class AddressSearchCommand extends InlineCommand {
-  constructor(
-    private readonly lookups: Lookups,
-    private readonly handlers: LookupHandlers,
-  ) {
+@Command({ name: 'address:search', arguments: '<query...>', description: 'Suggestions d’adresses (BAN)' })
+export class AddressSearchCommand extends JsonCommand {
+  constructor(private readonly lookups: Lookups) {
     super();
   }
 
@@ -244,25 +241,20 @@ export class AddressSearchCommand extends InlineCommand {
     return Math.min(10, Math.max(1, Number(value) || 5));
   }
 
-  async run(words: string[], options: InlineOption & { limit?: number }): Promise<void> {
-    const input = { q: words.join(' '), limit: options.limit ?? 5 };
-    const found = options.inline ? await this.handlers.handle('address:search', input) : await this.lookups.run('address:search', input);
+  async run(words: string[], options: JsonOption & { limit?: number }): Promise<void> {
+    const found = await this.lookups.run('address:search', { q: words.join(' '), limit: options.limit ?? 5 });
     print(options.json, found, () => (found.length === 0 ? 'Aucune adresse.' : found.map(describeAddress).join('\n')));
   }
 }
 
-@Command({ name: 'address:reverse', arguments: '<lon> <lat>', description: 'Adresse la plus proche d’un point, par le worker ou --inline' })
-export class AddressReverseCommand extends InlineCommand {
-  constructor(
-    private readonly lookups: Lookups,
-    private readonly handlers: LookupHandlers,
-  ) {
+@Command({ name: 'address:reverse', arguments: '<lon> <lat>', description: 'Adresse la plus proche d’un point' })
+export class AddressReverseCommand extends JsonCommand {
+  constructor(private readonly lookups: Lookups) {
     super();
   }
 
-  async run([lon, lat]: string[], options: InlineOption): Promise<void> {
-    const input = { lon: numberArg(lon, 'Longitude'), lat: numberArg(lat, 'Latitude') };
-    const a = options.inline ? await this.handlers.handle('address:reverse', input) : await this.lookups.run('address:reverse', input);
+  async run([lon, lat]: string[], options: JsonOption): Promise<void> {
+    const a = await this.lookups.run('address:reverse', { lon: numberArg(lon, 'Longitude'), lat: numberArg(lat, 'Latitude') });
     print(options.json, a, () => (a ? describeAddress(a) : 'Aucune adresse.'));
   }
 }
