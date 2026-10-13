@@ -4,7 +4,7 @@
 // serveur partagé exige : chaque environnement a sa base, son rôle (non superutilisateur), son
 // préfixe Redis, et `remove` ne laisse rien.
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -68,6 +68,9 @@ function docker(...args: string[]): string {
 function sql(database: string, query: string): string {
   return docker('exec', `${ID}-postgres`, 'psql', '-qAt', '-U', 'postgres', '-d', database, '-c', query);
 }
+
+/** Conteneur en service d'une application du faux once (`once-app-<application>-<id>`). */
+const container = (app: string) => docker('ps', '-q', '--filter', `name=^once-app-${app}-[0-9a-f]+$`);
 
 const calls = () => readFileSync(path.join(state, 'calls'), 'utf8').trim().split('\n');
 
@@ -133,9 +136,39 @@ describe('ardha-env', () => {
     );
   });
 
-  it('create pr-1 : semée au démarrage, clés Redis sous son préfixe, 512 Mo', async () => {
-    ok('create', 'pr-1', '--image', IMAGE);
+  it('la production a des comptes, une session et des fichiers', () => {
+    const r = spawnSync('docker', ['exec', '-i', container('ardha'), 'ardha', 'user:create-admin', '-e', 'alexis@exemple.fr', '-n', 'Alexis', '--password-stdin'], {
+      input: 'cheval pomme agrafe\n',
+      encoding: 'utf8',
+    });
+    expect(r.status, r.stderr).toBe(0);
+    ok('exec', 'production', 'ardha', 'user:set-role', '--email', 'alexis@exemple.fr', '--role', 'user');
+    sql(
+      'ardha_production',
+      `INSERT INTO sessions (user_id, token_hash, expires_at, absolute_expires_at)
+       SELECT id, 'x', now() + interval '1 day', now() + interval '1 day' FROM users`,
+    );
+    docker('exec', container('ardha'), 'sh', '-c', 'mkdir -p /storage/files/studies/s1 && echo vignette > /storage/files/studies/s1/thumbnail.png');
+  });
+
+  it('create pr-1 : copie de la production (base, comptes, fichiers ; ni sessions), semée au démarrage, clés Redis sous son préfixe, 512 Mo', async () => {
+    const out = ok('create', 'pr-1', '--image', IMAGE);
+    expect(out).toMatch(/Base ardha_pr_1 copiée de la production\./);
+    expect(out).toMatch(/Fichiers copiés de la production\./);
     expect(calls().at(-1)).toMatch(/^deploy \S+ --host ardha-pr-1\.test\.local --memory 512 --auto-update=false --env/);
+    // Même compte, même empreinte de mot de passe, même rôle ; les sessions ne suivent pas.
+    const account = `SELECT email, role, password_hash FROM users`;
+    expect(sql('ardha_pr_1', account)).toBe(sql('ardha_production', account));
+    expect(sql('ardha_pr_1', account)).toMatch(/^alexis@exemple\.fr\|user\|\S+$/);
+    expect(sql('ardha_pr_1', 'SELECT count(*) FROM sessions')).toBe('0');
+    expect(sql('ardha_production', 'SELECT count(*) FROM sessions')).toBe('1');
+    // Tout appartient au rôle de la PR (migrations comprises) ; rien à la production ni au superutilisateur.
+    expect(
+      sql('ardha_pr_1', `SELECT DISTINCT tableowner FROM pg_tables WHERE schemaname IN ('public', 'drizzle') AND tablename <> 'spatial_ref_sys'`),
+    ).toBe('ardha_pr_1');
+    expect(sql('ardha_pr_1', 'SELECT count(*) FROM drizzle.__drizzle_migrations')).toBe(String(MIGRATIONS));
+    expect(docker('exec', container('ardha-pr-1'), 'cat', '/storage/files/studies/s1/thumbnail.png')).toBe('vignette');
+    expect(statSync(path.join(home, 'envs/pr-1.copy.log')).mode & 0o777).toBe(0o600);
     // Le bilan du seed s'imprime une fois toutes les communes chargées.
     await eventually(() => /Seed : Beaumont-Village \(37023\) chargée/.test(ok('logs', 'pr-1')), 'seed de pr-1');
     expect(sql('ardha_pr_1', 'SELECT count(*) FROM communes')).toBe('4');
@@ -157,7 +190,7 @@ describe('ardha-env', () => {
   });
 
   it('exec, logs et psql pour déboguer un environnement', () => {
-    expect(ok('exec', 'pr-1', 'ardha', 'user:list')).toBe('Aucun compte.\n');
+    expect(ok('exec', 'pr-1', 'ardha', 'user:list')).toMatch(/^alexis@exemple\.fr\tuser\tactif\tAlexis\t/);
     expect(ok('logs', 'pr-1', '--tail', '500')).toMatch(/"name":"launcher"|Migrations à jour/);
     expect(ok('psql', 'pr-1', '-qAt', '-c', 'SELECT count(*) FROM communes')).toBe('4\n');
   });
@@ -179,51 +212,13 @@ describe('ardha-env', () => {
       'list; rm -rf ~',
       'logs pr-1 --follow',
       'sweep pr-1',
+      `create pr-2 --image ${sha} --empty-db`,
+      'accounts pr-1',
     ]) {
       const r = ci(command);
       expect(r.code, command).toBe(1);
       expect(r.err, command).toMatch(/commande refusée à la CI/);
     }
-  });
-
-  it('comptes de l’équipe : liste sur le serveur seulement (600), mots de passe lus sur l’entrée standard ; pas pour la CI', () => {
-    const set = (email: string, name: string, password: string) =>
-      spawnSync(path.join(ROOT, 'deploy/server/ardha-env'), ['team-set', '--email', email, '--name', name], { env, encoding: 'utf8', input: password });
-    expect(set('alice@exemple.fr', 'Alice', 'court\n').stderr).toMatch(/au moins 12 caractères/);
-    expect(set('pas-un-email', 'Alice', 'cheval pomme agrafe\n').stderr).toMatch(/e-mail invalide/);
-    expect(set('alice@exemple.fr', 'Alice Martin', 'cheval pomme agrafe\n').status).toBe(0);
-    expect(set('bob@exemple.fr', 'Bob', 'tartine beurre confiture\n').status).toBe(0);
-    // Remplacer un compte ne le duplique pas.
-    expect(set('alice@exemple.fr', 'Alice Martin', 'cheval pomme agrafe\n').stdout).toMatch(/alice@exemple\.fr enregistré/);
-    expect(statSync(path.join(home, 'team')).mode & 0o777).toBe(0o600);
-    expect(ok('team-list')).toBe('alice@exemple.fr\tAlice Martin\nbob@exemple.fr\tBob\n');
-    for (const command of ['team-list', 'team-set --email x@exemple.fr --name X', 'team-remove --email bob@exemple.fr']) {
-      expect(ci(command).err, command).toMatch(/commande refusée à la CI/);
-    }
-  });
-
-  it('accounts : crée les comptes absents avec leur mot de passe ; sortie sans e-mail ni mot de passe (journaux de CI publics)', () => {
-    const r = ci('accounts pr-1');
-    expect(r.code).toBe(0);
-    expect(r.out).toBe('Comptes de l’équipe sur pr-1 : 2 créé(s), 0 mot(s) de passe donné(s), 0 inchangé(s).\n');
-    expect(r.out + r.err).not.toMatch(/exemple\.fr|cheval|tartine/);
-    const users = ok('exec', 'pr-1', 'ardha', 'user:list');
-    expect(users).toMatch(/^alice@exemple\.fr\tadmin\tactif\tAlice Martin\t/m);
-    expect(users).toMatch(/^bob@exemple\.fr\tadmin\tactif\tBob\t/m);
-  });
-
-  it('accounts : donne son mot de passe au compte qui n’en a pas, laisse les comptes actifs et désactivés', () => {
-    ok('exec', 'pr-1', 'ardha', 'user:deactivate', '--email', 'bob@exemple.fr');
-    sql('ardha_pr_1', `UPDATE users SET password_hash = NULL WHERE email = 'alice@exemple.fr'`);
-    expect(ci('accounts pr-1').out).toBe('Comptes de l’équipe sur pr-1 : 0 créé(s), 1 mot(s) de passe donné(s), 1 inchangé(s).\n');
-    expect(ok('exec', 'pr-1', 'ardha', 'user:list')).toMatch(/^bob@exemple\.fr\tadmin\tdésactivé\t/m);
-    expect(ci('accounts pr-1').out).toBe('Comptes de l’équipe sur pr-1 : 0 créé(s), 0 mot(s) de passe donné(s), 2 inchangé(s).\n');
-  });
-
-  it('team-remove : retire un compte de la liste (pas des environnements)', () => {
-    expect(ok('team-remove', '--email', 'bob@exemple.fr')).toMatch(/bob@exemple\.fr retiré/);
-    expect(ok('team-list')).toBe('alice@exemple.fr\tAlice Martin\n');
-    expect(ardhaEnv('team-remove', '--email', 'bob@exemple.fr').err).toMatch(/bob@exemple\.fr absent de la liste/);
   });
 
   it('mode ci : liste, journaux et balayage permis ; « ardha/ardha-env » en tête (pnpm server) accepté', () => {
@@ -232,14 +227,34 @@ describe('ardha-env', () => {
     expect(ci('sweep --keep pr-1,pr-12').out).toBe('Balayage : 0 environnement(s) supprimé(s).\n');
   });
 
-  it('update --reset-db : nouvelle base, resemée ; l’environnement (mots de passe compris) est repris', async () => {
+  it('update --reset-db : nouvelle copie de la production, resemée ; l’environnement (mots de passe compris) est repris', async () => {
     const before = readFileSync(path.join(home, 'envs/pr-1.env'), 'utf8');
     sql('ardha_pr_1', `INSERT INTO users (email, name) VALUES ('x@exemple.fr', 'X')`);
-    ok('update', 'pr-1', '--image', IMAGE, '--reset-db');
+    expect(ok('update', 'pr-1', '--image', IMAGE, '--reset-db')).toMatch(/Base ardha_pr_1 copiée de la production\.[^]*Fichiers copiés/);
     expect(readFileSync(path.join(home, 'envs/pr-1.env'), 'utf8')).toBe(before);
-    expect(sql('ardha_pr_1', 'SELECT count(*) FROM users')).toBe('0');
+    expect(sql('ardha_pr_1', 'SELECT email FROM users')).toBe('alexis@exemple.fr');
     await eventually(() => sql('ardha_pr_1', 'SELECT count(*) FROM communes') === '4', 'seed après reset');
     expect(calls().at(-1)).toMatch(/^update ardha-pr-1\.test\.local --image \S+ --env DATABASE_URL=…/);
+  });
+
+  it('update --reset-db --empty-db : base vide ; --empty-db seul refusé', () => {
+    expect(ardhaEnv('update', 'pr-1', '--image', IMAGE, '--empty-db').err).toMatch(/--empty-db va avec --reset-db/);
+    expect(ok('update', 'pr-1', '--image', IMAGE, '--reset-db', '--empty-db')).toMatch(/Base ardha_pr_1 vide\./);
+    expect(sql('ardha_pr_1', 'SELECT count(*) FROM users')).toBe('0');
+  });
+
+  it('copie impossible (production absente) : base vide, déploiement mené à bien', () => {
+    const prod = path.join(home, 'envs/production.env');
+    renameSync(prod, `${prod}.bak`);
+    try {
+      const r = ardhaEnv('update', 'pr-1', '--image', IMAGE, '--reset-db');
+      expect(r.code, r.err).toBe(0);
+      expect(r.err).toMatch(/copie de la production impossible ; base ardha_pr_1 vide/);
+      expect(r.out).toMatch(/Environnement pr-1 à jour/);
+      expect(sql('ardha_pr_1', 'SELECT count(*) FROM users')).toBe('0');
+    } finally {
+      renameSync(`${prod}.bak`, prod);
+    }
   });
 
   it('refuse --reset-db sur la production, et sa suppression sans confirmation', () => {
@@ -254,6 +269,7 @@ describe('ardha-env', () => {
     expect(docker('exec', `${ID}-redis`, 'redis-cli', '--scan', '--pattern', 'ardha-pr-1:*')).toBe('');
     expect(docker('ps', '-aq', '--filter', 'name=^once-app-ardha-pr-1-')).toBe('');
     expect(existsSync(path.join(home, 'envs/pr-1.env'))).toBe(false);
+    expect(existsSync(path.join(home, 'envs/pr-1.copy.log'))).toBe(false);
     // La production n'a pas bougé.
     expect(ok('list')).toMatch(/^production\t.*\trunning\t/m);
   });
@@ -298,6 +314,7 @@ describe('ardha-env', () => {
     expect(readFileSync(path.join(state, 'registry-password'), 'utf8')).toBe('ghp_second\n');
     expect(sql('postgres', `SELECT count(*) FROM pg_database WHERE datname = 'ardha_pr_7'`)).toBe('0');
     expect(existsSync(path.join(home, 'envs/pr-7.env'))).toBe(false);
+    expect(existsSync(path.join(home, 'envs/pr-7.copy.log'))).toBe(false);
   });
 
   it('remove production --confirm production', () => {

@@ -229,32 +229,39 @@ jobs:
           NAME: pr-${{ github.event.number }}
           BEFORE: ${{ github.event.before }}
         run: |
+          # Sans shell explicite, GitHub lance `bash -e` sans pipefail : un échec avant `tee` passerait.
+          set -o pipefail
           image="$IMAGE_REPOSITORY:sha-${COMMIT::7}"
           server() { ssh -o BatchMode=yes ubuntu@ssh.once.florent.cc "$*"; }
           if server list | grep -q "^$NAME"$'\t'; then
             reset=''
             # Migrations modifiées par ce push (ou historique réécrit : on ne sait pas) : base neuve.
             if ! git diff --quiet "$BEFORE" "$COMMIT" -- drizzle/ 2>/dev/null; then reset='--reset-db'; fi
-            server update "$NAME" --image "$image" $reset
+            server update "$NAME" --image "$image" $reset | tee deploy.log
             # Un `&&` en dernière commande ferait échouer l'étape quand la base est gardée.
             if [[ -n $reset ]]; then echo "fresh=true" >> "$GITHUB_OUTPUT"; fi
           else
-            server create "$NAME" --image "$image"
+            server create "$NAME" --image "$image" | tee deploy.log
             echo "fresh=true" >> "$GITHUB_OUTPUT"
           fi
-          # Comptes de l'équipe : la liste (e-mails, mots de passe) est lue sur le serveur ; la CI n'en
-          # voit que des nombres.
-          server accounts "$NAME"
+          # Base neuve copiée de la production (comptes compris) ; sinon vide, semée au démarrage.
+          if grep -q 'copiée de la production' deploy.log; then echo "copied=true" >> "$GITHUB_OUTPUT"; fi
 
-      # Base neuve : l'environnement annoncé dans la PR. Les comptes de l'équipe y sont, avec leurs
-      # mots de passe habituels ; ni e-mail ni mot de passe dans la PR (dépôt public).
+      # Base neuve : l'environnement annoncé dans la PR. Copiée de la production, elle en a les
+      # dossiers et les comptes ; ni e-mail ni mot de passe dans la PR (dépôt public).
       - name: Lien de l'environnement dans la PR
         if: steps.deploiement.outputs.fresh == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.number }}
+          COPIED: ${{ steps.deploiement.outputs.copied }}
         run: |
-          body="Environnement de la PR : https://ardha-pr-$PR.once.florent.cc (image \`sha-${COMMIT::7}\`). Comptes de l'équipe prêts, mots de passe habituels."
+          if [[ $COPIED == true ]]; then
+            data="Base copiée de la production : mêmes dossiers, mêmes comptes et mots de passe."
+          else
+            data="Base vide (copie de la production impossible), semée des communes de référence ; aucun compte."
+          fi
+          body="Environnement de la PR : https://ardha-pr-$PR.once.florent.cc (image \`sha-${COMMIT::7}\`). $data"
           gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --edit-last --create-if-none --body "$body"
 
   # master → production (ardha.once.florent.cc), avec l'image testée.
@@ -282,4 +289,3 @@ jobs:
       - name: Déploiement
         run: |
           ssh -o BatchMode=yes ubuntu@ssh.once.florent.cc "update production --image $IMAGE_REPOSITORY:sha-${COMMIT::7}"
-          ssh -o BatchMode=yes ubuntu@ssh.once.florent.cc "accounts production"

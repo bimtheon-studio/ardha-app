@@ -31,6 +31,12 @@ describe('plan', () => {
       { kind: 'sync' },
       { kind: 'remote', args: ['create', 'pr-12', '--image', 'ghcr.io/bimtheon-studio/ardha:sha-0123456'], tty: false },
     ]);
+    // Sans copie de la production : --empty-db transmis après l'image.
+    expect(plan(['create', 'pr-12', '--empty-db'], ctx).at(-1)).toEqual({
+      kind: 'remote',
+      args: ['create', 'pr-12', '--image', 'ghcr.io/bimtheon-studio/ardha:sha-0123456', '--empty-db'],
+      tty: false,
+    });
   });
 
   it('update : image explicite et --reset-db transmis', () => {
@@ -86,17 +92,6 @@ describe('plan', () => {
       { kind: 'remote', args: ['registry', '--username', 'ci-bot'], tty: false, secret: 'Jeton ghcr.io (read:packages) : ' },
     ]);
     expect(() => plan(['registry'], ctx)).toThrow(/--username manquant/);
-  });
-
-  it('comptes d’équipe : le mot de passe part par l’entrée standard ; liste, retrait et accounts transmis', () => {
-    expect(plan(['team-set', '--email', 'a@exemple.fr', '--name', 'Alice Martin'], ctx)).toEqual([
-      { kind: 'sync' },
-      { kind: 'remote', args: ['team-set', '--email', 'a@exemple.fr', '--name', 'Alice Martin'], tty: false, secret: 'Mot de passe du compte : ' },
-    ]);
-    expect(plan(['team-list'], ctx)).toEqual([{ kind: 'remote', args: ['team-list'], tty: false }]);
-    expect(plan(['team-remove', '--email', 'a@exemple.fr'], ctx)).toEqual([{ kind: 'remote', args: ['team-remove', '--email', 'a@exemple.fr'], tty: false }]);
-    expect(plan(['accounts', 'production'], ctx)).toEqual([{ kind: 'remote', args: ['accounts', 'production'], tty: false }]);
-    expect(() => plan(['accounts'], ctx)).toThrow(/nom d’environnement manquant/);
   });
 
   it('sync seul', () => {

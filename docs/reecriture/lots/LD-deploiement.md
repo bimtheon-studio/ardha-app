@@ -108,6 +108,17 @@ Ce que le code de once v0.3.3 impose (lu dans `internal/docker` et `internal/com
   désactivés laissés tels quels. La CI n'en voit que des nombres ; la PR n'annonce que l'URL.
   Remplace l'admin de recette commun et le lien posté dans la PR (même jour). Nouvelle commande
   d'administration `ardha user:set-password --password-stdin`.
+- **Remplacé le 13/10/2026 : une PR part d'une copie de la production** (porteur du produit : « copier
+  la bdd de prod par défaut lors d'un nouvel env, comme ça on peut reprendre les dossiers
+  facilement » ; et copier ainsi les comptes, son compte compris). `create pr-<n>` et
+  `update --reset-db` restaurent la base de la production dans celle de la PR (`pg_dump` →
+  `pg_restore --role`, objets au rôle de la PR, extensions non copiées), sans sessions ni liens de
+  réinitialisation, puis copient `/storage/files` une fois le conteneur démarré. Les comptes
+  suivent : mêmes e-mails, empreintes de mot de passe et rôles. `--empty-db` pour partir d'une base
+  vide ; sans production, ou si la copie échoue, base vide semée au démarrage. Les messages de la
+  copie (qui peuvent citer des lignes) restent sur le serveur, `envs/<nom>.copy.log` (600). La liste
+  d'équipe (`team-set|team-list|team-remove`, `accounts`) est retirée. Nouvelle commande
+  `ardha user:set-role --email <e> --role admin|user`.
 - **Tests du déploiement en CI seulement si la PR touche au déploiement** (`Dockerfile`, `docker/`,
   `deploy/`, `tools/server/`, `test/deploy/`, `src/launcher/`, workflows, `drizzle/`), **jamais sur
   `master`** (porteur du produit, 01/10/2026 : « phase d'itération ultra rapide, pas besoin de

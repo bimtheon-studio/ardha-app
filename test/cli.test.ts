@@ -86,6 +86,18 @@ describe('CLI', () => {
     expect((await pool.query(`SELECT count(*)::int AS n FROM sessions WHERE user_id = $1`, [id])).rows[0].n).toBe(0);
   });
 
+  it('user:set-role : passe un compte administrateur ou utilisateur ; rôle inconnu refusé', async () => {
+    await run('user:create-admin', '-e', 'alexis@ardha.test', '-n', 'Alexis');
+    await pool.query(`UPDATE users SET role = 'user' WHERE email = 'alexis@ardha.test'`);
+    output = [];
+    await run('user:set-role', '--email', 'alexis@ardha.test', '--role', 'admin');
+    expect(output).toEqual(['Rôle de alexis@ardha.test : admin.']);
+    expect((await pool.query(`SELECT role FROM users WHERE email = 'alexis@ardha.test'`)).rows[0].role).toBe('admin');
+    await run('user:set-role', '--email', 'alexis@ardha.test', '--role', 'chef');
+    expect(errors.join('')).toMatch(/rôle inconnu « chef » \(admin ou user\)/);
+    expect((await pool.query(`SELECT role FROM users WHERE email = 'alexis@ardha.test'`)).rows[0].role).toBe('admin');
+  });
+
   it('crée un administrateur et affiche le lien pour choisir son mot de passe', async () => {
     await run('user:create-admin', '--email', 'admin@ardha.fr', '--name', 'Admin');
     expect(output[0]).toMatch(/^Administrateur créé : admin@ardha\.fr \(/);
