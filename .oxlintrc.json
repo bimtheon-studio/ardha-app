@@ -1,0 +1,122 @@
+// Lint du dépôt (remplace eslint.config.js). Au-delà du style, il tient les frontières de
+// l'architecture :
+//  - le domaine (`src/domain`) est pur : aucun import hors de son dossier ;
+//  - le contrat (`src/contracts`) ne dépend que du domaine et de zod ;
+//  - Drizzle ne sort pas de `src/db` et des repositories (D-06) ;
+//  - seuls le worker et la CLI touchent aux sources publiques (`src/sources`, `src/ingestion`) :
+//    l'API ne sort jamais (PLAN §3), et `fetch` n'existe que dans `src/sources/http.ts` ;
+//  - le front n'importe du back que le contrat et le domaine (`@contracts`, `@domain`).
+//
+// Perte assumée en passant d'ESLint à oxlint : les règles type-aware
+// `@typescript-eslint/no-floating-promises` et `no-misused-promises` n'ont pas d'équivalent
+// (oxlint ne fait pas d'analyse de types). `pnpm typecheck` (tsc) reste en CI.
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error"
+  },
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/coverage/**",
+    "docs/**",
+    "tools/inventaire-ancien.mjs",
+    "tools/rendre-inventaire.mjs"
+  ],
+  "rules": {
+    // Dans le périmètre par défaut d'oxlint mais absentes de l'ancienne configuration ESLint :
+    // désactivées pour garder la politique de lint à l'identique (à réévaluer séparément).
+    "eslint/no-unsafe-optional-chaining": "off",
+    "unicorn/no-useless-spread": "off",
+    "eqeqeq": ["error", "always"],
+    "typescript/consistent-type-imports": ["error", { "fixStyle": "inline-type-imports", "disallowTypeAnnotations": false }],
+    "typescript/no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }]
+  },
+  "overrides": [
+    {
+      // Nest injecte par le type des paramètres du constructeur : ces imports doivent rester des valeurs.
+      "files": ["src/**/*.ts", "test/**/*.ts"],
+      "rules": { "typescript/consistent-type-imports": "off" }
+    },
+    {
+      "files": ["src/**/*.ts"],
+      "excludeFiles": ["src/db/**", "src/**/*.repository.ts", "src/**/*.test.ts", "src/worker/**/*.ts", "src/cli/**/*.ts", "src/ingestion/**/*.ts", "src/sources/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": ["error", {
+          "patterns": [
+            { "group": ["drizzle-orm", "drizzle-orm/*"], "message": "Drizzle reste dans src/db et les repositories (D-06)." },
+            { "group": ["**/sources/*", "**/ingestion/*"], "message": "Seuls le worker et la CLI appellent les sources publiques (PLAN §3) : l’API dépose un job." }
+          ]
+        }]
+      }
+    },
+    {
+      // Ce qui a le droit de sortir vers l'extérieur, ou de piloter ce qui sort.
+      "files": ["src/worker/**/*.ts", "src/cli/**/*.ts", "src/ingestion/**/*.ts", "src/sources/**/*.ts"],
+      "excludeFiles": ["src/**/*.repository.ts", "src/**/*.test.ts"],
+      "rules": {
+        "no-restricted-imports": ["error", {
+          "patterns": [
+            { "group": ["drizzle-orm", "drizzle-orm/*"], "message": "Drizzle reste dans src/db et les repositories (D-06)." }
+          ]
+        }]
+      }
+    },
+    {
+      "files": ["src/db/**/*.ts", "src/**/*.repository.ts"],
+      "excludeFiles": ["src/**/*.test.ts"],
+      "rules": {
+        "no-restricted-imports": ["error", {
+          "patterns": [
+            { "group": ["**/sources/*", "**/ingestion/*"], "message": "Seuls le worker et la CLI appellent les sources publiques (PLAN §3) : l’API dépose un job." }
+          ]
+        }]
+      }
+    },
+    {
+      "files": ["src/**/*.ts"],
+      "excludeFiles": ["src/sources/http.ts", "src/**/*.test.ts"],
+      "rules": {
+        "no-restricted-globals": ["error", { "name": "fetch", "message": "Les appels sortants passent par Http (src/sources/http.ts), depuis le worker." }]
+      }
+    },
+    {
+      "files": ["src/domain/**/*.ts"],
+      "excludeFiles": ["**/*.test.ts"],
+      "rules": {
+        "no-restricted-imports": ["error", {
+          "patterns": [
+            { "regex": "^(?!\\./)", "message": "Le domaine est pur : ni framework, ni base, ni import hors de src/domain." }
+          ]
+        }]
+      }
+    },
+    {
+      "files": ["src/contracts/**/*.ts"],
+      "excludeFiles": ["**/*.test.ts"],
+      "rules": {
+        "no-restricted-imports": ["error", {
+          "patterns": [
+            { "regex": "^(?!\\./|\\.\\./domain/|zod$)", "message": "Le contrat ne dépend que de src/domain et de zod : le front l’importe." }
+          ]
+        }]
+      }
+    },
+    {
+      "files": ["frontend/**/*.ts", "frontend/**/*.tsx"],
+      "rules": {
+        "react-hooks/rules-of-hooks": "error",
+        "react-hooks/exhaustive-deps": "error",
+        "no-restricted-imports": ["error", {
+          "patterns": [
+            { "regex": "^\\.\\./", "message": "Du back, le front n’importe que @contracts et @domain ; dans le front, utiliser @/." }
+          ]
+        }]
+      }
+    },
+    {
+      // Primitives shadcn/ui reprises telles quelles (PLAN §5) : on ne les reformate pas.
+      "files": ["frontend/src/components/ui/**"],
+      "rules": { "react-hooks/rules-of-hooks": "off", "typescript/no-empty-object-type": "off" }
+    }
+  ]
+}

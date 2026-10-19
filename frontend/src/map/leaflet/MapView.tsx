@@ -53,7 +53,7 @@ function viewportOf(map: L.Map): Viewport {
 
 function ViewportEvents({ onViewport }: { onViewport: (v: Viewport) => void }) {
   const map = useMapEvents({ moveend: () => onViewport(viewportOf(map)) });
-  useEffect(() => onViewport(viewportOf(map)), [map]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => onViewport(viewportOf(map)), [map]); // oxlint-disable-line react-hooks/exhaustive-deps
   return null;
 }
 

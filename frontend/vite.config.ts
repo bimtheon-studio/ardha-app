@@ -19,7 +19,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(import.meta.dirname, 'src'),
-      // Seuls points de contact avec le back : le contrat et les règles pures (voir eslint.config.js).
+      // Seuls points de contact avec le back : le contrat et les règles pures (voir .oxlintrc.json).
       '@contracts': path.resolve(root, 'src/contracts/index.ts'),
       '@domain': path.resolve(root, 'src/domain/index.ts'),
     },
